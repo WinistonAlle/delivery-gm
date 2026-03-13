@@ -100,6 +100,35 @@ type DailySummary = {
 
 type PeriodRange = "mes_atual" | "mes_anterior" | "ultimos_90";
 
+type CustomerEventRow = {
+  id: string;
+  visitor_id: string;
+  event_name: string;
+  customer_name: string | null;
+  phone: string | null;
+  document_cpf: string | null;
+  path: string | null;
+  created_at: string;
+};
+
+type VisitorFunnelSummary = {
+  uniqueVisitors: number;
+  registeredVisitors: number;
+  checkoutVisitors: number;
+  buyers: number;
+  visitorsWithoutPurchase: number;
+};
+
+type LeadWithoutPurchase = {
+  visitorId: string;
+  customerName: string | null;
+  phone: string | null;
+  documentCpf: string | null;
+  lastEventName: string;
+  lastPath: string | null;
+  lastSeenAt: string;
+};
+
 const formatCurrency = (value: number) =>
   (value || 0).toLocaleString("pt-BR", {
     style: "currency",
@@ -209,6 +238,8 @@ const ReportsPage: React.FC = () => {
   const [topProducts, setTopProducts] = useState<ProductSummary[]>([]);
   const [dailySummary, setDailySummary] = useState<DailySummary | null>(null);
   const [ordersRaw, setOrdersRaw] = useState<RawOrder[]>([]);
+  const [visitorFunnel, setVisitorFunnel] = useState<VisitorFunnelSummary | null>(null);
+  const [leadsWithoutPurchase, setLeadsWithoutPurchase] = useState<LeadWithoutPurchase[]>([]);
   const [currentRange, setCurrentRange] = useState<{
     start: string;
     end: string;
@@ -314,6 +345,71 @@ const ReportsPage: React.FC = () => {
 
         const orders: RawOrder[] = (data as any[]) ?? [];
         setOrdersRaw(orders);
+
+        const { data: eventsData, error: eventsError } = await supabase
+          .from("delivery_customer_events")
+          .select("id, visitor_id, event_name, customer_name, phone, document_cpf, path, created_at")
+          .gte("created_at", rangeStart.toISOString())
+          .lt("created_at", rangeEnd.toISOString())
+          .order("created_at", { ascending: false });
+
+        if (eventsError) {
+          console.error("Erro ao carregar eventos de visitantes:", eventsError);
+          setVisitorFunnel(null);
+          setLeadsWithoutPurchase([]);
+        } else {
+          const events = ((eventsData as CustomerEventRow[]) ?? []).filter((event) => event.visitor_id);
+          const visitors = new Set<string>();
+          const registered = new Set<string>();
+          const checkoutStarted = new Set<string>();
+          const buyers = new Set<string>();
+          const latestByVisitor = new Map<string, LeadWithoutPurchase>();
+
+          for (const event of events) {
+            visitors.add(event.visitor_id);
+
+            if (event.event_name === "signup_completed") {
+              registered.add(event.visitor_id);
+            }
+
+            if (event.event_name === "checkout_started" || event.event_name === "checkout_view") {
+              checkoutStarted.add(event.visitor_id);
+            }
+
+            if (event.event_name === "order_completed") {
+              buyers.add(event.visitor_id);
+            }
+
+            if (!latestByVisitor.has(event.visitor_id)) {
+              latestByVisitor.set(event.visitor_id, {
+                visitorId: event.visitor_id,
+                customerName: event.customer_name,
+                phone: event.phone,
+                documentCpf: event.document_cpf,
+                lastEventName: event.event_name,
+                lastPath: event.path,
+                lastSeenAt: event.created_at,
+              });
+            }
+          }
+
+          const withoutPurchase = Array.from(latestByVisitor.values())
+            .filter((lead) => !buyers.has(lead.visitorId))
+            .sort(
+              (a, b) =>
+                new Date(b.lastSeenAt).getTime() - new Date(a.lastSeenAt).getTime()
+            )
+            .slice(0, 12);
+
+          setVisitorFunnel({
+            uniqueVisitors: visitors.size,
+            registeredVisitors: registered.size,
+            checkoutVisitors: checkoutStarted.size,
+            buyers: buyers.size,
+            visitorsWithoutPurchase: Math.max(0, visitors.size - buyers.size),
+          });
+          setLeadsWithoutPurchase(withoutPurchase);
+        }
 
         // ---- agregações para período atual ----
         let totalOrders = orders.length;
@@ -1071,6 +1167,78 @@ const ReportsPage: React.FC = () => {
                 </div>
               )}
             </section>
+
+            {visitorFunnel ? (
+              <section className="space-y-3">
+                <div className="flex flex-col gap-1">
+                  <h2 className="text-sm font-semibold text-gray-800">
+                    Conversão do delivery
+                  </h2>
+                  <span className="text-[11px] text-gray-500">
+                    Visitantes rastreados no período e quem ainda não concluiu pedido.
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+                  <div className="rounded-2xl bg-white/80 backdrop-blur-sm border border-gray-100 shadow-sm p-4">
+                    <p className="text-[11px] text-gray-500 mb-1">Visitantes únicos</p>
+                    <p className="text-2xl font-bold text-gray-900">{visitorFunnel.uniqueVisitors}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/80 backdrop-blur-sm border border-blue-100 shadow-sm p-4">
+                    <p className="text-[11px] text-gray-500 mb-1">Cadastros</p>
+                    <p className="text-2xl font-bold text-gray-900">{visitorFunnel.registeredVisitors}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/80 backdrop-blur-sm border border-amber-100 shadow-sm p-4">
+                    <p className="text-[11px] text-gray-500 mb-1">Foram ao checkout</p>
+                    <p className="text-2xl font-bold text-gray-900">{visitorFunnel.checkoutVisitors}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/80 backdrop-blur-sm border border-emerald-100 shadow-sm p-4">
+                    <p className="text-[11px] text-gray-500 mb-1">Compraram</p>
+                    <p className="text-2xl font-bold text-gray-900">{visitorFunnel.buyers}</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/80 backdrop-blur-sm border border-red-100 shadow-sm p-4">
+                    <p className="text-[11px] text-gray-500 mb-1">Entraram e não compraram</p>
+                    <p className="text-2xl font-bold text-gray-900">{visitorFunnel.visitorsWithoutPurchase}</p>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-gray-100 bg-white/85 shadow-sm overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/70">
+                    <h3 className="text-sm font-semibold text-gray-800">
+                      Visitantes sem pedido concluído
+                    </h3>
+                  </div>
+                  {leadsWithoutPurchase.length === 0 ? (
+                    <div className="px-4 py-4 text-sm text-gray-500">
+                      Nenhum visitante sem compra registrado nesse período.
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {leadsWithoutPurchase.map((lead) => (
+                        <div key={lead.visitorId} className="px-4 py-3 text-sm">
+                          <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+                            <div>
+                              <div className="font-medium text-gray-900">
+                                {lead.customerName || "Visitante sem nome"}
+                              </div>
+                              <div className="text-gray-500">
+                                {lead.phone || "Sem telefone"} {lead.documentCpf ? `• CPF ${lead.documentCpf}` : ""}
+                              </div>
+                            </div>
+                            <div className="text-gray-500">
+                              {new Date(lead.lastSeenAt).toLocaleString("pt-BR")}
+                            </div>
+                          </div>
+                          <div className="mt-1 text-[12px] text-gray-500">
+                            Último evento: {lead.lastEventName} {lead.lastPath ? `• ${lead.lastPath}` : ""}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </section>
+            ) : null}
 
             {/* NOVA SEÇÃO: COMPARAÇÃO DE MESES */}
             <section className="space-y-3">

@@ -6,6 +6,7 @@ import {
   findCustomerByPhone,
   normalizePhone,
 } from "@/lib/customerAuth";
+import { trackCustomerEvent } from "@/lib/customerInsights";
 
 const maskPhone = (value: string) => {
   const d = normalizePhone(value).slice(0, 11);
@@ -46,6 +47,12 @@ const Login: React.FC = () => {
       }
 
       createCustomerSession(customer);
+      void trackCustomerEvent({
+        eventName: "login_success",
+        customerName: customer.full_name,
+        phone: customer.phone,
+        documentCpf: customer.document_cpf,
+      });
       navigate("/catalogo", { replace: true });
     } finally {
       setSubmitting(false);

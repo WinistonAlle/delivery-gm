@@ -7,6 +7,7 @@ import {
   normalizePhone,
   upsertCustomer,
 } from "@/lib/customerAuth";
+import { trackCustomerEvent } from "@/lib/customerInsights";
 import { createFullAddress, fetchAddressFromCEP, formatCEP, formatCPF } from "@/utils/formatUtils";
 
 const maskPhone = (value: string) => {
@@ -85,6 +86,16 @@ const Cadastro: React.FC = () => {
       });
 
       createCustomerSession(customer);
+      void trackCustomerEvent({
+        eventName: "signup_completed",
+        customerName: customer.full_name,
+        phone: customer.phone,
+        documentCpf: customer.document_cpf,
+        metadata: {
+          howFoundUs,
+          howFoundUsDetails: requiresDetails ? howFoundUsDetails.trim() : "",
+        },
+      });
       navigate("/catalogo", { replace: true });
     } catch (err: any) {
       setError(err?.message || "Não foi possível concluir seu cadastro.");

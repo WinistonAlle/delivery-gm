@@ -11,6 +11,7 @@ import { incrementMetric } from "@/lib/deliveryEnhancements";
 import { loadPlacementRecommendations } from "@/lib/deliveryOffers";
 import { FREE_SHIPPING_THRESHOLD, SHIPPING_RATES } from "@/data/shipping";
 import { findCustomerByPhone } from "@/lib/customerAuth";
+import { trackCustomerEvent, trackCustomerEventOnce } from "@/lib/customerInsights";
 
 function safeGetSession() {
   try {
@@ -70,6 +71,16 @@ const Checkout: React.FC = () => {
     selectedCity.trim().length > 0 &&
     paymentMethod.trim().length > 0 &&
     cartItems.length > 0;
+
+  useEffect(() => {
+    trackCustomerEventOnce("checkout_view", {
+      eventName: "checkout_view",
+      metadata: {
+        itemsCount: cartItems.length,
+        cartTotal,
+      },
+    });
+  }, [cartItems.length, cartTotal]);
 
   useEffect(() => {
     const cleanPhone = onlyDigits(customerPhone || session?.phone || session?.cpf || "");
@@ -173,6 +184,20 @@ const Checkout: React.FC = () => {
 
       toast.success("Pedido confirmado", {
         description: `Pedido ${orderNumber} recebido com sucesso.`,
+      });
+
+      void trackCustomerEvent({
+        eventName: "order_completed",
+        customerName: customerName.trim(),
+        phone: cleanPhone,
+        documentCpf: customerDocumentCpf,
+        metadata: {
+          selectedCity,
+          paymentMethod,
+          finalShipping,
+          finalTotal,
+          itemsCount: cartItems.length,
+        },
       });
 
       const itemsSummary = cartItems

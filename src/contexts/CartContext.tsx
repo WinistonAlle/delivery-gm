@@ -3,6 +3,7 @@ import { Product, CartItem } from "../types/products";
 import { FREE_SHIPPING_THRESHOLD } from "../data/shipping";
 import { MIN_PACKAGES, MIN_WEIGHT_KG } from "@/data/products";
 import { deriveIsPackage, deriveWeightKg } from "@/utils/productMetrics";
+import { trackCustomerEventOnce } from "@/lib/customerInsights";
 
 interface CartContextType {
   cartItems: CartItem[];
@@ -146,6 +147,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
       "quantity:",
       quantity
     );
+    trackCustomerEventOnce("cart_started", {
+      eventName: "cart_started",
+      metadata: {
+        firstProductId: String(product.id),
+        firstProductName: product.name,
+      },
+    });
     setCartItems((prevItems) => {
       const existingItem = prevItems.find(
         (item) => item.product.id === product.id

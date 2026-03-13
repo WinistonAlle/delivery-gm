@@ -21,6 +21,7 @@ import {
   incrementMetric,
   markCartDraft,
 } from "@/lib/deliveryEnhancements";
+import { trackCustomerEvent } from "@/lib/customerInsights";
 
 const Cart: React.FC = () => {
   const navigate = useNavigate();
@@ -79,6 +80,15 @@ const Cart: React.FC = () => {
     if (cartItems.length === 0) return;
 
     incrementMetric("startedCheckoutCount");
+    void trackCustomerEvent({
+      eventName: "checkout_started",
+      metadata: {
+        itemsCount,
+        packageCount,
+        totalWeight,
+        cartTotal: safeCartTotal,
+      },
+    });
     navigate("/checkout");
     closeCart();
   };

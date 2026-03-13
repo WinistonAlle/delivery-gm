@@ -1,6 +1,6 @@
 // src/App.tsx
 import { useEffect } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -38,6 +38,7 @@ import DeliveryOps from "./pages/DeliveryOps";
 // ✅ NOVO: AdminOrders
 import AdminOrders from "./pages/AdminOrders"; 
 import { applyTheme, getLocalTheme, loadTheme } from "./lib/appTheme";
+import { trackCustomerEventOnce } from "./lib/customerInsights";
 // Se o seu arquivo estiver em: src/pages/admin/AdminOrders.tsx, use:
 // import AdminOrders from "./pages/admin/AdminOrders";
 
@@ -111,6 +112,20 @@ function CatalogGate({ children }: { children: JSX.Element }) {
   return children;
 }
 
+function RouteTracker() {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.pathname !== "/" && location.pathname !== "/catalogo") return;
+    trackCustomerEventOnce("site_visit", {
+      eventName: "site_visit",
+      path: location.pathname,
+    });
+  }, [location.pathname]);
+
+  return null;
+}
+
 /* --------------------------------------------------------
    APP
 -------------------------------------------------------- */
@@ -146,6 +161,7 @@ function App() {
 
         <CartProvider>
           <BrowserRouter>
+            <RouteTracker />
             <Routes>
               {/* Home */}
               <Route path="/" element={<Navigate to="/catalogo" replace />} />
