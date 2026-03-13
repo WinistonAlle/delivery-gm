@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { Product, CartItem } from "../types/products";
 import { FREE_SHIPPING_THRESHOLD } from "../data/shipping";
-import { MIN_PACKAGES, MIN_WEIGHT_KG } from "@/data/products";
+import { MIN_ORDER_VALUE, MIN_PACKAGES } from "@/data/products";
 import { deriveIsPackage, deriveWeightKg } from "@/utils/productMetrics";
 import { trackCustomerEventOnce } from "@/lib/customerInsights";
 
@@ -313,7 +313,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
   }, 0);
 
   const meetsMinimumOrder =
-    packageCount >= MIN_PACKAGES || totalWeight >= MIN_WEIGHT_KG;
+    packageCount >= MIN_PACKAGES || cartTotal >= MIN_ORDER_VALUE;
 
   const value: CartContextType = {
     cartItems,

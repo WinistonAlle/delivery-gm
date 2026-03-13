@@ -40,8 +40,19 @@ export function deriveIsPackage(product: Partial<Product> & { name?: string; pac
   if (weight > 0 && weight <= 1.05) return true;
 
   const text = `${product.name || ""} ${product.packageInfo || ""}`.toLowerCase();
-  if (/50\s*unid/.test(text) || /pacote\s+com\s+\d+/.test(text)) return true;
+  if (
+    /\bpct\b/.test(text) ||
+    /\bpacote\b/.test(text) ||
+    /\bpac\s*\d+/i.test(text) ||
+    /\bpote\b/.test(text) ||
+    /\bkit\b/.test(text) ||
+    /\bcombo\b/.test(text) ||
+    /\d+\s*unid/.test(text) ||
+    /\d+\s*un\b/.test(text) ||
+    /pacote\s+com\s+\d+/.test(text)
+  ) {
+    return true;
+  }
 
   return false;
 }
-

@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { FREE_SHIPPING_THRESHOLD } from "@/data/shipping";
-import { MIN_PACKAGES, MIN_WEIGHT_KG } from "@/data/products";
+import { MIN_ORDER_VALUE, MIN_PACKAGES } from "@/data/products";
 import {
   captureAbandonmentIfNeeded,
   incrementMetric,
@@ -45,6 +45,7 @@ const Cart: React.FC = () => {
 
   const safeCartTotal = Number.isFinite(cartTotal) ? cartTotal : 0;
   const missingForFreeShipping = Math.max(0, FREE_SHIPPING_THRESHOLD - safeCartTotal);
+  const missingForMinimumValue = Math.max(0, MIN_ORDER_VALUE - safeCartTotal);
   const hasCustomerSession = useMemo(() => {
     try {
       const raw = localStorage.getItem("employee_session");
@@ -263,14 +264,20 @@ const Cart: React.FC = () => {
                   <span className={packageCount >= MIN_PACKAGES ? "text-green-600 font-bold" : ""}>
                     Pacotes: {packageCount}/{MIN_PACKAGES}
                   </span>
-                  <span className={totalWeight >= MIN_WEIGHT_KG ? "text-green-600 font-bold" : ""}>
-                    Peso: {totalWeight.toFixed(1)}/{MIN_WEIGHT_KG}kg
+                  <span className={safeCartTotal >= MIN_ORDER_VALUE ? "text-green-600 font-bold" : ""}>
+                    Valor: R$ {safeCartTotal.toFixed(2)}/R$ {MIN_ORDER_VALUE.toFixed(2)}
                   </span>
                 </div>
 
                 {!meetsMinimumOrder ? (
                   <p className="text-xs font-medium bg-amber-50 p-2 rounded-md text-amber-700">
-                    ⚠️ Pedido mínimo: {MIN_PACKAGES} pacotes diversos ou {MIN_WEIGHT_KG}kg no total.
+                    ⚠️ Pedido mínimo: {MIN_PACKAGES} pacotes diversos ou R$ {MIN_ORDER_VALUE.toFixed(2)} no total.
+                  </p>
+                ) : null}
+
+                {!meetsMinimumOrder && missingForMinimumValue > 0 ? (
+                  <p className="text-xs text-gray-500">
+                    Faltam R$ {missingForMinimumValue.toFixed(2)} para liberar por valor mínimo.
                   </p>
                 ) : null}
 
@@ -279,7 +286,12 @@ const Cart: React.FC = () => {
                   <span className="font-bold">R$ {safeCartTotal.toFixed(2)}</span>
                 </div>
 
-                <Button className="w-full bg-red-600 hover:bg-red-700 text-white" size="lg" onClick={handleNext}>
+                <Button
+                  className="w-full bg-red-600 hover:bg-red-700 text-white disabled:bg-red-300 disabled:text-white/80"
+                  size="lg"
+                  onClick={handleNext}
+                  disabled={!meetsMinimumOrder || cartItems.length === 0}
+                >
                   <span>Ir para checkout</span>
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>

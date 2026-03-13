@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { ShoppingCart, Package, Weight } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { Button } from "@/components/ui/button";
-import { MIN_PACKAGES, MIN_WEIGHT_KG } from "@/data/products";
+import { MIN_ORDER_VALUE, MIN_PACKAGES } from "@/data/products";
 
 const CartToggle: React.FC = () => {
   const {
@@ -33,9 +33,9 @@ const CartToggle: React.FC = () => {
               <Package className="inline h-3.5 w-3.5 mr-1" />
               {packageCount}/{MIN_PACKAGES}
             </span>
-            <span className={totalWeight >= MIN_WEIGHT_KG ? "font-bold text-green-700" : ""}>
+            <span className={cartTotal >= MIN_ORDER_VALUE ? "font-bold text-green-700" : ""}>
               <Weight className="inline h-3.5 w-3.5 mr-1" />
-              {totalWeight.toFixed(1)}/{MIN_WEIGHT_KG}kg
+              R$ {cartTotal.toFixed(2)}/R$ {MIN_ORDER_VALUE.toFixed(2)}
             </span>
             <span className={freeShippingRemaining <= 0 ? "font-bold text-green-700" : "font-semibold"}>
               {freeShippingRemaining <= 0 ? "Frete grátis" : `Faltam R$ ${freeShippingRemaining.toFixed(2)}`}

@@ -7,6 +7,7 @@ export const STORE_WHATSAPP = '5561985941557';
 // Requisitos mínimos de pedido
 export const MIN_PACKAGES = 5;
 export const MIN_WEIGHT_KG = 5;
+export const MIN_ORDER_VALUE = 150;
 
 // Categorias disponíveis
 export const CATEGORIES: Category[] = [

@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Bot, MessageCircle, Send, Sparkles, X } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MIN_PACKAGES, MIN_WEIGHT_KG } from "@/data/products";
+import { MIN_ORDER_VALUE, MIN_PACKAGES } from "@/data/products";
 import { FREE_SHIPPING_THRESHOLD, SHIPPING_RATES } from "@/data/shipping";
 import { normalizeText } from "@/utils/stringUtils";
 
@@ -140,7 +140,7 @@ function buildDeliveryAnswer(question: string) {
 }
 
 function buildMinimumOrderAnswer() {
-  return `Hoje o carrinho trabalha com pedido mínimo de ${MIN_PACKAGES} pacotes e ${MIN_WEIGHT_KG} kg. Conforme você adiciona os itens, o próprio carrinho mostra o que ainda falta para atingir o mínimo.`;
+  return `Hoje o carrinho trabalha com pedido mínimo de ${MIN_PACKAGES} pacotes ou R$ ${MIN_ORDER_VALUE.toFixed(2).replace(".", ",")}. Conforme você adiciona os itens, o próprio carrinho mostra o que ainda falta para atingir o mínimo.`;
 }
 
 function buildStorageAnswer(question: string) {
