@@ -467,21 +467,23 @@ const HelperChat: React.FC = () => {
         <button
           type="button"
           onClick={() => setIsOpen((current) => !current)}
-          className="group inline-flex h-12 w-12 items-center justify-center rounded-full border border-slate-200/80 bg-white/88 text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.14)] backdrop-blur md:h-auto md:w-auto md:justify-start md:gap-3 md:px-4 md:py-3 md:bg-slate-900 md:text-white md:shadow-[0_20px_36px_rgba(15,23,42,0.28)]"
+          className="group inline-flex h-12 w-12 items-center justify-center rounded-full border border-slate-200/80 bg-white/88 text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.14)] backdrop-blur transition-[width,box-shadow,background-color] duration-500 ease-out md:h-16 md:w-16 md:justify-start md:overflow-hidden md:hover:w-[280px] md:hover:bg-white md:hover:shadow-[0_22px_42px_rgba(15,23,42,0.20)]"
           aria-expanded={isOpen}
           aria-label="Abrir assistente de dúvidas"
         >
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-700 md:h-11 md:w-11 md:bg-white md:text-slate-900">
-            <MessageCircle className="h-4.5 w-4.5 md:h-5 md:w-5" />
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-700 md:ml-2 md:h-12 md:w-12 md:shrink-0 md:bg-slate-100 md:text-slate-700">
+            <MessageCircle className="h-4.5 w-4.5 md:h-6 md:w-6" />
           </span>
 
-          <span className="hidden min-w-0 text-left md:block">
-            <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-300">
+          <span className="hidden min-w-0 pointer-events-none text-left md:ml-3 md:block">
+            <span className="block max-w-0 -translate-x-3 whitespace-nowrap opacity-0 transition-[max-width,opacity,transform] duration-500 ease-out md:group-hover:max-w-[190px] md:group-hover:translate-x-0 md:group-hover:opacity-100">
+            <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
               <Sparkles className="h-3.5 w-3.5" />
               Assistente
             </span>
-            <span className="block text-sm font-semibold leading-tight">
+            <span className="block text-base font-semibold leading-tight">
               Tire dúvidas rápidas
+            </span>
             </span>
           </span>
         </button>
