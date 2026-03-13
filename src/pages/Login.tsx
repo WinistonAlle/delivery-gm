@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import logo from "../images/logop.jpg";
 import {
   createCustomerSession,
@@ -18,6 +18,11 @@ const maskPhone = (value: string) => {
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectTo =
+    location.state && typeof (location.state as { redirectTo?: unknown }).redirectTo === "string"
+      ? String((location.state as { redirectTo?: string }).redirectTo)
+      : "/catalogo";
   const [phone, setPhone] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -41,7 +46,7 @@ const Login: React.FC = () => {
       if (!customer) {
         navigate("/cadastro", {
           replace: true,
-          state: { prefilledPhone: normalizePhone(phone) },
+          state: { prefilledPhone: normalizePhone(phone), redirectTo },
         });
         return;
       }
@@ -53,7 +58,7 @@ const Login: React.FC = () => {
         phone: customer.phone,
         documentCpf: customer.document_cpf,
       });
-      navigate("/catalogo", { replace: true });
+      navigate(redirectTo, { replace: true });
     } finally {
       setSubmitting(false);
     }
@@ -98,7 +103,7 @@ const Login: React.FC = () => {
             type="button"
             onClick={() =>
               navigate("/cadastro", {
-                state: { prefilledPhone: normalizePhone(phone) },
+                state: { prefilledPhone: normalizePhone(phone), redirectTo },
               })
             }
             className="w-full rounded-lg border border-gray-300 text-gray-800 font-semibold py-2.5 hover:bg-gray-50"

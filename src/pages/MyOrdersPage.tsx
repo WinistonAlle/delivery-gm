@@ -287,7 +287,7 @@ const MyOrdersPage: React.FC = () => {
   const handleLogout = () => {
     localStorage.removeItem("employee_session");
     setMenuOpen(false);
-    navigate("/login", { replace: true });
+    navigate("/catalogo", { replace: true });
   };
 
   // -------------------------------

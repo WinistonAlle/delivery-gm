@@ -995,7 +995,7 @@ const Index: React.FC = () => {
   const handleLogout = () => {
     localStorage.removeItem("employee_session");
     setMenuOpen(false);
-    navigate("/login", { replace: true });
+    navigate("/catalogo", { replace: true });
   };
 
   /* ---------------- mobile + search (FIX DO "SALTO") ---------------- */
@@ -1789,19 +1789,19 @@ const Index: React.FC = () => {
                 <article
                   key={combo.id}
                   onClick={() => handleOpenComboDetail(combo)}
-                  className="group relative cursor-pointer overflow-hidden rounded-[1.9rem] border border-white/90 bg-white/82 p-4 shadow-[0_16px_44px_rgba(15,23,42,0.12)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_54px_rgba(15,23,42,0.18)]"
+                  className="group relative cursor-pointer overflow-hidden rounded-[1.6rem] border border-orange-100 bg-[linear-gradient(145deg,rgba(255,247,237,0.96),rgba(255,241,242,0.92))] p-3 shadow-[0_16px_44px_rgba(15,23,42,0.12)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_54px_rgba(15,23,42,0.18)] md:rounded-[1.9rem] md:p-4"
                 >
-                  <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-red-200/35 blur-2xl transition-transform duration-300 group-hover:scale-110" />
+                  <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-orange-200/40 blur-2xl transition-transform duration-300 group-hover:scale-110" />
 
                   <div className="relative z-10">
-                    <h3 className="text-[22px] leading-tight font-extrabold text-slate-900">{combo.title}</h3>
+                    <h3 className="text-[19px] leading-tight font-extrabold text-slate-900 md:text-[22px]">{combo.title}</h3>
 
-                    <div className="mt-4 grid grid-cols-[1fr_auto] gap-3 items-end">
-                      <div className="rounded-2xl border border-white/90 bg-white/70 p-2 shadow-sm">
+                    <div className="mt-3 grid grid-cols-[1fr_auto] gap-2.5 items-end md:mt-4 md:gap-3">
+                      <div className="rounded-[1.15rem] border border-white/80 bg-white/72 p-2 shadow-sm md:rounded-2xl">
                         <img
                           src={combo.items[0]?.product.images?.[0] || combo.items[0]?.product.image_path || "/placeholder.png"}
                           alt={combo.title}
-                          className="h-24 w-full rounded-xl object-cover"
+                          className="h-20 w-full rounded-xl object-cover md:h-24"
                         />
                         <div className="-mt-2 flex items-center gap-2 overflow-hidden">
                           {combo.items.slice(0, 4).map((item) => (
@@ -1809,7 +1809,7 @@ const Index: React.FC = () => {
                               <img
                                 src={item.product.images?.[0] || item.product.image_path || "/placeholder.png"}
                                 alt={item.product.name}
-                                className="h-10 w-10 rounded-lg border-2 border-white object-cover shadow-sm"
+                                className="h-9 w-9 rounded-lg border-2 border-white object-cover shadow-sm md:h-10 md:w-10"
                               />
                               <span className="absolute -bottom-1 -right-1 rounded-full bg-red-600 text-white text-[10px] h-4 min-w-4 px-1 flex items-center justify-center font-bold">
                                 {item.quantity}
@@ -1822,9 +1822,9 @@ const Index: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="rounded-2xl border border-white/90 bg-white/75 px-3 py-2 text-right shadow-sm">
+                      <div className="rounded-[1.15rem] border border-white/80 bg-white/78 px-2.5 py-2 text-right shadow-sm md:rounded-2xl md:px-3">
                         <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Total</p>
-                        <p className="text-2xl font-black text-slate-900 leading-none">
+                        <p className="text-[1.35rem] font-black text-slate-900 leading-none md:text-2xl">
                           {combo.total.toLocaleString("pt-BR", {
                             style: "currency",
                             currency: "BRL",
@@ -1833,8 +1833,8 @@ const Index: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="mt-4 flex items-center justify-between gap-3">
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
+                    <div className="mt-3 flex items-center justify-between gap-2.5 md:mt-4 md:gap-3">
+                      <span className="rounded-full bg-white/75 px-2.5 py-1 text-[10px] font-semibold text-slate-600 md:px-3 md:text-[11px]">
                         Toque para ver detalhes
                       </span>
                       <Button
@@ -1844,7 +1844,7 @@ const Index: React.FC = () => {
                           e.stopPropagation();
                           handleAddCombo(combo);
                         }}
-                        className="h-11 rounded-full px-6 text-base font-bold bg-red-600 hover:bg-red-700 text-white shadow-[0_10px_24px_rgba(220,38,38,0.35)]"
+                        className="h-10 rounded-full px-4 text-sm font-bold bg-red-600 hover:bg-red-700 text-white shadow-[0_10px_24px_rgba(220,38,38,0.35)] md:h-11 md:px-6 md:text-base"
                       >
                         Adicionar combo
                       </Button>

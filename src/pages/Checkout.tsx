@@ -42,6 +42,8 @@ const PRODUCTS_CACHE_KEY = "gm_catalog_products_v1";
 const formatCurrency = (value: number) =>
   value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+const formatKg = (value: number) => `${value.toFixed(2)}kg`;
+
 const normalizeMatch = (value: string) =>
   String(value ?? "")
     .normalize("NFD")
@@ -95,6 +97,9 @@ const Checkout: React.FC = () => {
 
   const session = useMemo(() => safeGetSession() ?? {}, []);
   const customerDocumentCpf = (session as any)?.document_cpf?.toString?.() ?? "";
+  const customerCep = (session as any)?.cep?.toString?.() ?? "";
+  const customerHowFoundUs = (session as any)?.how_found_us?.toString?.() ?? "";
+  const customerHowFoundUsDetails = (session as any)?.how_found_us_details?.toString?.() ?? "";
 
   const [customerName, setCustomerName] = useState(session?.full_name ?? session?.name ?? "");
   const [customerPhone, setCustomerPhone] = useState(session?.phone ?? session?.cpf ?? "");
@@ -194,6 +199,9 @@ const Checkout: React.FC = () => {
 
     try {
       const cleanPhone = onlyDigits(customerPhone);
+      const howFoundLabel = customerHowFoundUsDetails
+        ? `${customerHowFoundUs} - ${customerHowFoundUsDetails}`
+        : customerHowFoundUs || "Não informado";
 
       const { orderNumber } = await createOrder({
         employeeCpf: cleanPhone,
@@ -245,38 +253,39 @@ const Checkout: React.FC = () => {
       });
 
       const itemsSummary = cartItems
-        .map((item, index) => {
+        .map((item) => {
           const unitPrice = Number(item.product.employee_price ?? item.product.price ?? 0);
-          const subtotal = unitPrice * item.quantity;
-          return `${index + 1}. ${item.product.name}\nQtd: ${item.quantity}\nValor unitário: ${formatCurrency(
-            unitPrice
-          )}\nSubtotal: ${formatCurrency(subtotal)}`;
+          const totalWeight = Number(item.product.weight ?? 0) * item.quantity;
+          const packageInfo = String(item.product.packageInfo ?? "").trim();
+          const code = item.product.old_id ?? item.product.id;
+          return `${item.quantity}x ${item.product.name.toUpperCase()} - ${
+            packageInfo || "UN"
+          } - ${formatCurrency(unitPrice)} - Peso total: ${formatKg(totalWeight)} - ${code}`;
         })
-        .join("\n\n");
+        .join("\n");
 
       const messageLines = [
-        "NOVO PEDIDO DELIVERY",
+        "*Novo Pedido*",
         "",
-        "DADOS DO CLIENTE",
-        `Nome: ${customerName.trim()}`,
-        `Telefone: ${cleanPhone}`,
-        `CPF: ${customerDocumentCpf || "Não informado"}`,
-        "",
-        "ENTREGA",
-        `Endereço: ${deliveryAddress.trim()}`,
-        `Cidade: ${selectedCity || "Não informada"}`,
-        "",
-        "PAGAMENTO",
-        `Forma: ${formatPaymentMethodLabel(paymentMethod)}`,
-        `Frete: ${finalShipping > 0 ? formatCurrency(finalShipping) : "Grátis"}`,
-        `Total: ${formatCurrency(finalTotal)}`,
-        "",
-        "ITENS DO PEDIDO",
+        "*Produtos:*",
         itemsSummary,
+        "",
+        `*Entrega para:* ${selectedCity || "Não informada"}`,
+        `*Taxa de entrega:* ${finalShipping > 0 ? formatCurrency(finalShipping) : "Grátis"}`,
+        `*Forma de pagamento:* ${formatPaymentMethodLabel(paymentMethod)}`,
+        "",
+        "*Dados do Cliente:*",
+        `Nome: ${customerName.trim()}`,
+        `CPF: ${customerDocumentCpf || "Não informado"}`,
+        `Endereço: ${deliveryAddress.trim()}`,
+        `CEP: ${customerCep || "Não informado"}`,
+        `Como nos conheceu: ${howFoundLabel}`,
+        "",
+        `*Total:* ${formatCurrency(finalTotal)}`,
       ];
 
       if (notes.trim()) {
-        messageLines.push("", "OBSERVAÇÕES", notes.trim());
+        messageLines.push("", `Observações: ${notes.trim()}`);
       }
 
       const msg = encodeURIComponent(messageLines.join("\n"));

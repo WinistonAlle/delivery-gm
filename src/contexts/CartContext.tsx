@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { Product, CartItem } from "../types/products";
 import { FREE_SHIPPING_THRESHOLD } from "../data/shipping";
 import { MIN_PACKAGES, MIN_WEIGHT_KG } from "@/data/products";
@@ -78,6 +78,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
     if (typeof window === "undefined") return "anon";
     return getEmployeeSignature();
   });
+  const previousSignatureRef = useRef<string>("anon");
 
   // Chave final usada no localStorage
   const cartStorageKey = `cart_${employeeSignature}`;
@@ -87,12 +88,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
     if (typeof window === "undefined") return;
 
     let lastSignature = getEmployeeSignature();
+    previousSignatureRef.current = lastSignature;
     setEmployeeSignature(lastSignature);
 
     const interval = setInterval(() => {
       const current = getEmployeeSignature();
       if (current !== lastSignature) {
         console.log("[CartContext] employee_session mudou, trocando carrinho...");
+        previousSignatureRef.current = lastSignature;
         lastSignature = current;
         setEmployeeSignature(current);
       }
@@ -110,7 +113,30 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
       if (storedCart) {
         setCartItems(JSON.parse(storedCart));
       } else {
-        setCartItems([]);
+        const fallbackKeys = Array.from(
+          new Set([
+            `cart_${previousSignatureRef.current}`,
+            "cart_anon",
+          ].filter((key) => key && key !== cartStorageKey))
+        );
+
+        let migrated = false;
+        for (const key of fallbackKeys) {
+          const fallbackCart = localStorage.getItem(key);
+          if (!fallbackCart) continue;
+
+          const parsed = JSON.parse(fallbackCart);
+          if (!Array.isArray(parsed) || parsed.length === 0) continue;
+
+          setCartItems(parsed);
+          localStorage.setItem(cartStorageKey, JSON.stringify(parsed));
+          migrated = true;
+          break;
+        }
+
+        if (!migrated) {
+          setCartItems([]);
+        }
       }
 
       console.log("[CartContext] Carrinho carregado para", cartStorageKey);
@@ -206,7 +232,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
     });
 
     setAnimateCartIcon((prev) => prev + 1);
-    setIsCartOpen(true);
   };
 
   const decreaseQuantity = (productId: string) => {

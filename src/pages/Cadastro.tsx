@@ -21,6 +21,10 @@ const maskPhone = (value: string) => {
 const Cadastro: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const redirectTo =
+    location.state && typeof (location.state as { redirectTo?: unknown }).redirectTo === "string"
+      ? String((location.state as { redirectTo?: string }).redirectTo)
+      : "/catalogo";
   const prefilledPhone =
     location.state && typeof (location.state as { prefilledPhone?: unknown }).prefilledPhone === "string"
       ? normalizePhone((location.state as { prefilledPhone?: string }).prefilledPhone ?? "")
@@ -52,6 +56,7 @@ const Cadastro: React.FC = () => {
   const canSubmit = useMemo(() => {
     return (
       name.trim().length >= 3 &&
+      !/\d/.test(name) &&
       normalizePhone(phone).length >= 10 &&
       normalizeCpf(cpf).length === 11 &&
       street.trim().length >= 3 &&
@@ -80,6 +85,7 @@ const Cadastro: React.FC = () => {
         full_name: name,
         phone,
         document_cpf: cpf,
+        cep,
         address: fullAddress,
         how_found_us: howFoundUs,
         how_found_us_details: requiresDetails ? howFoundUsDetails : "",
@@ -96,7 +102,7 @@ const Cadastro: React.FC = () => {
           howFoundUsDetails: requiresDetails ? howFoundUsDetails.trim() : "",
         },
       });
-      navigate("/catalogo", { replace: true });
+      navigate(redirectTo, { replace: true });
     } catch (err: any) {
       setError(err?.message || "Não foi possível concluir seu cadastro.");
     } finally {
@@ -176,7 +182,7 @@ const Cadastro: React.FC = () => {
                   <input
                     className={inputClassName}
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    onChange={(e) => setName(e.target.value.replace(/\d/g, ""))}
                     placeholder="Seu nome"
                     disabled={submitting}
                   />
@@ -360,7 +366,7 @@ const Cadastro: React.FC = () => {
 
             <button
               type="button"
-              onClick={() => navigate("/login")}
+              onClick={() => navigate("/login", { state: { redirectTo } })}
               className="w-full rounded-xl border border-gray-300 px-4 py-2.5 font-semibold text-gray-800 transition hover:bg-gray-50"
             >
               Já tenho conta

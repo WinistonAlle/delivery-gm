@@ -3,6 +3,7 @@ export type CustomerRecord = {
   full_name: string;
   phone: string;
   document_cpf: string;
+  cep?: string;
   address: string;
   addresses?: string[];
   how_found_us: string;
@@ -90,6 +91,7 @@ export function getCustomers(): CustomerRecord[] {
         full_name: String(item?.full_name ?? ""),
         phone,
         document_cpf: normalizeCpf(String(item?.document_cpf ?? legacyCpf)),
+        cep: String(item?.cep ?? "").replace(/\D/g, "").slice(0, 8),
         address: String(item?.address ?? ""),
         addresses: Array.isArray(item?.addresses)
           ? item.addresses.map((address) => String(address)).filter(Boolean)
@@ -118,6 +120,7 @@ export function findCustomerByPhone(phone: string): CustomerRecord | null {
 export function upsertCustomer(record: Omit<CustomerRecord, "id" | "created_at">) {
   const phone = normalizePhone(record.phone);
   const documentCpf = normalizeCpf(record.document_cpf);
+  const cep = String(record.cep ?? "").replace(/\D/g, "").slice(0, 8);
   const customers = getCustomers();
   const existing = customers.find((c) => normalizePhone(c.phone) === phone);
 
@@ -132,6 +135,7 @@ export function upsertCustomer(record: Omit<CustomerRecord, "id" | "created_at">
       address: record.address.trim(),
       phone,
       document_cpf: documentCpf,
+      cep,
       addresses: dedup,
       how_found_us: record.how_found_us.trim(),
       how_found_us_details: record.how_found_us_details?.trim() ?? "",
@@ -145,6 +149,7 @@ export function upsertCustomer(record: Omit<CustomerRecord, "id" | "created_at">
     full_name: record.full_name.trim(),
     phone,
     document_cpf: documentCpf,
+    cep,
     address: record.address.trim(),
     addresses: [record.address.trim()],
     how_found_us: record.how_found_us.trim(),
@@ -173,6 +178,7 @@ export function createCustomerSession(customer: CustomerRecord) {
     cpf: cleanPhone,
     phone: cleanPhone,
     document_cpf: customer.document_cpf,
+    cep: customer.cep ?? "",
     address: customer.address,
     addresses: customer.addresses ?? [customer.address],
     how_found_us: customer.how_found_us,

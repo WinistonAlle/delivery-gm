@@ -363,7 +363,7 @@ const Destaques: React.FC = () => {
   const handleLogout = () => {
     localStorage.removeItem("employee_session");
     setMenuOpen(false);
-    navigate("/login", { replace: true });
+    navigate("/catalogo", { replace: true });
   };
 
   /* -------- LOAD MODE (carousel_settings) -------- */

@@ -11,6 +11,7 @@ import {
   Plus,
   Minus,
   ShoppingCart,
+  ArrowLeft,
   ArrowRight,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -44,6 +45,16 @@ const Cart: React.FC = () => {
 
   const safeCartTotal = Number.isFinite(cartTotal) ? cartTotal : 0;
   const missingForFreeShipping = Math.max(0, FREE_SHIPPING_THRESHOLD - safeCartTotal);
+  const hasCustomerSession = useMemo(() => {
+    try {
+      const raw = localStorage.getItem("employee_session");
+      if (!raw) return false;
+      const session = JSON.parse(raw);
+      return !!(session?.id || session?.phone || session?.cpf);
+    } catch {
+      return false;
+    }
+  }, [isCartOpen]);
 
   useEffect(() => {
     markCartDraft(cartItems.length > 0);
@@ -78,6 +89,15 @@ const Cart: React.FC = () => {
 
     if (!meetsMinimumOrder) return;
     if (cartItems.length === 0) return;
+    if (!hasCustomerSession) {
+      navigate("/login", {
+        state: {
+          redirectTo: "/checkout",
+        },
+      });
+      closeCart();
+      return;
+    }
 
     incrementMetric("startedCheckoutCount");
     void trackCustomerEvent({
@@ -123,10 +143,21 @@ const Cart: React.FC = () => {
             transition={{ type: "tween", duration: 0.3 }}
           >
             <div className="p-4 bg-red-600 text-white flex justify-between items-center">
-              <h2 className="text-xl font-bold flex items-center">
-                <ShoppingCart className="mr-2 h-5 w-5" />
-                {`Carrinho (${itemsCount})`}
-              </h2>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleClose}
+                  className="text-white hover:bg-white/10"
+                  aria-label="Voltar"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <h2 className="text-xl font-bold flex items-center">
+                  <ShoppingCart className="mr-2 h-5 w-5" />
+                  {`Carrinho (${itemsCount})`}
+                </h2>
+              </div>
 
               <Button variant="ghost" size="icon" onClick={handleClose} className="text-white hidden md:inline-flex">
                 <X className="h-5 w-5" />
