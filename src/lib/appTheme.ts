@@ -4,7 +4,6 @@ export type AppThemeKey =
   | "default"
   | "junino"
   | "natal"
-  | "aniversario"
   | "blackfriday"
   | "pascoa"
   | "anonovo"
@@ -14,7 +13,6 @@ export const APP_THEMES: { key: AppThemeKey; label: string; subtitle: string }[]
   { key: "default", label: "Padrão", subtitle: "Visual atual do delivery" },
   { key: "junino", label: "Junino", subtitle: "Cores quentes e clima de arraial" },
   { key: "natal", label: "Natal", subtitle: "Verde e vermelho natalino" },
-  { key: "aniversario", label: "Aniversário", subtitle: "Tema comemorativo da empresa" },
   { key: "blackfriday", label: "Black Friday", subtitle: "Preto, contraste e energia de oferta" },
   { key: "pascoa", label: "Páscoa", subtitle: "Paleta suave e acolhedora" },
   { key: "anonovo", label: "Ano Novo", subtitle: "Dourado e clima de celebração" },
@@ -84,4 +82,3 @@ export async function saveTheme(theme: AppThemeKey): Promise<"supabase" | "local
     return "local";
   }
 }
-

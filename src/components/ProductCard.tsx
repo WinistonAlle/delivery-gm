@@ -209,6 +209,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           shadow-[0_14px_34px_rgba(15,23,42,0.08)] rounded-3xl
           border transition-all duration-300
           min-w-0
+          h-full
           cursor-pointer
 
           bg-white/60 backdrop-blur-2xl
@@ -330,10 +331,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
               </div>
             )}
 
-            <div className="hidden md:inline-flex absolute top-2 right-12 bg-white/95 text-slate-700 font-bold px-2 py-1 rounded-full text-[10px] shadow-sm">
-              {product.category}
-            </div>
-
             {product.isLaunch && (
               <div className="absolute top-2 left-2 bg-green-600 text-white font-bold px-2 py-1 rounded-full text-[10px] shadow-sm">
                 Lançamento
@@ -348,9 +345,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
               </div>
             )}
 
-            <span className="hidden md:block absolute bottom-2 right-2 text-[10px] px-2 py-1 rounded-full bg-black/40 text-white backdrop-blur-sm">
-              Ver detalhes
-            </span>
           </button>
         )}
 
@@ -376,7 +370,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           >
             <h3
               className={`
-                font-semibold mb-1 line-clamp-2 min-w-0
+                font-semibold mb-1 line-clamp-2 min-w-0 min-h-[2.4rem] md:min-h-[3rem]
                 ${hideImages ? "text-[13px]" : "text-[13px] md:text-base"}
                 [[data-featured-card='true']_&]:text-[14px]
                 md:[[data-featured-card='true']_&]:text-base
@@ -386,7 +380,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
               {product.name}
             </h3>
 
-            <p className="text-[11px] md:text-xs text-gray-500 mb-1 line-clamp-2 min-w-0">
+            <p className="text-[11px] md:text-xs text-gray-500 mb-1 line-clamp-2 min-w-0 min-h-[2rem] md:min-h-[2.5rem]">
               {product.packageInfo}
             </p>
 

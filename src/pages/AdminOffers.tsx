@@ -26,7 +26,6 @@ const THEME_SWATCHES: Record<AppThemeKey, [string, string, string]> = {
   default: ["#dc2626", "#f3f6fb", "#334155"],
   junino: ["#f97316", "#facc15", "#ea580c"],
   natal: ["#059669", "#dc2626", "#ecfdf5"],
-  aniversario: ["#4f46e5", "#a855f7", "#f59e0b"],
   blackfriday: ["#000000", "#27272a", "#f59e0b"],
   pascoa: ["#ec4899", "#a78bfa", "#fbcfe8"],
   anonovo: ["#f59e0b", "#1e293b", "#fef3c7"],

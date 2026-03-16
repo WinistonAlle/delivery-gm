@@ -25,6 +25,77 @@ function normalizeQuestion(question: string) {
   return normalizeText(question).replace(/\s+/g, " ").trim();
 }
 
+function tokenizeQuestion(question: string) {
+  return normalizeQuestion(question)
+    .split(/[^a-z0-9]+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+}
+
+function levenshteinDistance(a: string, b: string) {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+
+  const rows = a.length + 1;
+  const cols = b.length + 1;
+  const matrix = Array.from({ length: rows }, () => new Array<number>(cols).fill(0));
+
+  for (let i = 0; i < rows; i += 1) matrix[i][0] = i;
+  for (let j = 0; j < cols; j += 1) matrix[0][j] = j;
+
+  for (let i = 1; i < rows; i += 1) {
+    for (let j = 1; j < cols; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
+      );
+    }
+  }
+
+  return matrix[a.length][b.length];
+}
+
+function isApproxWordMatch(source: string, target: string) {
+  if (source === target) return true;
+  if (!source || !target) return false;
+
+  const maxLength = Math.max(source.length, target.length);
+  const distance = levenshteinDistance(source, target);
+
+  if (maxLength <= 4) return distance <= 1;
+  if (maxLength <= 7) return distance <= 2;
+  return distance <= 3;
+}
+
+function hasApproxPhrase(question: string, phrase: string) {
+  const normalizedQuestion = normalizeQuestion(question);
+  const normalizedPhrase = normalizeQuestion(phrase);
+
+  if (normalizedQuestion.includes(normalizedPhrase)) return true;
+
+  const questionTokens = tokenizeQuestion(question);
+  const rawPhraseTokens = normalizedPhrase
+    .split(" ")
+    .map((token) => token.trim())
+    .filter(Boolean);
+  const phraseTokens = rawPhraseTokens.filter(
+    (token) => token.length >= 3 || rawPhraseTokens.length === 1
+  );
+
+  if (!phraseTokens.length) return false;
+
+  return phraseTokens.every((phraseToken) =>
+    questionTokens.some((questionToken) => isApproxWordMatch(questionToken, phraseToken))
+  );
+}
+
+function questionHasAny(question: string, variants: string[]) {
+  return variants.some((variant) => hasApproxPhrase(question, variant));
+}
+
 function extractNumber(question: string) {
   const match = question.match(/(\d{1,4})/);
   if (!match) return null;
@@ -32,11 +103,7 @@ function extractNumber(question: string) {
 }
 
 function findShippingCity(question: string) {
-  const normalized = normalizeQuestion(question);
-
-  return SHIPPING_RATES.find((rate) =>
-    normalized.includes(normalizeText(rate.city))
-  );
+  return SHIPPING_RATES.find((rate) => hasApproxPhrase(question, rate.city));
 }
 
 function roundUpPackages(quantity: number, packageSize = 50) {
@@ -44,20 +111,11 @@ function roundUpPackages(quantity: number, packageSize = 50) {
 }
 
 function buildSavorySuggestions(question: string) {
-  const normalized = normalizeQuestion(question);
-
-  if (
-    normalized.includes("assado") ||
-    normalized.includes("forno")
-  ) {
+  if (questionHasAny(question, ["assado", "forno"])) {
     return "Uma boa seleção de assados costuma incluir mini esfirra de carne, enroladinho de salsicha assado e outros salgados assados para variar sabor e textura.";
   }
 
-  if (
-    normalized.includes("fritar") ||
-    normalized.includes("frito") ||
-    normalized.includes("fritura")
-  ) {
+  if (questionHasAny(question, ["fritar", "frito", "fritura"])) {
     return "Para fritura, uma sugestão segura é combinar coxinha, risoles, quibe e bolinha de queijo. Esse mix costuma funcionar bem em festa e dá variedade sem complicar a escolha.";
   }
 
@@ -67,8 +125,7 @@ function buildSavorySuggestions(question: string) {
 function buildPartyAnswer(question: string) {
   const normalized = normalizeQuestion(question);
   const peopleCount = extractNumber(normalized);
-  const isCheeseBread =
-    normalized.includes("pao de queijo") || normalized.includes("pao queijo");
+  const isCheeseBread = questionHasAny(question, ["pao de queijo", "pao queijo"]);
 
   if (!peopleCount) {
     if (isCheeseBread) {
@@ -100,15 +157,9 @@ function buildPartyAnswer(question: string) {
 }
 
 function buildOvenAnswer(question: string) {
-  const normalized = normalizeQuestion(question);
-  const isCheeseBread =
-    normalized.includes("pao de queijo") || normalized.includes("pao queijo");
-  const hasAirFryer =
-    normalized.includes("airfryer") || normalized.includes("air fryer");
-  const isFrying =
-    normalized.includes("fritar") ||
-    normalized.includes("fritura") ||
-    normalized.includes("oleo");
+  const isCheeseBread = questionHasAny(question, ["pao de queijo", "pao queijo"]);
+  const hasAirFryer = questionHasAny(question, ["airfryer", "air fryer"]);
+  const isFrying = questionHasAny(question, ["fritar", "fritura", "oleo"]);
 
   if (hasAirFryer && isCheeseBread) {
     return "Para pão de queijo na air fryer, uma boa referência é de 8 a 12 minutos, com o equipamento já aquecido. O ponto ideal é quando ele cresce e fica levemente dourado.";
@@ -144,11 +195,7 @@ function buildMinimumOrderAnswer() {
 }
 
 function buildStorageAnswer(question: string) {
-  const normalized = normalizeQuestion(question);
-  const mentionsFreezer =
-    normalized.includes("congel") ||
-    normalized.includes("freezer") ||
-    normalized.includes("armazen");
+  const mentionsFreezer = questionHasAny(question, ["congelado", "freezer", "armazenar"]);
 
   if (mentionsFreezer) {
     return "O ideal é manter os produtos congelados até o preparo, preservando a embalagem bem fechada. Depois de descongelar, a recomendação mais segura é preparar sem recongelar.";
@@ -186,137 +233,119 @@ function buildFallbackAnswer() {
 }
 
 function buildFaqAnswer(question: string) {
-  const normalized = normalizeQuestion(question);
-
   if (
-    normalized === "oi" ||
-    normalized === "ola" ||
-    normalized === "olá" ||
-    normalized.includes("bom dia") ||
-    normalized.includes("boa tarde") ||
-    normalized.includes("boa noite")
+    questionHasAny(question, ["oi", "ola", "bom dia", "boa tarde", "boa noite"])
   ) {
     return buildGreetingAnswer();
   }
 
   if (
-    normalized.includes("quais salgados") ||
-    normalized.includes("sugere salgados") ||
-    normalized.includes("sugestao de salgado") ||
-    normalized.includes("sugestão de salgado") ||
-    normalized.includes("quais voces sugerem") ||
-    normalized.includes("quais vocês sugerem")
+    questionHasAny(question, [
+      "quais salgados",
+      "sugere salgados",
+      "sugestao de salgado",
+      "quais voces sugerem",
+    ])
   ) {
     return buildSavorySuggestions(question);
   }
 
   if (
-    normalized.includes("quantos salgados") ||
-    normalized.includes("quantidade de salgado") ||
-    normalized.includes("salgados para festa") ||
-    normalized.includes("pao de queijo para") ||
-    normalized.includes("festa") ||
-    normalized.includes("evento") ||
-    normalized.includes("aniversario")
+    questionHasAny(question, [
+      "quantos salgados",
+      "quantidade de salgado",
+      "salgados para festa",
+      "pao de queijo para",
+      "festa",
+      "evento",
+      "aniversario",
+    ])
   ) {
     return buildPartyAnswer(question);
   }
 
   if (
-    normalized.includes("forno") ||
-    normalized.includes("assar") ||
-    normalized.includes("tempo do pao") ||
-    normalized.includes("quanto tempo") ||
-    normalized.includes("air fryer") ||
-    normalized.includes("airfryer") ||
-    normalized.includes("fritar")
+    questionHasAny(question, [
+      "forno",
+      "assar",
+      "tempo do pao",
+      "quanto tempo",
+      "air fryer",
+      "airfryer",
+      "fritar",
+    ])
   ) {
     return buildOvenAnswer(question);
   }
 
   if (
-    normalized.includes("entrega") ||
-    normalized.includes("entregam") ||
-    normalized.includes("frete") ||
-    normalized.includes("cidade") ||
-    normalized.includes("regiao") ||
-    normalized.includes("região")
+    questionHasAny(question, [
+      "entrega",
+      "entregam",
+      "frete",
+      "cidade",
+      "regiao",
+    ])
   ) {
     return buildDeliveryAnswer(question);
   }
 
   if (
-    normalized.includes("pedido minimo") ||
-    normalized.includes("pedido mínimo") ||
-    normalized.includes("minimo") ||
-    normalized.includes("mínimo") ||
-    normalized.includes("quantidade minima") ||
-    normalized.includes("quantidade mínima")
+    questionHasAny(question, [
+      "pedido minimo",
+      "minimo",
+      "quantidade minima",
+    ])
   ) {
     return buildMinimumOrderAnswer();
   }
 
   if (
-    normalized.includes("conservar") ||
-    normalized.includes("congelado") ||
-    normalized.includes("freezer") ||
-    normalized.includes("armazenar") ||
-    normalized.includes("descongel")
+    questionHasAny(question, [
+      "conservar",
+      "congelado",
+      "freezer",
+      "armazenar",
+      "descongelado",
+    ])
   ) {
     return buildStorageAnswer(question);
   }
 
   if (
-    normalized.includes("preco") ||
-    normalized.includes("preço") ||
-    normalized.includes("valor") ||
-    normalized.includes("custa quanto") ||
-    normalized.includes("quanto custa")
+    questionHasAny(question, [
+      "preco",
+      "valor",
+      "custa quanto",
+      "quanto custa",
+    ])
   ) {
     return buildPriceAnswer();
   }
 
   if (
-    normalized.includes("mais vendido") ||
-    normalized.includes("campeao de vendas") ||
-    normalized.includes("campeão de vendas") ||
-    normalized.includes("mais sai")
+    questionHasAny(question, [
+      "mais vendido",
+      "campeao de vendas",
+      "mais sai",
+    ])
   ) {
     return buildBestSellerAnswer();
   }
 
-  if (
-    normalized.includes("combo") ||
-    normalized.includes("kit") ||
-    normalized.includes("pedido misto")
-  ) {
+  if (questionHasAny(question, ["combo", "kit", "pedido misto"])) {
     return buildComboAnswer();
   }
 
-  if (
-    normalized.includes("horario") ||
-    normalized.includes("horário") ||
-    normalized.includes("funciona") ||
-    normalized.includes("atendimento")
-  ) {
+  if (questionHasAny(question, ["horario", "funciona", "atendimento"])) {
     return buildHoursAnswer();
   }
 
-  if (
-    normalized.includes("pagamento") ||
-    normalized.includes("pix") ||
-    normalized.includes("cartao") ||
-    normalized.includes("cartão")
-  ) {
+  if (questionHasAny(question, ["pagamento", "pix", "cartao"])) {
     return buildPaymentAnswer();
   }
 
-  if (
-    normalized.includes("frete gratis") ||
-    normalized.includes("frete grátis") ||
-    normalized.includes("gratis") ||
-    normalized.includes("grátis")
-  ) {
+  if (questionHasAny(question, ["frete gratis", "gratis"])) {
     return `O frete grátis é liberado a partir de R$ ${FREE_SHIPPING_THRESHOLD.toFixed(2).replace(".", ",")}. Abaixo disso, o valor varia conforme a região de entrega.`;
   }
 

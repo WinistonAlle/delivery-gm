@@ -61,6 +61,22 @@ const ITEMS_PER_PAGE = 24;
 const PRODUCTS_CACHE_KEY = "gm_catalog_products_v1";
 const SEARCH_CACHE_KEY = "gm_catalog_search";
 const CATEGORY_CACHE_KEY = "gm_catalog_category";
+const JUNINO_FLAG_COLORS = [
+  "#ef4444",
+  "#f97316",
+  "#facc15",
+  "#22c55e",
+  "#06b6d4",
+  "#3b82f6",
+  "#a855f7",
+  "#ec4899",
+];
+const NEW_YEAR_FIREWORKS = [
+  { x: "12%", y: "20%", size: "0.9", delay: "0s", color: "#f8fafc" },
+  { x: "26%", y: "10%", size: "1.15", delay: "0.45s", color: "#fbbf24" },
+  { x: "74%", y: "18%", size: "1.05", delay: "0.2s", color: "#fde68a" },
+  { x: "86%", y: "12%", size: "0.82", delay: "0.72s", color: "#ffffff" },
+];
 
 /* --------------------------------------------------------
    HELPERS
@@ -164,14 +180,6 @@ const THEME_HEADER_COLORS: Record<
     menuBg: "rgba(16, 185, 129, 0.75)",
     menuBorder: "rgba(167, 243, 208, 0.5)",
   },
-  aniversario: {
-    solid: "#4f46e5",
-    translucent: "rgba(79, 70, 229, 0.55)",
-    borderSolid: "#4f46e5",
-    borderTranslucent: "rgba(199, 210, 254, 0.4)",
-    menuBg: "rgba(99, 102, 241, 0.75)",
-    menuBorder: "rgba(165, 180, 252, 0.5)",
-  },
   blackfriday: {
     solid: "#0a0a0a",
     translucent: "rgba(10, 10, 10, 0.62)",
@@ -181,28 +189,28 @@ const THEME_HEADER_COLORS: Record<
     menuBorder: "rgba(255, 255, 255, 0.25)",
   },
   pascoa: {
-    solid: "#db2777",
-    translucent: "rgba(219, 39, 119, 0.56)",
-    borderSolid: "#db2777",
-    borderTranslucent: "rgba(251, 207, 232, 0.42)",
-    menuBg: "rgba(236, 72, 153, 0.75)",
-    menuBorder: "rgba(249, 168, 212, 0.5)",
+    solid: "#D8C7F3",
+    translucent: "rgba(216, 199, 243, 0.62)",
+    borderSolid: "#D8C7F3",
+    borderTranslucent: "rgba(247, 198, 217, 0.48)",
+    menuBg: "rgba(190, 231, 208, 0.82)",
+    menuBorder: "rgba(207, 232, 255, 0.56)",
   },
   anonovo: {
-    solid: "#d97706",
-    translucent: "rgba(217, 119, 6, 0.56)",
-    borderSolid: "#d97706",
-    borderTranslucent: "rgba(253, 230, 138, 0.35)",
-    menuBg: "rgba(245, 158, 11, 0.78)",
-    menuBorder: "rgba(252, 211, 77, 0.5)",
+    solid: "#c9971a",
+    translucent: "rgba(217, 169, 52, 0.5)",
+    borderSolid: "#f8e7b6",
+    borderTranslucent: "rgba(255, 248, 220, 0.34)",
+    menuBg: "rgba(255, 255, 255, 0.16)",
+    menuBorder: "rgba(255, 244, 214, 0.42)",
   },
   copa: {
-    solid: "#16a34a",
-    translucent: "rgba(22, 163, 74, 0.56)",
-    borderSolid: "#16a34a",
-    borderTranslucent: "rgba(167, 243, 208, 0.4)",
-    menuBg: "rgba(34, 197, 94, 0.78)",
-    menuBorder: "rgba(110, 231, 183, 0.5)",
+    solid: "#facc15",
+    translucent: "rgba(250, 204, 21, 0.62)",
+    borderSolid: "#facc15",
+    borderTranslucent: "rgba(254, 240, 138, 0.46)",
+    menuBg: "rgba(22, 163, 74, 0.82)",
+    menuBorder: "rgba(110, 231, 183, 0.52)",
   },
 };
 
@@ -1326,8 +1334,44 @@ const Index: React.FC = () => {
             ))}
           </div>
         )}
+        {activeTheme === "anonovo" && (
+          <div className="newyear-header-glow" aria-hidden="true">
+            <div className="newyear-spark-cluster left" />
+            <div className="newyear-spark-cluster right" />
+          </div>
+        )}
+        {activeTheme === "pascoa" && (
+          <>
+            <div className="easter-egg easter-egg-header-accent" aria-hidden="true" />
+            <div className="easter-bunny easter-bunny-header" aria-hidden="true" />
+          </>
+        )}
+        {activeTheme === "copa" && (
+          <>
+            <div className="copa-ribbon copa-ribbon-header" aria-hidden="true" />
+          </>
+        )}
+        {activeTheme === "junino" && (
+          <div className="junino-bunting junino-bunting-header" aria-hidden="true">
+            {Array.from({ length: 12 }).map((_, index) => (
+              <span
+                key={`header-flag-${index}`}
+                className="junino-flag junino-flag-header"
+                style={{
+                  backgroundColor: JUNINO_FLAG_COLORS[index % JUNINO_FLAG_COLORS.length],
+                  transform: `rotate(${index % 2 === 0 ? -7 : 7}deg)`,
+                }}
+              />
+            ))}
+          </div>
+        )}
 
         <div className="container relative z-10 mx-auto px-4 flex items-center justify-between gap-4">
+          {activeTheme === "anonovo" && (
+            <div className="pointer-events-none absolute inset-x-0 top-1/2 hidden -translate-y-1/2 justify-center md:flex">
+              <span className="newyear-greeting newyear-greeting-header">Feliz Ano Novo!</span>
+            </div>
+          )}
           {/* ✅ LOGO NO LUGAR DO TEXTO */}
           <button
             onClick={() => goTo("/catalogo")}
@@ -1603,7 +1647,7 @@ const Index: React.FC = () => {
         <section className="mb-6 relative">
           <div
             className={`
-              relative overflow-hidden rounded-[2rem] min-h-[300px] md:min-h-[390px]
+              relative overflow-hidden rounded-[2rem] min-h-[300px] md:min-h-[390px] theme-season-hero
               flex items-stretch shadow-[0_28px_70px_rgba(15,23,42,0.22)]
               ${
                 (hasNotices ? true : false) && !((hasNotices ? notices[currentNoticeIndex] : null)?.image_url)
@@ -1629,6 +1673,74 @@ const Index: React.FC = () => {
                   }
             }
           >
+            {activeTheme === "pascoa" && (
+              <>
+                <div className="easter-chocolate-drip" aria-hidden="true" />
+                <div className="easter-bunny easter-bunny-hero" aria-hidden="true" />
+                <div className="easter-egg easter-egg-hero-accent" aria-hidden="true" />
+              </>
+            )}
+            {activeTheme === "copa" && (
+              <>
+                <div className="copa-ribbon copa-ribbon-hero" aria-hidden="true" />
+              </>
+            )}
+            {activeTheme === "anonovo" && (
+              <div className="newyear-fireworks" aria-hidden="true">
+                {NEW_YEAR_FIREWORKS.map((firework, index) => (
+                  <div
+                    key={`firework-${index}`}
+                    className="newyear-firework"
+                    style={
+                      {
+                        "--firework-x": firework.x,
+                        "--firework-y": firework.y,
+                        "--firework-scale": firework.size,
+                        "--firework-delay": firework.delay,
+                        "--firework-color": firework.color,
+                      } as React.CSSProperties
+                    }
+                  >
+                    {Array.from({ length: 8 }).map((_, rayIndex) => (
+                      <span
+                        key={`firework-ray-${index}-${rayIndex}`}
+                        className="newyear-firework-ray"
+                        style={{ transform: `rotate(${rayIndex * 45}deg)` }}
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+            {activeTheme === "junino" && (
+              <>
+                <div className="junino-bunting junino-bunting-top" aria-hidden="true">
+                  {Array.from({ length: 10 }).map((_, index) => (
+                    <span
+                      key={`top-${index}`}
+                      className="junino-flag"
+                      style={{
+                        backgroundColor: JUNINO_FLAG_COLORS[index % JUNINO_FLAG_COLORS.length],
+                        transform: `rotate(${index % 2 === 0 ? -6 : 6}deg)`,
+                      }}
+                    />
+                  ))}
+                </div>
+                <div className="junino-bunting junino-bunting-middle" aria-hidden="true">
+                  {Array.from({ length: 9 }).map((_, index) => (
+                    <span
+                      key={`middle-${index}`}
+                      className="junino-flag junino-flag-small"
+                      style={{
+                        backgroundColor:
+                          JUNINO_FLAG_COLORS[(index + 3) % JUNINO_FLAG_COLORS.length],
+                        transform: `rotate(${index % 2 === 0 ? 5 : -5}deg)`,
+                      }}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
             <div className="absolute inset-0 bg-gradient-to-br from-slate-950/60 via-slate-900/40 to-slate-950/55" />
             <div className="absolute -top-12 -left-12 h-40 w-40 rounded-full bg-white/15 blur-2xl" />
             <div className="absolute -bottom-12 right-10 h-44 w-44 rounded-full bg-red-400/20 blur-3xl" />
@@ -1637,6 +1749,7 @@ const Index: React.FC = () => {
               {((hasNotices ? notices[currentNoticeIndex] : null) != null) ? (
                 (hasNotices ? notices[currentNoticeIndex] : null)!.image_url ? (
                   <div className="relative max-w-2xl rounded-3xl border border-white/25 bg-white/10 p-5 md:p-7 backdrop-blur-md text-white shadow-[0_16px_44px_rgba(0,0,0,0.26)]">
+                    {activeTheme === "natal" && <div className="santa-hat" aria-hidden="true" />}
                     <span className="inline-flex items-center rounded-full border border-white/30 bg-white/10 px-3 py-1 text-[10px] uppercase tracking-[0.16em] font-semibold">
                       Aviso em destaque
                     </span>
@@ -1659,7 +1772,8 @@ const Index: React.FC = () => {
                     </button>
                   </div>
                 ) : (
-                  <div className="max-w-2xl rounded-3xl border border-white/60 bg-white/88 p-5 md:p-7 backdrop-blur-md shadow-[0_18px_46px_rgba(15,23,42,0.20)]">
+                  <div className="relative max-w-2xl rounded-3xl border border-white/60 bg-white/88 px-5 py-6 md:px-7 md:py-8 backdrop-blur-md shadow-[0_18px_46px_rgba(15,23,42,0.20)]">
+                    {activeTheme === "natal" && <div className="santa-hat" aria-hidden="true" />}
                     <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-red-600 mb-2">
                       Avisos internos Gostinho Mineiro
                     </p>
@@ -1682,29 +1796,13 @@ const Index: React.FC = () => {
               ) : (
                 <div className="w-full flex items-center justify-center">
                   <div className="max-w-3xl rounded-3xl border border-white/20 bg-white/10 backdrop-blur-md px-5 py-6 md:px-9 md:py-8 text-center text-white flex flex-col items-center shadow-[0_22px_56px_rgba(0,0,0,0.28)]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-white/80 mb-2">
-                      Gourmet Frozen Delivery
-                    </p>
-
                     <h2 className="text-3xl md:text-5xl font-extrabold leading-tight">
                       Produtos Gostinho Mineiro
                     </h2>
 
                     <p className="text-sm md:text-lg text-white/90 mt-3 max-w-2xl">
-                      Uma experiência de pedido premium, rápida e intuitiva. Escolha seus produtos, finalize em poucos passos e receba no conforto de casa.
+                      Uma experiência premium de delivery, rápida e intuitiva. Escolha seus produtos, finalize em poucos passos e receba no conforto de casa.
                     </p>
-
-                    <div className="mt-4 flex flex-wrap justify-center gap-2">
-                      <span className="rounded-full bg-white/15 border border-white/20 px-3 py-1 text-[11px] font-semibold">
-                        Entrega rápida
-                      </span>
-                      <span className="rounded-full bg-white/15 border border-white/20 px-3 py-1 text-[11px] font-semibold">
-                        Catálogo completo
-                      </span>
-                      <span className="rounded-full bg-white/15 border border-white/20 px-3 py-1 text-[11px] font-semibold">
-                        Pedido fácil
-                      </span>
-                    </div>
 
                     <button
                       onClick={() =>
@@ -1778,9 +1876,6 @@ const Index: React.FC = () => {
                 <h2 className="text-lg md:text-xl font-bold text-slate-900">
                   Combos inteligentes
                 </h2>
-                <p className="text-xs md:text-sm text-slate-500">
-                  Adicione kits prontos para montar pedidos maiores em 1 clique.
-                </p>
               </div>
             </div>
 
@@ -1938,6 +2033,7 @@ const Index: React.FC = () => {
                   {paginated.map((p) => (
                     <motion.div
                       key={String(p.id)}
+                      className="h-full"
                       layout
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -2045,60 +2141,134 @@ const socialLinks = [
     name: "Instagram",
     url: "https://www.instagram.com/gostinhomineiro.oficial/",
     icon: Instagram,
+    hoverGlow:
+      "from-fuchsia-200/0 via-fuchsia-300/70 to-amber-200/0",
+    hoverIcon:
+      "group-hover:bg-[linear-gradient(135deg,#f58529_0%,#feda77_20%,#dd2a7b_52%,#8134af_78%,#515bd4_100%)]",
   },
   {
     name: "Facebook",
     url: "https://www.facebook.com/gostinhomineirobsb/?locale=pt_BR",
     icon: Facebook,
+    hoverGlow: "from-blue-100/0 via-blue-300/70 to-cyan-100/0",
+    hoverIcon: "group-hover:bg-[#1877F2]",
   },
   {
     name: "YouTube",
     url: "https://www.youtube.com/@gostinhomineiropaodequeijo7377",
     icon: Youtube,
+    hoverGlow: "from-red-100/0 via-red-300/70 to-orange-100/0",
+    hoverIcon: "group-hover:bg-[#FF0000]",
   },
 ];
 
 const developerText =
-  "©️ 2025 Catálogo Interativo Delivery desenvolvido por Winiston Alle & Mateus Borges";
+  "©️ 2026 Catálogo Interativo Delivery desenvolvido por Winiston Alle & Mateus Borges";
 
 const Footer: React.FC<{ activeTheme: AppThemeKey }> = ({ activeTheme }) => {
   return (
-    <footer className="relative bg-transparent pt-4 pb-24 md:pb-2 border-t border-white/70">
+    <footer
+      className={`relative pt-4 pb-24 md:pb-2 ${
+        activeTheme === "copa"
+          ? "border-t border-blue-300/70 bg-blue-200/80"
+          : "border-t border-slate-300/80 bg-slate-200/75"
+      }`}
+    >
       {activeTheme === "natal" && (
         <>
           <div className="xmas-tree xmas-tree-footer-left">
+            <span className="xmas-tree-star" />
+            <span className="xmas-tree-ornament xmas-tree-ornament-red" />
+            <span className="xmas-tree-ornament xmas-tree-ornament-gold" />
+            <span className="xmas-tree-ornament xmas-tree-ornament-blue" />
             <span className="xmas-tree-trunk" />
           </div>
           <div className="xmas-tree xmas-tree-footer-right">
+            <span className="xmas-tree-star" />
+            <span className="xmas-tree-ornament xmas-tree-ornament-red" />
+            <span className="xmas-tree-ornament xmas-tree-ornament-gold" />
+            <span className="xmas-tree-ornament xmas-tree-ornament-blue" />
             <span className="xmas-tree-trunk" />
           </div>
         </>
       )}
+      {activeTheme === "anonovo" && (
+        <>
+          <div className="newyear-footer-glow" aria-hidden="true" />
+          <div className="newyear-spark-cluster footer-left" aria-hidden="true" />
+          <div className="newyear-spark-cluster footer-right" aria-hidden="true" />
+        </>
+      )}
+      {activeTheme === "copa" && (
+        <>
+          <div className="copa-ribbon copa-ribbon-footer" aria-hidden="true" />
+          <div className="copa-flag" aria-hidden="true">
+            <span className="copa-flag-diamond" />
+            <span className="copa-flag-circle" />
+          </div>
+        </>
+      )}
+      {activeTheme === "pascoa" && (
+        <>
+          <div className="easter-egg easter-egg-footer-accent" aria-hidden="true" />
+          <div className="easter-cross" aria-hidden="true" />
+        </>
+      )}
+      {activeTheme === "junino" && (
+        <>
+          <div className="junino-bunting junino-bunting-footer" aria-hidden="true">
+            {Array.from({ length: 10 }).map((_, index) => (
+              <span
+                key={`footer-flag-${index}`}
+                className="junino-flag junino-flag-footer"
+                style={{
+                  backgroundColor:
+                    JUNINO_FLAG_COLORS[(index + 2) % JUNINO_FLAG_COLORS.length],
+                  transform: `rotate(${index % 2 === 0 ? 6 : -6}deg)`,
+                }}
+              />
+            ))}
+          </div>
+          <div className="junino-lantern junino-lantern-left" aria-hidden="true" />
+          <div className="junino-lantern junino-lantern-right" aria-hidden="true" />
+        </>
+      )}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center justify-center">
-          <div className="flex space-x-4 mb-4 mt-4">
-            {socialLinks.map((link) => (
-              <a
+          {activeTheme === "anonovo" && (
+            <p className="newyear-greeting newyear-greeting-footer mt-2">Feliz Ano Novo!</p>
+          )}
+          <div className="mb-4 mt-4 flex flex-wrap items-center justify-center gap-3">
+            {socialLinks.map((link, index) => (
+              <motion.a
                 key={link.name}
                 href={link.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="
-                  flex items-center justify-center
-                  h-10 w-10 rounded-full
-                  bg-white/80 text-slate-700 border border-white/80
-                  hover:bg-white transition-colors
-                "
                 aria-label={`Link para ${link.name}`}
+                initial={{ opacity: 0, y: 14 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.5 }}
+                transition={{ duration: 0.35, delay: index * 0.06 }}
+                whileHover={{ y: -4, scale: 1.06 }}
+                whileTap={{ scale: 0.97 }}
+                className="group relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-white/85 bg-white/88 text-slate-700 shadow-[0_14px_32px_rgba(15,23,42,0.10)] transition-shadow hover:shadow-[0_18px_40px_rgba(15,23,42,0.16)]"
               >
-                <link.icon className="h-5 w-5" />
-              </a>
+                <span
+                  className={`absolute inset-0 bg-gradient-to-r ${link.hoverGlow} opacity-0 transition-opacity duration-300 group-hover:opacity-100`}
+                />
+                <span
+                  className={`relative flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-white shadow-[0_8px_18px_rgba(15,23,42,0.18)] transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6 ${link.hoverIcon}`}
+                >
+                  <link.icon className="h-5 w-5" />
+                </span>
+              </motion.a>
             ))}
           </div>
-        </div>
 
-        <div className="text-center pt-2">
-          <p className="text-xs text-slate-500">{developerText}</p>
+          <div className="pt-2 text-center">
+            <p className="text-xs text-slate-500">{developerText}</p>
+          </div>
         </div>
       </div>
     </footer>
