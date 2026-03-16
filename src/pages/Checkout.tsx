@@ -3,14 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   ChevronRight,
-  Clock3,
   CreditCard,
   MapPin,
   MessageCircleMore,
   Package2,
   Smartphone,
   Sparkles,
-  StickyNote,
   Truck,
   UserRound,
 } from "lucide-react";
@@ -365,6 +363,64 @@ const Checkout: React.FC = () => {
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.2 }}
+              className="rounded-[30px] border border-white/80 bg-white/88 p-5 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-6"
+            >
+              <div className="mb-5 flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-50 text-sky-600">
+                  <MapPin className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black text-slate-950">Entrega</h2>
+                  <p className="text-sm text-slate-500">Informe o endereco e confirme a cidade para calcular o frete.</p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_260px]">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">Endereco de entrega</span>
+                  <textarea
+                    className="min-h-[112px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[15px] text-slate-900 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
+                    value={deliveryAddress}
+                    onChange={(e) => setDeliveryAddress(e.target.value)}
+                    disabled={isSubmitting}
+                    placeholder="Rua, numero, bairro e referencia"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">Cidade</span>
+                  <select
+                    className="h-[56px] w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] font-medium text-slate-900 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
+                    value={selectedCity}
+                    onChange={(e) => setSelectedCity(e.target.value)}
+                    disabled={isSubmitting}
+                  >
+                    <option value="">Selecione a cidade</option>
+                    {SHIPPING_RATES.map((rate) => (
+                      <option key={rate.city} value={rate.city}>
+                        {rate.city} {cartTotal >= FREE_SHIPPING_THRESHOLD ? "- frete gratis" : `- ${formatCurrency(Number(rate.cost ?? 0))}`}
+                      </option>
+                    ))}
+                  </select>
+
+                  <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                    {selectedCity ? (
+                      <span>
+                        Frete para <strong className="text-slate-900">{selectedCity}</strong>:{" "}
+                        <strong className="text-slate-900">{finalShipping > 0 ? formatCurrency(finalShipping) : "Gratis"}</strong>
+                      </span>
+                    ) : (
+                      <span>Selecione a cidade para liberar a confirmacao do pedido.</span>
+                    )}
+                  </div>
+                </label>
+              </div>
+            </motion.section>
+
+            <motion.section
+              initial={{ opacity: 0, y: 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.24 }}
               className="rounded-[30px] border border-white/80 bg-white/88 p-5 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur md:p-6"
             >
               <div className="mb-5 flex items-center gap-3">
