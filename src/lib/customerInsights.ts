@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { getCustomerSession } from "@/lib/customerAuth";
 
 const VISITOR_ID_KEY = "gm_delivery_visitor_id_v1";
 
@@ -19,13 +20,7 @@ type EventPayload = {
 };
 
 function safeSession() {
-  try {
-    const raw = localStorage.getItem("employee_session");
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
+  return getCustomerSession();
 }
 
 export function getVisitorId() {

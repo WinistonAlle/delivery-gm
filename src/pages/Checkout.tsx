@@ -21,17 +21,11 @@ import logo from "../images/logoc.png";
 import { incrementMetric } from "@/lib/deliveryEnhancements";
 import { loadPlacementRecommendations } from "@/lib/deliveryOffers";
 import { FREE_SHIPPING_THRESHOLD, SHIPPING_RATES } from "@/data/shipping";
-import { findCustomerByPhone } from "@/lib/customerAuth";
+import { findCustomerByPhone, getCustomerSession, CUSTOMER_SESSION_KEY, LEGACY_SESSION_KEY } from "@/lib/customerAuth";
 import { trackCustomerEvent, trackCustomerEventOnce } from "@/lib/customerInsights";
 
 function safeGetSession() {
-  try {
-    const raw = localStorage.getItem("employee_session");
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
+  return getCustomerSession();
 }
 
 const onlyDigits = (v: string) => v.replace(/\D/g, "");
@@ -202,32 +196,36 @@ const Checkout: React.FC = () => {
         : customerHowFoundUs || "Não informado";
 
       const { orderNumber } = await createOrder({
-        employeeCpf: cleanPhone,
-        employeeName: `${customerName.trim()} | Tel: ${cleanPhone} | End: ${deliveryAddress.trim()}${
-          selectedCity ? ` | Cidade: ${selectedCity}` : ""
-        }${paymentMethod ? ` | Pgto: ${paymentMethod}` : ""}${
-          finalShipping > 0 ? ` | Frete: R$ ${finalShipping.toFixed(2)}` : " | Frete: Grátis"
-        }${notes.trim() ? ` | Obs: ${notes.trim()}` : ""}`,
+        customerPhone: cleanPhone,
+        customerName: customerName.trim(),
+        customerDocumentCpf,
+        customerAddress: deliveryAddress.trim(),
+        customerCity: selectedCity,
+        customerCep,
+        paymentMethod,
+        notes: notes.trim(),
+        shippingCost: finalShipping,
         items: cartItems.map((ci) => ({
           product: ci.product,
           quantity: ci.quantity,
         })),
       });
 
-      localStorage.setItem(
-        "employee_session",
-        JSON.stringify({
-          ...(session ?? {}),
-          id: `customer-${cleanPhone}`,
-          full_name: customerName.trim(),
-          name: customerName.trim(),
-          cpf: cleanPhone,
-          phone: cleanPhone,
-          address: deliveryAddress.trim(),
-          addresses: Array.from(new Set([deliveryAddress.trim()].filter(Boolean))),
-          role: (session as any)?.role ?? "customer",
-        })
-      );
+      const updatedSession = {
+        ...(session ?? {}),
+        id: `customer-${cleanPhone}`,
+        full_name: customerName.trim(),
+        name: customerName.trim(),
+        cpf: cleanPhone,
+        phone: cleanPhone,
+        document_cpf: customerDocumentCpf,
+        cep: customerCep,
+        address: deliveryAddress.trim(),
+        addresses: Array.from(new Set([deliveryAddress.trim()].filter(Boolean))),
+        role: (session as any)?.role ?? "customer",
+      };
+      localStorage.setItem(CUSTOMER_SESSION_KEY, JSON.stringify(updatedSession));
+      localStorage.setItem(LEGACY_SESSION_KEY, JSON.stringify(updatedSession));
 
       clearCart();
       incrementMetric("finishedOrderCount");

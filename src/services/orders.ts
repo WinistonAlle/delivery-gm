@@ -8,10 +8,15 @@ export interface CartItem {
 }
 
 interface CreateOrderParams {
-  // Mantemos employeeId só para compatibilidade, mas não vamos usar agora
-  employeeId?: string;
-  employeeCpf: string;
-  employeeName?: string;
+  customerPhone: string;
+  customerName: string;
+  customerDocumentCpf?: string;
+  customerAddress?: string;
+  customerCity?: string;
+  customerCep?: string;
+  paymentMethod?: string;
+  notes?: string;
+  shippingCost?: number;
   items: CartItem[];
 }
 
@@ -24,9 +29,15 @@ function generateOrderNumber() {
 }
 
 export async function createOrder({
-  employeeId, // ignorado por enquanto
-  employeeCpf,
-  employeeName,
+  customerPhone,
+  customerName,
+  customerDocumentCpf,
+  customerAddress,
+  customerCity,
+  customerCep,
+  paymentMethod,
+  notes,
+  shippingCost = 0,
   items,
 }: CreateOrderParams) {
   if (!items.length) {
@@ -35,29 +46,84 @@ export async function createOrder({
 
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
 
-  const totalValue = items.reduce(
+  const itemsTotal = items.reduce(
     (sum, item) =>
       sum + (Number(item.product.employee_price) || 0) * item.quantity,
     0
   );
+  const finalTotal = itemsTotal + Number(shippingCost || 0);
 
   const orderNumber = generateOrderNumber();
 
-  const orderPayload: any = {
+  const baseOrderPayload = {
     order_number: orderNumber,
-    employee_cpf: employeeCpf,
-    employee_name: employeeName ?? null,
+    customer_phone: customerPhone,
+    customer_document_cpf: customerDocumentCpf ?? null,
+    customer_address: customerAddress ?? null,
+    customer_city: customerCity ?? null,
+    customer_cep: customerCep ?? null,
     total_items: totalItems,
-    total_value: totalValue,
+    total_value: finalTotal,
+    total_cents: Math.round(finalTotal * 100),
+    payment_method: paymentMethod ?? null,
+    notes: notes ?? null,
     status: "recebido",
+    metadata: {
+      customer_name: customerName,
+      items_total: itemsTotal,
+      shipping_cost: Number(shippingCost || 0),
+    },
   };
 
   // 1) Cria o pedido
-  const { data: order, error: orderError } = await supabase
+  let order:
+    | {
+        id: string;
+        order_number: string | null;
+      }
+    | null = null;
+  let orderError: unknown = null;
+
+  const nextSchemaPayload = {
+    ...baseOrderPayload,
+    customer_name: customerName,
+    shipping_cost: Number(shippingCost || 0),
+    shipping_cents: Math.round(Number(shippingCost || 0) * 100),
+  };
+
+  const legacySchemaPayload = {
+    ...baseOrderPayload,
+    employee_cpf: customerPhone,
+    employee_name: customerName,
+  };
+
+  const nextSchemaResult = await supabase
     .from("orders")
-    .insert(orderPayload)
+    .insert(nextSchemaPayload)
     .select("id, order_number")
     .single();
+
+  order = nextSchemaResult.data;
+  orderError = nextSchemaResult.error;
+
+  if (nextSchemaResult.error) {
+    const message = String(nextSchemaResult.error.message || "").toLowerCase();
+    const missingColumn =
+      message.includes("customer_name") ||
+      message.includes("shipping_cost") ||
+      message.includes("shipping_cents");
+
+    if (missingColumn) {
+      const legacyResult = await supabase
+        .from("orders")
+        .insert(legacySchemaPayload)
+        .select("id, order_number")
+        .single();
+
+      order = legacyResult.data;
+      orderError = legacyResult.error;
+    }
+  }
 
   if (orderError || !order) {
     console.error("Erro ao inserir em orders:", orderError);
@@ -87,6 +153,6 @@ export async function createOrder({
   return {
     orderId: order.id,
     orderNumber: order.order_number ?? orderNumber,
-    total: totalValue,
+    total: finalTotal,
   };
 }

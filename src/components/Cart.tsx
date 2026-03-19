@@ -23,6 +23,7 @@ import {
   markCartDraft,
 } from "@/lib/deliveryEnhancements";
 import { trackCustomerEvent } from "@/lib/customerInsights";
+import { getCustomerSession } from "@/lib/customerAuth";
 
 const Cart: React.FC = () => {
   const navigate = useNavigate();
@@ -47,14 +48,8 @@ const Cart: React.FC = () => {
   const missingForFreeShipping = Math.max(0, FREE_SHIPPING_THRESHOLD - safeCartTotal);
   const missingForMinimumValue = Math.max(0, MIN_ORDER_VALUE - safeCartTotal);
   const hasCustomerSession = useMemo(() => {
-    try {
-      const raw = localStorage.getItem("employee_session");
-      if (!raw) return false;
-      const session = JSON.parse(raw);
-      return !!(session?.id || session?.phone || session?.cpf);
-    } catch {
-      return false;
-    }
+    const session = getCustomerSession();
+    return !!(session?.id || session?.phone || session?.cpf);
   }, [isCartOpen]);
 
   useEffect(() => {

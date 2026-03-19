@@ -22,7 +22,6 @@ import {
   Bell,
   ClipboardList,
   PenSquare,
-  Users,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -38,6 +37,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { getLocalTheme, type AppThemeKey } from "@/lib/appTheme";
+import { clearCustomerSession, getCustomerSession } from "@/lib/customerAuth";
 import {
   Dialog,
   DialogContent,
@@ -82,16 +82,7 @@ const NEW_YEAR_FIREWORKS = [
    HELPERS
 -------------------------------------------------------- */
 function safeGetEmployee() {
-  try {
-    const raw = localStorage.getItem("employee_session");
-    if (!raw) return {};
-    if (raw.trim().startsWith("{") || raw.trim().startsWith("[")) {
-      return JSON.parse(raw);
-    }
-    return {};
-  } catch {
-    return {};
-  }
+  return getCustomerSession() ?? {};
 }
 
 function useDebounce<T>(value: T, delay = 300) {
@@ -605,9 +596,6 @@ const Index: React.FC = () => {
     employee?.role === "admin" ||
     employee?.tipo === "ADMIN";
 
-  const isRH =
-    employee?.is_rh || employee?.role === "rh" || employee?.setor === "RH";
-
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
   const handleSelectCategory = (cat: string | "all") => {
@@ -1001,7 +989,7 @@ const Index: React.FC = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("employee_session");
+    clearCustomerSession();
     setMenuOpen(false);
     navigate("/catalogo", { replace: true });
   };
@@ -1538,7 +1526,7 @@ const Index: React.FC = () => {
             <span>Pedidos</span>
           </button>
 
-          {(isAdmin || isRH) && (
+          {isAdmin && (
             <button
               onClick={() => goTo("/relatorios")}
               className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-gray-800"
@@ -1550,7 +1538,7 @@ const Index: React.FC = () => {
             </button>
           )}
 
-          {(isAdmin || isRH) && (
+          {isAdmin && (
             <button
               onClick={() => goTo("/operacao-delivery")}
               className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-gray-800"
@@ -1559,18 +1547,6 @@ const Index: React.FC = () => {
                 <ClipboardList className="h-4 w-4 text-red-600" />
               </span>
               <span>Operação Delivery</span>
-            </button>
-          )}
-
-          {isRH && (
-            <button
-              onClick={() => goTo("/rh")}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-gray-800"
-            >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
-                <Users className="h-4 w-4 text-red-600" />
-              </span>
-              <span>RH</span>
             </button>
           )}
 

@@ -28,45 +28,35 @@ import Destaques from "./pages/Destaques";
 // Admin / RH / Relatórios / Separação
 import Admin from "./pages/Admin";
 import AdminOffers from "./pages/AdminOffers";
-import RhHome from "./pages/rh/RhHome";
-import EmployeesPage from "./pages/rh/EmployeesPage";
-import RHSpendingReport from "./pages/rh/RHSpendingReport";
 import ReportsDashboard from "./pages/ReportsDashboard";
-import SeparationBoard from "./pages/SeparationBoard";
 import DeliveryOps from "./pages/DeliveryOps";
 
 // ✅ NOVO: AdminOrders
 import AdminOrders from "./pages/AdminOrders"; 
 import { applyTheme, getLocalTheme, loadTheme } from "./lib/appTheme";
 import { trackCustomerEventOnce } from "./lib/customerInsights";
+import { getCustomerSession } from "./lib/customerAuth";
 // Se o seu arquivo estiver em: src/pages/admin/AdminOrders.tsx, use:
 // import AdminOrders from "./pages/admin/AdminOrders";
 
 const queryClient = new QueryClient();
 
-type EmployeeRole = "admin" | "rh" | "separacao" | string;
+type AppRole = "admin" | "customer" | string;
 
-type EmployeeSession = {
+type AppSession = {
   id: string;
   full_name: string;
-  cpf: string;
-  role: EmployeeRole;
+  phone?: string;
+  cpf?: string;
+  role: AppRole;
 };
 
-function getEmployeeSession(): EmployeeSession | null {
-  try {
-    const raw = localStorage.getItem("employee_session");
-    if (!raw) return null;
-
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return null;
-
-    if (!parsed.cpf || !parsed.role) return null;
-
-    return parsed as EmployeeSession;
-  } catch {
-    return null;
-  }
+function getAppSession(): AppSession | null {
+  const session = getCustomerSession();
+  if (!session || typeof session !== "object") return null;
+  if (!session.role) return null;
+  if (!session.phone && !session.cpf) return null;
+  return session as AppSession;
 }
 
 /* --------------------------------------------------------
@@ -74,7 +64,7 @@ function getEmployeeSession(): EmployeeSession | null {
 -------------------------------------------------------- */
 
 function RequireAuth({ children }: { children: JSX.Element }) {
-  const sess = getEmployeeSession();
+  const sess = getAppSession();
   if (!sess) return <Navigate to="/login" replace />;
   return children;
 }
@@ -84,29 +74,15 @@ function RequireRole({
   redirectTo = "/catalogo",
   children,
 }: {
-  allow: EmployeeRole[];
+  allow: AppRole[];
   redirectTo?: string;
   children: JSX.Element;
 }) {
-  const sess = getEmployeeSession();
+  const sess = getAppSession();
   if (!sess) return <Navigate to="/login" replace />;
 
   if (!allow.includes(sess.role)) {
     return <Navigate to={redirectTo} replace />;
-  }
-
-  return children;
-}
-
-/**
- * Catálogo: se for perfil separação, manda direto pro painel
- */
-function CatalogGate({ children }: { children: JSX.Element }) {
-  const sess = getEmployeeSession();
-  if (!sess) return children;
-
-  if (sess.role === "separacao") {
-    return <Navigate to="/painel-separacao" replace />;
   }
 
   return children;
@@ -175,9 +151,7 @@ function App() {
               <Route
                 path="/catalogo"
                 element={
-                  <CatalogGate>
-                    <Index />
-                  </CatalogGate>
+                  <Index />
                 }
               />
 
@@ -231,16 +205,6 @@ function App() {
                 }
               />
 
-              {/* Painel de separação (TV) */}
-              <Route
-                path="/painel-separacao"
-                element={
-                  <RequireRole allow={["separacao"]} redirectTo="/catalogo">
-                    <SeparationBoard />
-                  </RequireRole>
-                }
-              />
-
               {/* Admin */}
               <Route
                 path="/admin"
@@ -273,37 +237,8 @@ function App() {
               <Route
                 path="/operacao-delivery"
                 element={
-                  <RequireRole allow={["admin", "rh"]} redirectTo="/catalogo">
+                  <RequireRole allow={["admin"]} redirectTo="/catalogo">
                     <DeliveryOps />
-                  </RequireRole>
-                }
-              />
-
-              {/* RH */}
-              <Route
-                path="/rh"
-                element={
-                  <RequireRole allow={["rh"]} redirectTo="/catalogo">
-                    <RhHome />
-                  </RequireRole>
-                }
-              />
-
-              <Route
-                path="/rh/funcionarios"
-                element={
-                  <RequireRole allow={["rh"]} redirectTo="/catalogo">
-                    <EmployeesPage />
-                  </RequireRole>
-                }
-              />
-
-              {/* ✅ Relatório de gastos do RH */}
-              <Route
-                path="/rh/relatorio-gastos"
-                element={
-                  <RequireRole allow={["rh"]} redirectTo="/catalogo">
-                    <RHSpendingReport />
                   </RequireRole>
                 }
               />
@@ -312,7 +247,7 @@ function App() {
               <Route
                 path="/relatorios"
                 element={
-                  <RequireRole allow={["admin", "rh"]} redirectTo="/catalogo">
+                  <RequireRole allow={["admin"]} redirectTo="/catalogo">
                     <ReportsDashboard />
                   </RequireRole>
                 }

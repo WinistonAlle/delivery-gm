@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
+import { getCustomerSession } from "@/lib/customerAuth";
 
 type OrderRow = {
   id: string;
@@ -318,9 +319,8 @@ export default function AdminOrders() {
     if (possible) return onlyDigits(possible);
 
     try {
-      const raw = localStorage.getItem("employee_session");
-      if (!raw) return "";
-      const obj = JSON.parse(raw);
+      const obj = getCustomerSession();
+      if (!obj) return "";
       return onlyDigits(obj?.cpf || obj?.employee_cpf || "");
     } catch {
       return "";
@@ -587,7 +587,7 @@ export default function AdminOrders() {
     const ok = confirm(
       `Remover ESTE ITEM INTEIRO do pedido?\n\n${item.product_name || "Produto"}\nQtd: ${item.quantity ?? 0}\nValor: ${brlFromCents(
         item.total_cents
-      )}\n\nIsso pode estornar saldo do funcionário.`
+      )}\n\nIsso pode estornar saldo do cliente.`
     );
     if (!ok) return;
 
@@ -646,7 +646,7 @@ export default function AdminOrders() {
     const ok = confirm(
       `Remover parte do item?\n\n${item.product_name || "Produto"}\nRemover: ${qty} de ${currentQty}\nValor estimado: ${brlFromCents(
         est
-      )}\n\nIsso pode estornar saldo proporcional do funcionário.`
+      )}\n\nIsso pode estornar saldo proporcional do cliente.`
     );
     if (!ok) return;
 
@@ -1004,7 +1004,7 @@ export default function AdminOrders() {
                     <thead>
                       <tr>
                         <th style={styles.th}>Pedido</th>
-                        <th style={styles.th}>Funcionário</th>
+                        <th style={styles.th}>Cliente</th>
                         <th style={styles.th}>Pagamento</th>
                         <th style={styles.th}>Total</th>
                         <th style={styles.th}>Status</th>
@@ -1026,7 +1026,7 @@ export default function AdminOrders() {
                             </td>
 
                             <td style={styles.td}>
-                              <div style={{ fontWeight: 950 }}>{o.employee_name || "Nome não encontrado"}</div>
+                              <div style={{ fontWeight: 950 }}>{o.employee_name || "Cliente não identificado"}</div>
                               <div style={styles.tdMuted}>{formatCPF(o.employee_cpf)}</div>
                             </td>
 
@@ -1083,7 +1083,7 @@ export default function AdminOrders() {
                                 whiteSpace: "nowrap",
                               }}
                             >
-                              {o.employee_name || "Nome não encontrado"}
+                              {o.employee_name || "Cliente não identificado"}
                             </b>{" "}
                             • {formatCPF(o.employee_cpf)}
                           </div>
@@ -1130,7 +1130,7 @@ export default function AdminOrders() {
 
       <footer style={styles.footer}>
         <div style={styles.footerInner}>
-          <span style={styles.footerText}>Gostinho Mineiro • Catálogo Funcionários</span>
+          <span style={styles.footerText}>Gostinho Mineiro • Catálogo Delivery</span>
           <span style={styles.footerTextMuted}>Painel interno</span>
         </div>
       </footer>
@@ -1150,7 +1150,7 @@ export default function AdminOrders() {
               <div style={{ minWidth: 0 }}>
                 <div style={styles.modalTitle}>Pedido {selected.order_number || "—"}</div>
                 <div style={styles.modalSub}>
-                  {selected.employee_name || "Nome não encontrado"} • {formatCPF(selected.employee_cpf)} •{" "}
+                  {selected.employee_name || "Cliente não identificado"} • {formatCPF(selected.employee_cpf)} •{" "}
                   {new Date(selected.created_at).toLocaleString("pt-BR")}
                 </div>
               </div>
@@ -1655,7 +1655,7 @@ export default function AdminOrders() {
                           <thead>
                             <tr>
                               <th style={styles.th}>Pedido</th>
-                              <th style={styles.th}>Funcionário</th>
+                              <th style={styles.th}>Cliente</th>
                               <th style={styles.th}>Pagamento</th>
                               <th style={styles.th}>Total</th>
                               <th style={styles.th}>Cancelado em</th>

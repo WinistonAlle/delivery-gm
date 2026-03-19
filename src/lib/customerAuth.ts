@@ -12,7 +12,8 @@ export type CustomerRecord = {
 };
 
 const CUSTOMERS_KEY = "gm_customers_v1";
-const SESSION_KEY = "employee_session";
+export const CUSTOMER_SESSION_KEY = "customer_session";
+export const LEGACY_SESSION_KEY = "employee_session";
 const ADMIN_PHONES_KEY = "gm_admin_phones_v1";
 
 export const normalizePhone = (value: string) => value.replace(/\D/g, "");
@@ -163,13 +164,6 @@ export function upsertCustomer(record: Omit<CustomerRecord, "id" | "created_at">
 
 export function createCustomerSession(customer: CustomerRecord) {
   const cleanPhone = normalizePhone(customer.phone);
-  const admins = getAdminPhones();
-
-  // Bootstrap: se ainda não existe admin, promove o primeiro login automaticamente.
-  if (admins.length === 0 && cleanPhone.length >= 10) {
-    addAdminPhone(cleanPhone);
-  }
-
   const isAdmin = isAdminPhone(cleanPhone);
   const session = {
     id: customer.id,
@@ -186,16 +180,26 @@ export function createCustomerSession(customer: CustomerRecord) {
     role: isAdmin ? "admin" : "customer",
     is_admin: isAdmin,
   };
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+
+  // Mantemos a chave legada por compatibilidade durante a transição.
+  localStorage.setItem(CUSTOMER_SESSION_KEY, JSON.stringify(session));
+  localStorage.setItem(LEGACY_SESSION_KEY, JSON.stringify(session));
   return session;
 }
 
 export function getCustomerSession() {
   try {
-    const raw = localStorage.getItem(SESSION_KEY);
+    const raw =
+      localStorage.getItem(CUSTOMER_SESSION_KEY) ??
+      localStorage.getItem(LEGACY_SESSION_KEY);
     if (!raw) return null;
     return JSON.parse(raw);
   } catch {
     return null;
   }
+}
+
+export function clearCustomerSession() {
+  localStorage.removeItem(CUSTOMER_SESSION_KEY);
+  localStorage.removeItem(LEGACY_SESSION_KEY);
 }

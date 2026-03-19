@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
+import { clearCustomerSession, getCustomerSession } from "@/lib/customerAuth";
 import FeaturedProductsCarousel from "@/components/FeaturedProductsCarousel";
 import ProductCard from "@/components/ProductCard";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,6 @@ import {
   Heart,
   LogOut,
   PenSquare,
-  Users,
   BarChart2,
   Star,
   Search,
@@ -34,16 +34,7 @@ import {
    HELPERS
 -------------------------------------------------------- */
 function safeGetEmployee() {
-  try {
-    const raw = localStorage.getItem("employee_session");
-    if (!raw) return {};
-    if (raw.trim().startsWith("{") || raw.trim().startsWith("[")) {
-      return JSON.parse(raw);
-    }
-    return {};
-  } catch {
-    return {};
-  }
+  return getCustomerSession() ?? {};
 }
 
 function normalizeForSearch(text: string) {
@@ -219,7 +210,7 @@ const Footer: React.FC = () => (
 
       <div className="text-center pt-2">
         <p className="text-xs text-gray-600">
-          © 2025 Catálogo Interativo para funcionários desenvolvido por{" "}
+          © 2025 Catálogo Interativo do delivery desenvolvido por{" "}
           <b>Winiston Alle</b> & <b>Mateus Borges</b>
         </p>
       </div>
@@ -311,10 +302,7 @@ const Destaques: React.FC = () => {
     employee?.is_admin ||
     employee?.role === "admin" ||
     employee?.tipo === "ADMIN";
-  const isRH =
-    employee?.is_rh || employee?.role === "rh" || employee?.setor === "RH";
-
-  const displayName = employee?.full_name ?? employee?.name ?? "Funcionário";
+  const displayName = employee?.full_name ?? employee?.name ?? "Admin";
 
   const LIMIT = 5;
 
@@ -349,8 +337,7 @@ const Destaques: React.FC = () => {
   const [manualStorageOk, setManualStorageOk] = useState(true);
 
   useEffect(() => {
-    const sess = localStorage.getItem("employee_session");
-    if (!sess) navigate("/login", { replace: true });
+    if (!getCustomerSession()) navigate("/login", { replace: true });
     if (!isAdmin) navigate("/catalogo", { replace: true });
   }, [isAdmin, navigate]);
 
@@ -361,7 +348,7 @@ const Destaques: React.FC = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("employee_session");
+    clearCustomerSession();
     setMenuOpen(false);
     navigate("/catalogo", { replace: true });
   };
@@ -935,8 +922,8 @@ const Destaques: React.FC = () => {
             Pedidos
           </button>
 
-          {/* 5) Relatórios (Admin/RH) */}
-          {(isAdmin || isRH) && (
+          {/* 5) Relatórios */}
+          {isAdmin && (
             <button
               onClick={() => goTo("/relatorios")}
               className={`flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 ${
@@ -952,24 +939,7 @@ const Destaques: React.FC = () => {
             </button>
           )}
 
-          {/* 6) RH (RH) */}
-          {isRH && (
-            <button
-              onClick={() => goTo("/rh")}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 ${
-                activeTab("/rh")
-                  ? "bg-red-50 text-red-700 font-semibold"
-                  : "text-gray-800"
-              }`}
-            >
-              <span className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
-                <Users className="h-4 w-4 text-red-600" />
-              </span>
-              RH
-            </button>
-          )}
-
-          {/* 7) Destaques (Admin) */}
+          {/* 6) Destaques */}
           <button
             onClick={() => goTo("/destaques")}
             className={`flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 ${
@@ -984,7 +954,7 @@ const Destaques: React.FC = () => {
             Destaques
           </button>
 
-          {/* 8) Pedidos (Admin) ✅ NOVO */}
+          {/* 7) Pedidos (Admin) */}
           {isAdmin && (
             <button
               onClick={() => goTo("/admin/pedidos")}
@@ -1001,7 +971,7 @@ const Destaques: React.FC = () => {
             </button>
           )}
 
-          {/* 9) Editar (Admin) */}
+          {/* 8) Editar (Admin) */}
           {isAdmin && (
             <button
               onClick={() => goTo("/admin")}

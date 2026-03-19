@@ -10,8 +10,8 @@ import { Button } from "@/components/ui/button";
 type OrderRow = {
   id: string;
   order_number: string | null;
-  employee_name: string | null;
-  employee_cpf: string | null;
+  customer_name: string | null;
+  customer_phone: string | null;
   status: string | null;
   total_value: number | null;
   created_at: string;
@@ -27,11 +27,22 @@ const DeliveryOps: React.FC = () => {
     setLoading(true);
     const { data, error } = await supabase
       .from("orders")
-      .select("id, order_number, employee_name, employee_cpf, status, total_value, created_at")
+      .select("*")
       .order("created_at", { ascending: false })
       .limit(100);
 
-    if (!error) setOrders((data as any) ?? []);
+    if (!error) {
+      const mapped = ((data as any[]) ?? []).map((row) => ({
+        id: row.id,
+        order_number: row.order_number ?? null,
+        customer_name: row.customer_name ?? row.employee_name ?? null,
+        customer_phone: row.customer_phone ?? row.employee_cpf ?? null,
+        status: row.status ?? null,
+        total_value: row.total_value ?? null,
+        created_at: row.created_at,
+      }));
+      setOrders(mapped);
+    }
     setLoading(false);
   }
 
@@ -81,8 +92,8 @@ const DeliveryOps: React.FC = () => {
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <div>
                   <p className="font-semibold">{order.order_number || order.id}</p>
-                  <p className="text-sm text-gray-600">{order.employee_name || "Cliente"}</p>
-                  <p className="text-xs text-gray-500">{order.employee_cpf || "-"}</p>
+                  <p className="text-sm text-gray-600">{order.customer_name || "Cliente"}</p>
+                  <p className="text-xs text-gray-500">{order.customer_phone || "-"}</p>
                   <p className="text-xs text-gray-500">{new Date(order.created_at).toLocaleString("pt-BR")}</p>
                 </div>
 

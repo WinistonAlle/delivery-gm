@@ -7,15 +7,10 @@ import CartToggle from "@/components/CartToggle";
 import Cart from "@/components/Cart";
 import { Button } from "@/components/ui/button";
 import logoGostinho from "@/images/logoc.png";
+import { getCustomerSession } from "@/lib/customerAuth";
 
 function safeGetSession() {
-  try {
-    const raw = localStorage.getItem("employee_session");
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
+  return getCustomerSession();
 }
 
 function getFavoriteStorageKey() {
@@ -73,8 +68,7 @@ const FavoritesPage: React.FC = () => {
   const displayName = session?.full_name ?? session?.name ?? "Cliente";
 
   useEffect(() => {
-    const sess = localStorage.getItem("employee_session");
-    if (!sess) navigate("/login", { replace: true });
+    if (!safeGetSession()) navigate("/login", { replace: true });
   }, [navigate]);
 
   useEffect(() => {

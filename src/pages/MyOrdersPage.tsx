@@ -13,7 +13,6 @@ import {
   Bell,
   ClipboardList,
   PenSquare,
-  Users,
   LogOut,
   ChevronDown,
   ChevronUp,
@@ -28,21 +27,13 @@ import { Button } from "@/components/ui/button";
 import CartToggle from "@/components/CartToggle";
 import Cart from "@/components/Cart";
 import { statusLabel } from "@/lib/deliveryEnhancements";
+import { clearCustomerSession, getCustomerSession } from "@/lib/customerAuth";
 
 /* --------------------------------------------------------
    HELPER: SESSION
 -------------------------------------------------------- */
 function safeGetEmployee() {
-  try {
-    const raw = localStorage.getItem("employee_session");
-    if (!raw) return {};
-    if (raw.trim().startsWith("{") || raw.trim().startsWith("[")) {
-      return JSON.parse(raw);
-    }
-    return {};
-  } catch {
-    return {};
-  }
+  return getCustomerSession() ?? {};
 }
 
 /* --------------------------------------------------------
@@ -58,7 +49,8 @@ type OrderItem = {
 type Order = {
   id: string;
   order_number: string;
-  employee_cpf?: string;
+  customer_phone?: string;
+  customer_name?: string;
   total_items: number;
   total_value: number;
   status: string;
@@ -213,32 +205,28 @@ const MyOrdersPage: React.FC = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
 
-  const employee: any = safeGetEmployee();
+  const customer: any = safeGetEmployee();
 
-  const employeeCpf: string | null = employee?.cpf ?? null;
-  const employeeName: string =
-    employee?.full_name ??
-    employee?.name ??
-    employee?.apelido ??
+  const customerPhone: string | null = customer?.phone ?? customer?.cpf ?? null;
+  const customerName: string =
+    customer?.full_name ??
+    customer?.name ??
+    customer?.apelido ??
     "Cliente";
 
   const isAdmin =
-    employee?.is_admin ||
-    employee?.role === "admin" ||
-    employee?.tipo === "ADMIN";
-
-  const isRH =
-    employee?.is_rh || employee?.role === "rh" || employee?.setor === "RH";
+    customer?.is_admin ||
+    customer?.role === "admin" ||
+    customer?.tipo === "ADMIN";
 
   // Garante login
   useEffect(() => {
-    const sess = localStorage.getItem("employee_session");
-    if (!sess) navigate("/login", { replace: true });
+    if (!getCustomerSession()) navigate("/login", { replace: true });
   }, [navigate]);
 
-  // Carrega pedidos do cliente por identificador de sessão
+  // Carrega pedidos do cliente por telefone salvo na sessão
   useEffect(() => {
-    if (!employeeCpf) {
+    if (!customerPhone) {
       setLoading(false);
       return;
     }
@@ -250,7 +238,8 @@ const MyOrdersPage: React.FC = () => {
           `
           id,
           order_number,
-          employee_cpf,
+          customer_phone,
+          customer_name,
           total_items,
           total_value,
           status,
@@ -263,7 +252,7 @@ const MyOrdersPage: React.FC = () => {
           )
         `
         )
-        .eq("employee_cpf", employeeCpf)
+        .eq("customer_phone", customerPhone)
         .order("created_at", { ascending: false });
 
       if (error) {
@@ -273,7 +262,7 @@ const MyOrdersPage: React.FC = () => {
       setOrders((data as any) ?? []);
       setLoading(false);
     })();
-  }, [employeeCpf]);
+  }, [customerPhone]);
 
   const goTo = (path: string) => {
     if (path === "/catalogo") {
@@ -285,7 +274,7 @@ const MyOrdersPage: React.FC = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("employee_session");
+    clearCustomerSession();
     setMenuOpen(false);
     navigate("/catalogo", { replace: true });
   };
@@ -348,7 +337,7 @@ const MyOrdersPage: React.FC = () => {
     }
   }
 
-  if (!employeeCpf) {
+  if (!customerPhone) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p>Não foi possível identificar o cliente logado.</p>
@@ -398,12 +387,9 @@ const MyOrdersPage: React.FC = () => {
           <div className="flex items-center gap-3">
             <div className="flex flex-col text-right leading-tight">
               <span className="text-base font-semibold">
-                {employeeName}{" "}
+                {customerName}{" "}
                 {isAdmin && (
                   <span className="text-[11px] opacity-80 ml-1">(Admin)</span>
-                )}
-                {isRH && (
-                  <span className="text-[11px] opacity-80 ml-1">(RH)</span>
                 )}
               </span>
             </div>
@@ -462,7 +448,7 @@ const MyOrdersPage: React.FC = () => {
               Menu
             </span>
             <span className="text-sm font-semibold truncate max-w-[150px]">
-              {employeeName}
+              {customerName}
             </span>
           </div>
           <button
@@ -523,8 +509,8 @@ const MyOrdersPage: React.FC = () => {
             <span>Pedidos</span>
           </button>
 
-          {/* 5) Relatórios (Admin/RH) */}
-          {(isAdmin || isRH) && (
+          {/* 5) Relatórios (Admin) */}
+          {isAdmin && (
             <button
               onClick={() => goTo("/relatorios")}
               className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-gray-800"
@@ -536,20 +522,7 @@ const MyOrdersPage: React.FC = () => {
             </button>
           )}
 
-          {/* 6) RH (RH) */}
-          {isRH && (
-            <button
-              onClick={() => goTo("/rh")}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-gray-800"
-            >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
-                <Users className="h-4 w-4 text-red-600" />
-              </span>
-              <span>RH</span>
-            </button>
-          )}
-
-          {/* 7) Destaques (Admin) */}
+          {/* 6) Destaques (Admin) */}
           {isAdmin && (
             <button
               onClick={() => goTo("/destaques")}
@@ -562,7 +535,7 @@ const MyOrdersPage: React.FC = () => {
             </button>
           )}
 
-          {/* ✅ 8) Pedidos (Admin) - NOVO */}
+          {/* 7) Pedidos (Admin) */}
           {isAdmin && (
             <button
               onClick={() => goTo("/admin/pedidos")}
@@ -575,7 +548,7 @@ const MyOrdersPage: React.FC = () => {
             </button>
           )}
 
-          {/* 9) Editar (Admin) */}
+          {/* 8) Editar (Admin) */}
           {isAdmin && (
             <button
               onClick={() => goTo("/admin")}

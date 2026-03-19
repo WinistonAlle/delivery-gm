@@ -242,14 +242,17 @@ create table if not exists public.orders (
   id uuid primary key default gen_random_uuid(),
   order_number text null unique,
   employee_id uuid null references public.employees(id) on delete set null,
-  employee_cpf text null,
-  employee_name text null,
+  customer_name text null,
   customer_phone text null,
   customer_document_cpf text null,
   customer_address text null,
   customer_city text null,
   customer_cep text null,
   notes text null,
+  shipping_cost numeric(12,2) not null default 0,
+  shipping_cents bigint not null default 0,
+  employee_cpf text generated always as (customer_phone) stored,
+  employee_name text generated always as (customer_name) stored,
   total_items integer not null default 0,
   total_value numeric(12,2) not null default 0,
   total_cents bigint not null default 0,
@@ -273,6 +276,8 @@ create table if not exists public.orders (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint orders_total_items_non_negative check (total_items >= 0),
+  constraint orders_shipping_cost_non_negative check (shipping_cost >= 0),
+  constraint orders_shipping_cents_non_negative check (shipping_cents >= 0),
   constraint orders_total_value_non_negative check (total_value >= 0),
   constraint orders_total_cents_non_negative check (total_cents >= 0),
   constraint orders_wallet_non_negative check (wallet_used_cents >= 0 and spent_from_balance_cents >= 0 and pay_on_pickup_cents >= 0),
@@ -296,7 +301,7 @@ create table if not exists public.orders (
 );
 
 create index if not exists orders_created_at_idx on public.orders (created_at desc);
-create index if not exists orders_employee_cpf_idx on public.orders (employee_cpf);
+create index if not exists orders_customer_phone_idx on public.orders (customer_phone);
 create index if not exists orders_status_idx on public.orders (status, created_at desc);
 create index if not exists orders_saibweb_status_idx on public.orders (saibweb_status, created_at asc);
 
@@ -410,12 +415,12 @@ begin
 
   v_new_pickup := greatest(v_total_cents - v_new_wallet, 0);
 
-  update public.orders
-     set total_items = v_qty,
-         total_value = round(v_total_reais, 2),
-         total_cents = v_total_cents,
-         wallet_used_cents = v_new_wallet,
-         spent_from_balance_cents = v_new_wallet,
+	  update public.orders
+	     set total_items = v_qty,
+	         total_value = round(v_total_reais + coalesce(shipping_cost, 0), 2),
+	         total_cents = v_total_cents + coalesce(shipping_cents, 0),
+	         wallet_used_cents = v_new_wallet,
+	         spent_from_balance_cents = v_new_wallet,
          pay_on_pickup_cents = v_new_pickup,
          wallet_debited = (v_new_wallet > 0),
          payment_method = public.compute_payment_method(v_new_wallet, v_new_pickup),
@@ -883,29 +888,39 @@ begin
 end;
 $$;
 
-create or replace view public.rh_spending_report as
+create or replace view public.customer_orders_report as
 select
-  coalesce(o.employee_id, e.id) as employee_id,
+  coalesce(o.customer_phone, o.employee_cpf) as customer_phone,
   coalesce(
+    nullif(o.customer_name, ''),
     nullif(o.employee_name, ''),
-    e.full_name,
-    'Funcionario nao identificado'
-  ) as employee_name,
-  coalesce(nullif(o.employee_cpf, ''), e.cpf) as employee_cpf,
+    'Cliente nao identificado'
+  ) as customer_name,
+  coalesce(nullif(o.customer_document_cpf, ''), nullif(o.employee_cpf, '')) as customer_document_cpf,
   to_char(date_trunc('month', o.created_at), 'YYYY-MM') as month_key,
   count(*)::bigint as orders_count,
   round(sum(coalesce(o.total_value, 0)), 2) as total_spent,
   round(sum(coalesce(o.spent_from_balance_cents, o.wallet_used_cents, 0)) / 100.0, 2) as payroll_discount,
   round(sum(coalesce(o.pay_on_pickup_cents, 0)) / 100.0, 2) as spent_pay_on_pickup
 from public.orders o
-left join public.employees e
-  on e.cpf = o.employee_cpf
 where coalesce(o.status, '') <> 'cancelado'
 group by
-  coalesce(o.employee_id, e.id),
-  coalesce(nullif(o.employee_name, ''), e.full_name, 'Funcionario nao identificado'),
-  coalesce(nullif(o.employee_cpf, ''), e.cpf),
+  coalesce(o.customer_phone, o.employee_cpf),
+  coalesce(nullif(o.customer_name, ''), nullif(o.employee_name, ''), 'Cliente nao identificado'),
+  coalesce(nullif(o.customer_document_cpf, ''), nullif(o.employee_cpf, '')),
   to_char(date_trunc('month', o.created_at), 'YYYY-MM');
+
+create or replace view public.rh_spending_report as
+select
+  null::uuid as employee_id,
+  customer_name as employee_name,
+  customer_phone as employee_cpf,
+  month_key,
+  orders_count,
+  total_spent,
+  payroll_discount,
+  spent_pay_on_pickup
+from public.customer_orders_report;
 
 -- ============================================================
 -- RLS

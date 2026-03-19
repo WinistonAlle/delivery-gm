@@ -151,23 +151,21 @@ const EscolhaUsuario: React.FC = () => {
     };
   }, []);
 
-  const handleFuncionario = () => navigate("/login");
-  const handleCliente = () => {
-    window.location.href = "https://catalogointerativogm.vercel.app";
-  };
+  const handleEntrar = () => navigate("/login");
+  const handleCadastro = () => navigate("/cadastro");
 
   return (
     <Screen>
       <Wrapper>
         <Container>
-          <Box onClick={handleFuncionario}>
-            <Title>Sou Funcionário</Title>
-            <Subtitle>Acesso exclusivo com CPF</Subtitle>
+          <Box onClick={handleEntrar}>
+            <Title>Já tenho conta</Title>
+            <Subtitle>Entrar com telefone</Subtitle>
           </Box>
 
-          <Box onClick={handleCliente}>
-            <Title>Sou Cliente</Title>
-            <Subtitle>Catálogo de produtos</Subtitle>
+          <Box onClick={handleCadastro}>
+            <Title>Quero me cadastrar</Title>
+            <Subtitle>Criar acesso ao delivery</Subtitle>
           </Box>
         </Container>
       </Wrapper>

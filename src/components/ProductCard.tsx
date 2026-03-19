@@ -8,6 +8,7 @@ import { Input } from "./ui/input";
 import ProductImageCarousel from "./ProductImageCarousel";
 import ProductDetail from "./ProductDetail";
 import { toast } from "./ui/sonner";
+import { getCustomerSession } from "@/lib/customerAuth";
 
 interface ProductCardProps {
   product: Product;
@@ -18,9 +19,8 @@ interface ProductCardProps {
 
 function getFavoriteStorageKey() {
   try {
-    const raw = localStorage.getItem("employee_session");
-    if (!raw) return "favorites_anon";
-    const sess = JSON.parse(raw);
+    const sess = getCustomerSession();
+    if (!sess) return "favorites_anon";
     const signature =
       sess?.id || sess?.cpf || sess?.phone || sess?.full_name || "anon";
     return `favorites_${String(signature)}`;

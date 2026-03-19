@@ -10,7 +10,6 @@ import {
   Loader2,
   Plus,
   PenSquare,
-  Users,
   LogOut,
   Trash2,
   Pencil,
@@ -35,19 +34,11 @@ import {
 
 // ✅ LOGO (mesmo do Index)
 import logoGostinho from "@/images/logoc.png";
+import { clearCustomerSession, getCustomerSession } from "@/lib/customerAuth";
 
 // Mesmo helper do Index
 function safeGetEmployee() {
-  try {
-    const raw = localStorage.getItem("employee_session");
-    if (!raw) return {};
-    if (raw.trim().startsWith("{") || raw.trim().startsWith("[")) {
-      return JSON.parse(raw);
-    }
-    return {};
-  } catch {
-    return {};
-  }
+  return getCustomerSession() ?? {};
 }
 
 type Notice = {
@@ -275,10 +266,7 @@ const Avisos: React.FC = () => {
     employee?.role === "admin" ||
     employee?.tipo === "ADMIN";
 
-  const isRH =
-    employee?.is_rh || employee?.role === "rh" || employee?.setor === "RH";
-
-  const canManage = isAdmin || isRH;
+  const canManage = isAdmin;
 
   const displayName = employee?.full_name ?? employee?.name ?? "Cliente";
 
@@ -296,8 +284,7 @@ const Avisos: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    const sess = localStorage.getItem("employee_session");
-    if (!sess) navigate("/login", { replace: true });
+    if (!getCustomerSession()) navigate("/login", { replace: true });
   }, [navigate]);
 
   async function loadNotices() {
@@ -490,7 +477,7 @@ const Avisos: React.FC = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("employee_session");
+    clearCustomerSession();
     setMenuOpen(false);
     navigate("/catalogo", { replace: true });
   };
@@ -540,12 +527,9 @@ const Avisos: React.FC = () => {
                 {isAdmin && (
                   <span className="text-[11px] opacity-80 ml-1">(Admin)</span>
                 )}
-                {isRH && (
-                  <span className="text-[11px] opacity-80 ml-1">(RH)</span>
-                )}
               </span>
               <span className="text-xs text-red-100">
-                Central de avisos internos
+                Central de avisos
               </span>
             </div>
 
@@ -658,7 +642,7 @@ const Avisos: React.FC = () => {
             <span>Pedidos</span>
           </button>
 
-          {(isAdmin || isRH) && (
+          {isAdmin && (
             <button
               onClick={() => goTo("/relatorios")}
               className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-gray-800"
@@ -667,18 +651,6 @@ const Avisos: React.FC = () => {
                 <BarChart2 className="h-4 w-4 text-red-600" />
               </span>
               <span>Relatórios</span>
-            </button>
-          )}
-
-          {isRH && (
-            <button
-              onClick={() => goTo("/rh")}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-gray-800"
-            >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
-                <Users className="h-4 w-4 text-red-600" />
-              </span>
-              <span>RH</span>
             </button>
           )}
 
@@ -737,10 +709,10 @@ const Avisos: React.FC = () => {
             <div>
               <h2 className="text-xl md:text-2xl font-bold flex items-center gap-2">
                 <Megaphone className="h-6 w-6 text-red-600" />
-                Avisos da empresa
+                Avisos
               </h2>
               <p className="text-xs md:text-sm text-gray-500">
-                Comunicados oficiais para todos os colaboradores
+                Comunicados e atualizações do delivery
               </p>
             </div>
 

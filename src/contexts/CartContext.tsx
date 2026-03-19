@@ -4,6 +4,7 @@ import { FREE_SHIPPING_THRESHOLD } from "../data/shipping";
 import { MIN_ORDER_VALUE, MIN_PACKAGES } from "@/data/products";
 import { deriveIsPackage, deriveWeightKg } from "@/utils/productMetrics";
 import { trackCustomerEventOnce } from "@/lib/customerInsights";
+import { getCustomerSession } from "@/lib/customerAuth";
 
 interface CartContextType {
   cartItems: CartItem[];
@@ -37,27 +38,18 @@ export const useCart = (): CartContextType => {
   return context;
 };
 
-// 🔐 Gera uma "assinatura" do usuário atual pra separar os carrinhos
-// Tenta pegar cpf; se não achar, usa o JSON cru como assinatura
-function getEmployeeSignature(): string {
+// Gera uma assinatura do cliente atual pra separar os carrinhos.
+function getCustomerSignature(): string {
   try {
-    const raw = localStorage.getItem("employee_session");
-    if (!raw) return "anon";
+    const session = getCustomerSession();
+    if (!session) return "anon";
 
-    try {
-      const parsed = JSON.parse(raw);
-
-      const cpf = parsed?.cpf || parsed?.employee?.cpf || parsed?.user?.cpf;
-
-      if (cpf && typeof cpf === "string" && cpf.trim().length > 0) {
-        return cpf.trim();
-      }
-    } catch {
-      // se não der pra fazer parse, usa o raw mesmo
+    const signature = session.phone || session.cpf || session.id || session.full_name;
+    if (typeof signature === "string" && signature.trim().length > 0) {
+      return signature.trim();
     }
 
-    // fallback: usa o JSON bruto como assinatura
-    return raw;
+    return JSON.stringify(session);
   } catch {
     return "anon";
   }
@@ -74,30 +66,30 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
   const showFreeShippingAnimation = false;
 
   // 🧾 Assinatura do usuário atual (se mudar, a gente troca de carrinho)
-  const [employeeSignature, setEmployeeSignature] = useState<string>(() => {
+  const [customerSignature, setCustomerSignature] = useState<string>(() => {
     if (typeof window === "undefined") return "anon";
-    return getEmployeeSignature();
+    return getCustomerSignature();
   });
   const previousSignatureRef = useRef<string>("anon");
 
   // Chave final usada no localStorage
-  const cartStorageKey = `cart_${employeeSignature}`;
+  const cartStorageKey = `cart_${customerSignature}`;
 
-  // 👀 Observa mudanças no employee_session (mesma aba, sem reload)
+  // Observa mudanças na sessão do cliente na mesma aba.
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    let lastSignature = getEmployeeSignature();
+    let lastSignature = getCustomerSignature();
     previousSignatureRef.current = lastSignature;
-    setEmployeeSignature(lastSignature);
+    setCustomerSignature(lastSignature);
 
     const interval = setInterval(() => {
-      const current = getEmployeeSignature();
+      const current = getCustomerSignature();
       if (current !== lastSignature) {
-        console.log("[CartContext] employee_session mudou, trocando carrinho...");
+        console.log("[CartContext] customer_session mudou, trocando carrinho...");
         previousSignatureRef.current = lastSignature;
         lastSignature = current;
-        setEmployeeSignature(current);
+        setCustomerSignature(current);
       }
     }, 500);
 

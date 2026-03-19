@@ -38,19 +38,11 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { getCustomerSession } from "@/lib/customerAuth";
 
-/** Helper: sessão do funcionário */
+/** Helper: sessão do cliente/admin */
 function safeGetEmployee() {
-  try {
-    const raw = localStorage.getItem("employee_session");
-    if (!raw) return {};
-    if (raw.trim().startsWith("{") || raw.trim().startsWith("[")) {
-      return JSON.parse(raw);
-    }
-    return {};
-  } catch {
-    return {};
-  }
+  return getCustomerSession() ?? {};
 }
 
 type OrderItem = {
@@ -62,8 +54,8 @@ type OrderItem = {
 
 type RawOrder = {
   id: string;
-  employee_cpf: string | null;
-  employee_name?: string | null;
+  customer_phone: string | null;
+  customer_name?: string | null;
   total_items: number | null;
   total_value: number | null;
   status: string;
@@ -78,8 +70,8 @@ type Summary = {
   avgTicket: number;
 };
 
-type EmployeeSummary = {
-  cpf: string | null;
+type CustomerSummary = {
+  phone: string | null;
   name: string;
   totalValue: number;
   totalOrders: number;
@@ -211,21 +203,17 @@ const initialMonthOptions = buildLastMonthsOptions();
 const ReportsPage: React.FC = () => {
   const navigate = useNavigate();
   const employee: any = safeGetEmployee();
-
   const isAdmin =
     employee?.is_admin ||
     employee?.role === "admin" ||
     employee?.tipo === "ADMIN";
 
-  const isRH =
-    employee?.is_rh || employee?.role === "rh" || employee?.setor === "RH";
-
-  // se não for admin nem RH, manda pro catálogo
+  // se não for admin, manda pro catálogo
   useEffect(() => {
-    if (!isAdmin && !isRH) {
+    if (!isAdmin) {
       navigate("/catalogo", { replace: true });
     }
-  }, [isAdmin, isRH, navigate]);
+  }, [isAdmin, navigate]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -234,7 +222,7 @@ const ReportsPage: React.FC = () => {
   const [comparisonSummary, setComparisonSummary] = useState<Summary | null>(
     null
   );
-  const [topEmployees, setTopEmployees] = useState<EmployeeSummary[]>([]);
+  const [topCustomers, setTopCustomers] = useState<CustomerSummary[]>([]);
   const [topProducts, setTopProducts] = useState<ProductSummary[]>([]);
   const [dailySummary, setDailySummary] = useState<DailySummary | null>(null);
   const [ordersRaw, setOrdersRaw] = useState<RawOrder[]>([]);
@@ -248,13 +236,13 @@ const ReportsPage: React.FC = () => {
   const [selectedRange, setSelectedRange] =
     useState<PeriodRange>("mes_atual");
 
-  // Drill-down: funcionário
-  const [employeeDrill, setEmployeeDrill] = useState<{
-    cpf: string | null;
+  // Drill-down: cliente
+  const [customerDrill, setCustomerDrill] = useState<{
+    phone: string | null;
     name: string;
   } | null>(null);
-  const [employeeOrders, setEmployeeOrders] = useState<SimpleOrder[]>([]);
-  const [employeeDrillLoading, setEmployeeDrillLoading] = useState(false);
+  const [customerOrders, setCustomerOrders] = useState<SimpleOrder[]>([]);
+  const [customerDrillLoading, setCustomerDrillLoading] = useState(false);
 
   // ---------- NOVOS STATES: COMPARAÇÃO DE MESES ----------
   const [monthOptions] = useState<MonthOption[]>(initialMonthOptions);
@@ -320,8 +308,7 @@ const ReportsPage: React.FC = () => {
           .select(
             `
             id,
-            employee_cpf,
-            employee_name,
+            *,
             total_items,
             total_value,
             status,
@@ -416,7 +403,7 @@ const ReportsPage: React.FC = () => {
         let totalRevenue = 0;
         let totalItems = 0;
 
-        const empMap = new Map<string, EmployeeSummary>();
+        const customerMap = new Map<string, CustomerSummary>();
         const prodMap = new Map<string, ProductSummary>();
 
         for (const o of orders) {
@@ -426,23 +413,23 @@ const ReportsPage: React.FC = () => {
           totalRevenue += orderValue;
           totalItems += itemsCount;
 
-          // funcionário
-          const cpfKey = o.employee_cpf || "sem-cpf";
-          const empExisting =
-            empMap.get(cpfKey) ??
+          // cliente
+          const customerKey = o.customer_phone || "sem-telefone";
+          const customerExisting =
+            customerMap.get(customerKey) ??
             ({
-              cpf: o.employee_cpf ?? null,
+              phone: o.customer_phone ?? null,
               name:
-                o.employee_name ??
-                o.employee_cpf ??
-                "Funcionário não identificado",
+                o.customer_name ??
+                o.customer_phone ??
+                "Cliente não identificado",
               totalValue: 0,
               totalOrders: 0,
-            } as EmployeeSummary);
+            } as CustomerSummary);
 
-          empExisting.totalValue += orderValue;
-          empExisting.totalOrders += 1;
-          empMap.set(cpfKey, empExisting);
+          customerExisting.totalValue += orderValue;
+          customerExisting.totalOrders += 1;
+          customerMap.set(customerKey, customerExisting);
 
           // produtos
           (o.order_items ?? []).forEach((it) => {
@@ -477,14 +464,14 @@ const ReportsPage: React.FC = () => {
 
         setSummary(summaryCurrent);
 
-        const empList = Array.from(empMap.values()).sort(
+        const customerList = Array.from(customerMap.values()).sort(
           (a, b) => b.totalValue - a.totalValue
         );
         const prodList = Array.from(prodMap.values()).sort(
           (a, b) => b.totalQuantity - a.totalQuantity
         );
 
-        setTopEmployees(empList.slice(0, 5));
+        setTopCustomers(customerList.slice(0, 5));
         setTopProducts(prodList.slice(0, 5));
 
         // ---------- COMPARAÇÃO COM PERÍODO ANTERIOR ----------
@@ -651,13 +638,13 @@ const ReportsPage: React.FC = () => {
 
   // --- DADOS PARA OS GRÁFICOS ---
 
-  const employeeChartData = useMemo(
+  const customerChartData = useMemo(
     () =>
-      topEmployees.map((emp) => ({
-        name: emp.name,
-        value: Number(emp.totalValue || 0),
+      topCustomers.map((customer) => ({
+        name: customer.name,
+        value: Number(customer.totalValue || 0),
       })),
-    [topEmployees]
+    [topCustomers]
   );
 
   const productChartData = useMemo(
@@ -697,8 +684,8 @@ const ReportsPage: React.FC = () => {
       "id",
       "data",
       "hora",
-      "funcionario_nome",
-      "funcionario_cpf",
+      "cliente_nome",
+      "cliente_telefone",
       "total_itens",
       "total_valor",
       "status",
@@ -716,8 +703,8 @@ const ReportsPage: React.FC = () => {
         o.id,
         dataStr,
         horaStr,
-        o.employee_name ?? "",
-        o.employee_cpf ?? "",
+        o.customer_name ?? "",
+        o.customer_phone ?? "",
         o.total_items ?? 0,
         Number(o.total_value ?? 0).toFixed(2).replace(".", ","),
         o.status ?? "",
@@ -815,17 +802,17 @@ const ReportsPage: React.FC = () => {
 
     let currentY = dailySummary ? 97 : 77;
 
-    // Tabela de funcionários
-    if (topEmployees.length > 0) {
+    // Tabela de clientes
+    if (topCustomers.length > 0) {
       (doc as any).autoTable({
         startY: currentY,
-        head: [["#", "Funcionário", "CPF", "Pedidos", "Total (R$)"]],
-        body: topEmployees.map((emp, index) => [
+        head: [["#", "Cliente", "Telefone", "Pedidos", "Total (R$)"]],
+        body: topCustomers.map((customer, index) => [
           index + 1,
-          emp.name,
-          emp.cpf ?? "",
-          emp.totalOrders,
-          Number(emp.totalValue ?? 0).toFixed(2).replace(".", ","),
+          customer.name,
+          customer.phone ?? "",
+          customer.totalOrders,
+          Number(customer.totalValue ?? 0).toFixed(2).replace(".", ","),
         ]),
         styles: { fontSize: 9 },
         headStyles: { fillColor: [239, 68, 68] },
@@ -859,11 +846,11 @@ const ReportsPage: React.FC = () => {
     doc.save(`relatorio_catalogo_${dateLabel}.pdf`);
   };
 
-  // --- DRILL-DOWN FUNCIONÁRIO ---
-  const openEmployeeDrill = async (emp: EmployeeSummary) => {
+  // --- DRILL-DOWN CLIENTE ---
+  const openCustomerDrill = async (customer: CustomerSummary) => {
     if (!currentRange) return;
-    setEmployeeDrill({ cpf: emp.cpf ?? null, name: emp.name });
-    setEmployeeDrillLoading(true);
+    setCustomerDrill({ phone: customer.phone ?? null, name: customer.name });
+    setCustomerDrillLoading(true);
     try {
       let query = supabase
         .from("orders")
@@ -872,28 +859,28 @@ const ReportsPage: React.FC = () => {
         .lt("created_at", currentRange.end)
         .order("created_at", { ascending: false });
 
-      if (emp.cpf) {
-        query = query.eq("employee_cpf", emp.cpf);
+      if (customer.phone) {
+        query = query.eq("customer_phone", customer.phone);
       }
 
       const { data, error } = await query;
       if (error) throw error;
-      setEmployeeOrders((data as any[]) ?? []);
+      setCustomerOrders((data as any[]) ?? []);
     } catch (err) {
-      console.error("Erro ao carregar pedidos do funcionário:", err);
-      setEmployeeOrders([]);
+      console.error("Erro ao carregar pedidos do cliente:", err);
+      setCustomerOrders([]);
     } finally {
-      setEmployeeDrillLoading(false);
+      setCustomerDrillLoading(false);
     }
   };
 
-  const closeEmployeeDrill = () => {
-    setEmployeeDrill(null);
-    setEmployeeOrders([]);
+  const closeCustomerDrill = () => {
+    setCustomerDrill(null);
+    setCustomerOrders([]);
   };
 
-  // evita piscar conteúdo se não for admin/RH
-  if (!isAdmin && !isRH) {
+  // evita piscar conteúdo se não for admin
+  if (!isAdmin) {
     return null;
   }
 
@@ -1477,9 +1464,9 @@ const ReportsPage: React.FC = () => {
               </section>
             )}
 
-            {/* Top funcionários e produtos (lista com drill-down) */}
+            {/* Top clientes e produtos (lista com drill-down) */}
             <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Funcionários */}
+              {/* Clientes */}
               <div className="rounded-2xl bg-white/85 backdrop-blur-sm border border-gray-100 p-4 shadow-sm">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
@@ -1487,33 +1474,33 @@ const ReportsPage: React.FC = () => {
                       <Users className="h-4 w-4 text-red-600" />
                     </div>
                     <h3 className="text-sm font-semibold text-gray-800">
-                      Funcionários que mais compraram (R$)
+                      Clientes que mais compraram (R$)
                     </h3>
                   </div>
-                  {topEmployees.length > 0 && (
+                  {topCustomers.length > 0 && (
                     <span className="text-[11px] text-gray-400">
-                      Top {topEmployees.length} · Clique para detalhes
+                      Top {topCustomers.length} · Clique para detalhes
                     </span>
                   )}
                 </div>
 
-                {topEmployees.length === 0 ? (
+                {topCustomers.length === 0 ? (
                   <p className="text-xs text-gray-500">
                     Nenhum pedido registrado nesse período.
                   </p>
                 ) : (
                   <ul className="space-y-2">
-                    {topEmployees.map((emp, index) => {
-                      const max = topEmployees[0]?.totalValue || 1;
+                    {topCustomers.map((customer, index) => {
+                      const max = topCustomers[0]?.totalValue || 1;
                       const perc = Math.round(
-                        (emp.totalValue / max) * 100
+                        (customer.totalValue / max) * 100
                       );
 
                       return (
                         <li
-                          key={emp.cpf ?? index}
+                          key={customer.phone ?? index}
                           className="text-xs rounded-xl border border-gray-100 bg-gray-50/60 p-2.5 cursor-pointer hover:bg-gray-100/70 transition"
-                          onClick={() => openEmployeeDrill(emp)}
+                          onClick={() => openCustomerDrill(customer)}
                         >
                           <div className="flex items-center justify-between mb-1 gap-2">
                             <div className="flex items-center gap-2 min-w-0">
@@ -1521,11 +1508,11 @@ const ReportsPage: React.FC = () => {
                                 {index + 1}
                               </span>
                               <span className="font-medium text-gray-800 truncate">
-                                {emp.name}
+                                {customer.name}
                               </span>
                             </div>
                             <span className="text-gray-700 font-medium">
-                              {formatCurrency(emp.totalValue)}
+                              {formatCurrency(customer.totalValue)}
                             </span>
                           </div>
                           <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
@@ -1535,10 +1522,10 @@ const ReportsPage: React.FC = () => {
                             />
                           </div>
                           <p className="mt-1 text-[10px] text-gray-500 flex justify-between">
-                            <span>{emp.totalOrders} pedido(s) no período</span>
-                            {emp.cpf && (
+                            <span>{customer.totalOrders} pedido(s) no período</span>
+                            {customer.phone && (
                               <span className="font-mono opacity-70">
-                                CPF: {emp.cpf}
+                                Tel: {customer.phone}
                               </span>
                             )}
                           </p>
@@ -1623,19 +1610,19 @@ const ReportsPage: React.FC = () => {
             </section>
 
             {/* GRÁFICOS (pizza + barras) */}
-            {(employeeChartData.length > 0 || productChartData.length > 0) && (
+            {(customerChartData.length > 0 || productChartData.length > 0) && (
               <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Pizza: faturamento por funcionário */}
+                {/* Pizza: faturamento por cliente */}
                 <div className="rounded-2xl bg-white/90 backdrop-blur-sm border border-gray-100 p-4 shadow-sm flex flex-col">
                   <h3 className="text-sm font-semibold text-gray-800 mb-1">
-                    Distribuição do faturamento por funcionário
+                    Distribuição do faturamento por cliente
                   </h3>
                   <p className="text-[11px] text-gray-500 mb-4">
-                    Mostra quanto cada funcionário representa do total em R$ no
+                    Mostra quanto cada cliente representa do total em R$ no
                     período selecionado.
                   </p>
 
-                  {employeeChartData.length === 0 ? (
+                  {customerChartData.length === 0 ? (
                     <p className="text-xs text-gray-500">
                       Ainda não há dados suficientes para o gráfico.
                     </p>
@@ -1644,7 +1631,7 @@ const ReportsPage: React.FC = () => {
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
-                            data={employeeChartData}
+                            data={customerChartData}
                             dataKey="value"
                             nameKey="name"
                             cx="50%"
@@ -1653,7 +1640,7 @@ const ReportsPage: React.FC = () => {
                             outerRadius={90}
                             paddingAngle={2}
                           >
-                            {employeeChartData.map((_, index) => (
+                            {customerChartData.map((_, index) => (
                               <Cell
                                 key={`cell-emp-${index}`}
                                 fill={
@@ -1733,39 +1720,39 @@ const ReportsPage: React.FC = () => {
         )}
       </main>
 
-      {/* DIALOG: DRILL-DOWN FUNCIONÁRIO */}
-      <Dialog open={!!employeeDrill} onOpenChange={closeEmployeeDrill}>
+      {/* DIALOG: DRILL-DOWN CLIENTE */}
+      <Dialog open={!!customerDrill} onOpenChange={closeCustomerDrill}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="text-sm font-semibold">
-              Pedidos do funcionário
+              Pedidos do cliente
             </DialogTitle>
             <DialogDescription className="text-xs text-gray-500">
-              Mostrando os pedidos desse funcionário no período selecionado
+              Mostrando os pedidos desse cliente no período selecionado
               no dashboard.
             </DialogDescription>
           </DialogHeader>
 
           <div className="border rounded-lg bg-gray-50 px-3 py-2 mb-3 text-xs text-gray-700 flex flex-col gap-1">
             <span className="font-semibold">
-              {employeeDrill?.name ?? "Funcionário não identificado"}
+              {customerDrill?.name ?? "Cliente não identificado"}
             </span>
-            {employeeDrill?.cpf && (
+            {customerDrill?.phone && (
               <span className="font-mono text-[11px] text-gray-500">
-                CPF: {employeeDrill.cpf}
+                Telefone: {customerDrill.phone}
               </span>
             )}
           </div>
 
           <div className="flex-1 overflow-auto rounded-lg border border-gray-100 bg-white">
-            {employeeDrillLoading ? (
+            {customerDrillLoading ? (
               <div className="flex items-center justify-center py-10 gap-2 text-xs text-gray-500">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Carregando pedidos do funcionário...
+                Carregando pedidos do cliente...
               </div>
-            ) : employeeOrders.length === 0 ? (
+            ) : customerOrders.length === 0 ? (
               <div className="flex items-center justify-center py-10 text-xs text-gray-500">
-                Nenhum pedido encontrado para esse funcionário no período.
+                Nenhum pedido encontrado para esse cliente no período.
               </div>
             ) : (
               <table className="w-full text-[11px]">
@@ -1792,7 +1779,7 @@ const ReportsPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {employeeOrders.map((o) => {
+                  {customerOrders.map((o) => {
                     const d = new Date(o.created_at);
                     const dataStr = d.toLocaleDateString("pt-BR");
                     const horaStr = d.toLocaleTimeString("pt-BR", {
