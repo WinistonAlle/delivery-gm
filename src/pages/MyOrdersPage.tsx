@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
 import { useCart } from "@/contexts/CartContext";
 import type { Product } from "@/types/products";
 
@@ -27,13 +26,13 @@ import { Button } from "@/components/ui/button";
 import CartToggle from "@/components/CartToggle";
 import Cart from "@/components/Cart";
 import { statusLabel } from "@/lib/deliveryEnhancements";
-import { clearCustomerSession, getCustomerSession } from "@/lib/customerAuth";
+import { clearCustomerSession, getCustomerSession, type CustomerSession } from "@/lib/customerAuth";
 
 /* --------------------------------------------------------
    HELPER: SESSION
 -------------------------------------------------------- */
 function safeGetEmployee() {
-  return getCustomerSession() ?? {};
+  return getCustomerSession();
 }
 
 /* --------------------------------------------------------
@@ -56,6 +55,11 @@ type Order = {
   status: string;
   created_at: string;
   order_items?: OrderItem[];
+};
+
+type ReorderApiItem = {
+  quantity: number | null;
+  products: Record<string, unknown> | null;
 };
 
 /* --------------------------------------------------------
@@ -169,7 +173,7 @@ const formatCurrency = (value: number) =>
 /* --------------------------------------------------------
    MAPEAR PRODUTO DO SUPABASE -> Product DO CATÁLOGO
 -------------------------------------------------------- */
-function mapSupabaseProduct(row: any): Product {
+function mapSupabaseProduct(row: Record<string, unknown>): Product {
   const employeePrice = Number(row.employee_price ?? row.price ?? 0);
 
   return {
@@ -205,7 +209,7 @@ const MyOrdersPage: React.FC = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
 
-  const customer: any = safeGetEmployee();
+  const customer = safeGetEmployee();
 
   const customerPhone: string | null = customer?.phone ?? customer?.cpf ?? null;
   const customerName: string =
@@ -232,35 +236,23 @@ const MyOrdersPage: React.FC = () => {
     }
 
     (async () => {
-      const { data, error } = await supabase
-        .from("orders")
-        .select(
-          `
-          id,
-          order_number,
-          customer_phone,
-          customer_name,
-          total_items,
-          total_value,
-          status,
-          created_at,
-          order_items (
-            id,
-            product_name,
-            quantity,
-            subtotal
-          )
-        `
-        )
-        .eq("customer_phone", customerPhone)
-        .order("created_at", { ascending: false });
-
-      if (error) {
+      try {
+        const response = await fetch("/api/customer-orders", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ customerPhone }),
+        });
+        const payload = (await response.json()) as { orders?: Order[]; error?: string };
+        if (!response.ok) throw new Error(payload.error || "Erro ao carregar pedidos.");
+        setOrders(payload.orders ?? []);
+      } catch (error) {
         console.error(error);
+        setOrders([]);
+      } finally {
+        setLoading(false);
       }
-
-      setOrders((data as any) ?? []);
-      setLoading(false);
     })();
   }, [customerPhone]);
 
@@ -286,24 +278,21 @@ const MyOrdersPage: React.FC = () => {
     try {
       setRefazendoId(orderId);
 
-      const { data, error } = await supabase
-        .from("order_items")
-        .select(
-          `
-          product_id,
-          quantity,
-          products:product_id (*)
-        `
-        )
-        .eq("order_id", orderId);
-
-      if (error) {
-        console.error(error);
-        alert("Erro ao carregar itens do pedido.");
+      const response = await fetch("/api/customer-orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ action: "reorder", orderId, customerPhone }),
+      });
+      const payload = (await response.json()) as { items?: ReorderApiItem[]; error?: string };
+      if (!response.ok) {
+        console.error(payload.error);
+        alert(payload.error || "Erro ao carregar itens do pedido.");
         return;
       }
 
-      const rows = (data ?? []) as any[];
+      const rows = payload.items ?? [];
       const items = rows.filter((row) => row.products);
 
       if (!items.length) {

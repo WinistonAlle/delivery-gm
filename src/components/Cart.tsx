@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   X,
   Trash2,
@@ -13,6 +14,7 @@ import {
   ShoppingCart,
   ArrowLeft,
   ArrowRight,
+  BadgeCheck,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { FREE_SHIPPING_THRESHOLD } from "@/data/shipping";
@@ -244,7 +246,21 @@ const Cart: React.FC = () => {
                         Faltam <span className="font-bold text-red-600">R$ {missingForFreeShipping.toFixed(2)}</span> para frete grátis.
                       </p>
                     ) : (
-                      <p className="text-sm mb-1 text-green-700 font-semibold">Frete grátis liberado.</p>
+                      <Card className="mb-3 border-green-200 bg-green-50 shadow-none">
+                        <CardContent className="flex items-center gap-3 p-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-green-700">
+                            <BadgeCheck className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-green-800">
+                              Parabéns, você atingiu frete grátis!
+                            </p>
+                            <p className="text-xs text-green-700">
+                              Seu pedido já está elegível para entrega sem custo.
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
                     )}
                     <Progress
                       value={Math.max(0, Math.min(100, (1 - missingForFreeShipping / FREE_SHIPPING_THRESHOLD) * 100))}
@@ -280,6 +296,19 @@ const Cart: React.FC = () => {
                   <span className="font-medium">Subtotal:</span>
                   <span className="font-bold">R$ {safeCartTotal.toFixed(2)}</span>
                 </div>
+
+                {meetsMinimumOrder && missingForFreeShipping > 0 ? (
+                  <Card className="border-amber-200 bg-amber-50 shadow-none">
+                    <CardContent className="p-3">
+                      <p className="text-sm font-semibold text-amber-900">
+                        Você tem certeza que quer continuar?
+                      </p>
+                      <p className="text-xs text-amber-800">
+                        Falta R$ {missingForFreeShipping.toFixed(2)} pra você ganhar o frete grátis!
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : null}
 
                 <Button
                   className="w-full bg-red-600 hover:bg-red-700 text-white disabled:bg-red-300 disabled:text-white/80"

@@ -1,10 +1,10 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import { Product, CartItem } from "../types/products";
 import { FREE_SHIPPING_THRESHOLD } from "../data/shipping";
 import { MIN_ORDER_VALUE, MIN_PACKAGES } from "@/data/products";
 import { deriveIsPackage, deriveWeightKg } from "@/utils/productMetrics";
 import { trackCustomerEventOnce } from "@/lib/customerInsights";
-import { getCustomerSession } from "@/lib/customerAuth";
+import { CUSTOMER_SESSION_EVENT, getCustomerSession } from "@/lib/customerAuth";
 
 interface CartContextType {
   cartItems: CartItem[];
@@ -55,6 +55,14 @@ function getCustomerSignature(): string {
   }
 }
 
+function normalizeProductForMetrics(product: Product): Product {
+  return {
+    ...product,
+    weight: deriveWeightKg(product),
+    isPackage: deriveIsPackage(product),
+  };
+}
+
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
@@ -70,8 +78,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
     if (typeof window === "undefined") return "anon";
     return getCustomerSignature();
   });
-  const previousSignatureRef = useRef<string>("anon");
-
   // Chave final usada no localStorage
   const cartStorageKey = `cart_${customerSignature}`;
 
@@ -79,21 +85,31 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    let lastSignature = getCustomerSignature();
-    previousSignatureRef.current = lastSignature;
-    setCustomerSignature(lastSignature);
-
-    const interval = setInterval(() => {
+    const syncSignature = () => {
       const current = getCustomerSignature();
-      if (current !== lastSignature) {
-        console.log("[CartContext] customer_session mudou, trocando carrinho...");
-        previousSignatureRef.current = lastSignature;
-        lastSignature = current;
-        setCustomerSignature(current);
-      }
-    }, 500);
+      setCustomerSignature((previous) => {
+        if (current !== previous) console.log("[CartContext] customer_session mudou, trocando carrinho...");
+        return current;
+      });
+    };
 
-    return () => clearInterval(interval);
+    const onSessionChange = () => {
+      syncSignature();
+    };
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== "customer_session" && event.key !== "employee_session") return;
+      syncSignature();
+    };
+
+    setCustomerSignature(getCustomerSignature());
+    window.addEventListener(CUSTOMER_SESSION_EVENT, onSessionChange);
+    window.addEventListener("storage", onStorage);
+
+    return () => {
+      window.removeEventListener(CUSTOMER_SESSION_EVENT, onSessionChange);
+      window.removeEventListener("storage", onStorage);
+    };
   }, []);
 
   // 📥 Carrega o carrinho sempre que o "dono" (assinatura) mudar
@@ -104,31 +120,22 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
       const storedCart = localStorage.getItem(cartStorageKey);
       if (storedCart) {
         setCartItems(JSON.parse(storedCart));
-      } else {
-        const fallbackKeys = Array.from(
-          new Set([
-            `cart_${previousSignatureRef.current}`,
-            "cart_anon",
-          ].filter((key) => key && key !== cartStorageKey))
-        );
-
-        let migrated = false;
-        for (const key of fallbackKeys) {
-          const fallbackCart = localStorage.getItem(key);
-          if (!fallbackCart) continue;
-
-          const parsed = JSON.parse(fallbackCart);
-          if (!Array.isArray(parsed) || parsed.length === 0) continue;
-
-          setCartItems(parsed);
-          localStorage.setItem(cartStorageKey, JSON.stringify(parsed));
-          migrated = true;
-          break;
-        }
-
-        if (!migrated) {
+      } else if (customerSignature !== "anon") {
+        const anonCart = localStorage.getItem("cart_anon");
+        if (anonCart) {
+          const parsed = JSON.parse(anonCart);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setCartItems(parsed);
+            localStorage.setItem(cartStorageKey, JSON.stringify(parsed));
+            localStorage.removeItem("cart_anon");
+          } else {
+            setCartItems([]);
+          }
+        } else {
           setCartItems([]);
         }
+      } else {
+        setCartItems([]);
       }
 
       console.log("[CartContext] Carrinho carregado para", cartStorageKey);
@@ -136,7 +143,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
       console.error("Error parsing stored cart for key", cartStorageKey, e);
       setCartItems([]);
     }
-  }, [cartStorageKey]);
+  }, [cartStorageKey, customerSignature]);
 
   // 💰 Total do carrinho
   const cartTotal = cartItems.reduce(
@@ -295,12 +302,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
   const itemsCount = cartItems.reduce((total, item) => total + item.quantity, 0);
 
   const totalWeight = cartItems.reduce((total, item) => {
-    const w = deriveWeightKg(item.product as any);
+    const w = deriveWeightKg(item.product);
     return total + w * item.quantity;
   }, 0);
 
   const packageCount = cartItems.reduce((count, item) => {
-    const isPkg = deriveIsPackage(item.product as any);
+    const isPkg = deriveIsPackage(item.product);
     return isPkg ? count + item.quantity : count;
   }, 0);
 
@@ -331,13 +338,3 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 };
-  const normalizeProductForMetrics = (product: Product): Product => {
-    const weight = deriveWeightKg(product as any);
-    const isPackage = deriveIsPackage(product as any);
-
-    return {
-      ...product,
-      weight,
-      isPackage,
-    };
-  };

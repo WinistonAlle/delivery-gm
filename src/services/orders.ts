@@ -1,4 +1,3 @@
-// src/services/orders.ts
 import { supabase } from "@/lib/supabase";
 import type { Product } from "@/types/products";
 
@@ -7,7 +6,7 @@ export interface CartItem {
   quantity: number;
 }
 
-interface CreateOrderParams {
+export interface CreateOrderParams {
   customerPhone: string;
   customerName: string;
   customerDocumentCpf?: string;
@@ -20,15 +19,20 @@ interface CreateOrderParams {
   items: CartItem[];
 }
 
-// gera um número de pedido legível
+interface CreateOrderResponse {
+  orderId: string;
+  orderNumber: string;
+  total: number;
+}
+
 function generateOrderNumber() {
   const now = new Date();
-  const datePart = now.toISOString().slice(0, 10).replace(/-/g, ""); // ex: 20251209
-  const randomPart = Math.floor(1000 + Math.random() * 9000); // 4 dígitos
+  const datePart = now.toISOString().slice(0, 10).replace(/-/g, "");
+  const randomPart = Math.floor(1000 + Math.random() * 9000);
   return `GM-${datePart}-${randomPart}`;
 }
 
-export async function createOrder({
+async function createOrderClientSide({
   customerPhone,
   customerName,
   customerDocumentCpf,
@@ -39,20 +43,17 @@ export async function createOrder({
   notes,
   shippingCost = 0,
   items,
-}: CreateOrderParams) {
+}: CreateOrderParams): Promise<CreateOrderResponse> {
   if (!items.length) {
     throw new Error("Nenhum item no carrinho.");
   }
 
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
-
   const itemsTotal = items.reduce(
-    (sum, item) =>
-      sum + (Number(item.product.employee_price) || 0) * item.quantity,
+    (sum, item) => sum + (Number(item.product.employee_price) || 0) * item.quantity,
     0
   );
   const finalTotal = itemsTotal + Number(shippingCost || 0);
-
   const orderNumber = generateOrderNumber();
 
   const baseOrderPayload = {
@@ -75,7 +76,6 @@ export async function createOrder({
     },
   };
 
-  // 1) Cria o pedido
   let order:
     | {
         id: string;
@@ -126,33 +126,46 @@ export async function createOrder({
   }
 
   if (orderError || !order) {
-    console.error("Erro ao inserir em orders:", orderError);
     throw orderError ?? new Error("Erro ao criar pedido.");
   }
 
-  // 2) Cria os itens do pedido
-  // ❗ NÃO enviamos subtotal porque sua coluna é gerada no banco
   const itemsPayload = items.map((item) => ({
-    order_id: order.id,                                     // uuid do pedido
+    order_id: order.id,
     product_id: item.product.id,
-    product_old_id: (item.product as any).old_id ?? null,   // 👈 old_id
+    product_old_id: item.product.old_id ?? null,
     product_name: item.product.name,
     unit_price: Number(item.product.employee_price) || 0,
-    quantity: item.quantity,                                // 👈 qtd do item
+    quantity: item.quantity,
   }));
 
-  const { error: itemsError } = await supabase
-    .from("order_items")
-    .insert(itemsPayload);
-
-  if (itemsError) {
-    console.error("Erro ao inserir em order_items:", itemsError);
-    throw itemsError;
-  }
+  const { error: itemsError } = await supabase.from("order_items").insert(itemsPayload);
+  if (itemsError) throw itemsError;
 
   return {
     orderId: order.id,
     orderNumber: order.order_number ?? orderNumber,
     total: finalTotal,
   };
+}
+
+export async function createOrder(params: CreateOrderParams): Promise<CreateOrderResponse> {
+  const response = await fetch("/api/orders", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(params),
+  });
+
+  if (response.ok) {
+    return (await response.json()) as CreateOrderResponse;
+  }
+
+  const allowInsecureFallback = import.meta.env.VITE_ALLOW_CLIENT_SIDE_ORDER_WRITE === "true";
+  if (!allowInsecureFallback) {
+    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(payload?.error || "Nao foi possivel registrar o pedido.");
+  }
+
+  return createOrderClientSide(params);
 }

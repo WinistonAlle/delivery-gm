@@ -1,7 +1,6 @@
 // src/pages/AdminOrders.tsx
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
 import { getCustomerSession } from "@/lib/customerAuth";
 
 type OrderRow = {
@@ -116,8 +115,8 @@ type PaymentKind = "wallet" | "pickup" | "mixed" | "none";
 function getPaymentMeta(
   order: Pick<OrderRow, "total_cents" | "total_value" | "wallet_used_cents" | "spent_from_balance_cents" | "pay_on_pickup_cents">
 ) {
-  const total = toCentsFromOrder(order as any);
-  const wallet = getWalletUsed(order as any);
+  const total = toCentsFromOrder(order);
+  const wallet = getWalletUsed(order);
   const pickup =
     order.pay_on_pickup_cents === null || typeof order.pay_on_pickup_cents === "undefined"
       ? Math.max(0, total - wallet)
@@ -141,10 +140,27 @@ function getPaymentMeta(
   return { total, wallet, pickup, kind, tooltip };
 }
 
-function clampInt(n: any, min: number, max: number) {
+function clampInt(n: number | string | null | undefined, min: number, max: number) {
   const x = Math.trunc(Number(n));
   if (!Number.isFinite(x)) return min;
   return Math.max(min, Math.min(max, x));
+}
+
+async function postAdminOrders<T>(payload: Record<string, unknown>): Promise<T> {
+  const response = await fetch("/api/admin-orders", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const body = (await response.json().catch(() => null)) as (T & { error?: string }) | null;
+  if (!response.ok) {
+    throw new Error(body?.error || "Erro ao processar pedidos administrativos.");
+  }
+
+  return body as T;
 }
 
 function IconWallet({ size = 14 }: { size?: number }) {
@@ -329,38 +345,21 @@ export default function AdminOrders() {
 
   async function getActorCpf(): Promise<string> {
     const fromLocal = actorCpfFromLocalStorage();
-    if (fromLocal) return fromLocal;
-
-    const { data: auth } = await supabase.auth.getUser();
-    const userId = auth?.user?.id;
-    if (!userId) return "";
-
-    const { data: emp, error } = await supabase.from("employees").select("cpf").eq("user_id", userId).maybeSingle();
-    if (error) return "";
-
-    return onlyDigits((emp as any)?.cpf || "");
+    return fromLocal;
   }
 
   async function fetchEmployeeMap(): Promise<Map<string, string>> {
+    const { orders } = await postAdminOrders<{ orders: OrderRow[] }>({
+      action: "list",
+      cpfFilter,
+      orderFilter,
+      statusFilter,
+    });
     const map = new Map<string, string>();
-
-    const { data: rpcData } = await supabase.rpc("admin_get_employees_basic");
-    if (Array.isArray(rpcData)) {
-      for (const r of rpcData as any[]) {
-        const cpf = onlyDigits(r?.cpf || "");
-        const nm = r?.full_name || null;
-        if (cpf && nm) map.set(cpf, nm);
-      }
-      return map;
-    }
-
-    const { data } = await supabase.from("employees").select("cpf, full_name");
-    if (Array.isArray(data)) {
-      for (const r of data as any[]) {
-        const cpf = onlyDigits(r?.cpf || "");
-        const nm = r?.full_name || null;
-        if (cpf && nm) map.set(cpf, nm);
-      }
+    for (const order of orders) {
+      const cpf = onlyDigits(order.employee_cpf || "");
+      const name = order.employee_name || null;
+      if (cpf && name) map.set(cpf, name);
     }
     return map;
   }
@@ -368,99 +367,45 @@ export default function AdminOrders() {
   async function loadOrders() {
     setLoading(true);
     setErr(null);
-
-    let q = supabase
-      .from("orders")
-      .select(
-        [
-          "id",
-          "order_number",
-          "employee_id",
-          "employee_cpf",
-          "employee_name",
-          "total_items",
-          "total_value",
-          "total_cents",
-          "wallet_used_cents",
-          "spent_from_balance_cents",
-          "pay_on_pickup_cents",
-          "status",
-          "created_at",
-          "cancelled_at",
-          "cancel_reason",
-        ].join(",")
-      )
-      .order("created_at", { ascending: false });
-
-    const cpf = onlyDigits(cpfFilter);
-    if (cpf) q = q.ilike("employee_cpf", `%${cpf}%`);
-    if (orderFilter.trim()) q = q.ilike("order_number", `%${orderFilter.trim()}%`);
-    if (statusFilter) q = q.eq("status", statusFilter);
-
-    const { data, error } = await q;
-    if (error) {
-      setErr(error.message);
-      setOrders([]);
-      setLoading(false);
-      return;
-    }
-
-    const list = (Array.isArray(data) ? data : []) as unknown as OrderRow[];
-
-    const needName = list.some((o) => !o.employee_name && o.employee_cpf);
-    if (needName) {
-      const cpfMap = await fetchEmployeeMap();
-      const patched = list.map((o) => {
-        if (o.employee_name) return o;
-        const cpfKey = onlyDigits(o.employee_cpf || "");
-        return { ...o, employee_name: cpfMap.get(cpfKey) ?? null };
+    try {
+      const { orders: list } = await postAdminOrders<{ orders: OrderRow[] }>({
+        action: "list",
+        cpfFilter,
+        orderFilter,
+        statusFilter,
       });
-      setOrders(patched);
-    } else {
       setOrders(list);
+    } catch (error) {
+      setErr(error instanceof Error ? error.message : "Erro ao carregar pedidos.");
+      setOrders([]);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }
 
   async function reloadSelectedOrder(orderId: string) {
-    const { data, error } = await supabase
-      .from("orders")
-      .select(
-        [
-          "id",
-          "order_number",
-          "employee_id",
-          "employee_cpf",
-          "employee_name",
-          "total_items",
-          "total_value",
-          "total_cents",
-          "wallet_used_cents",
-          "spent_from_balance_cents",
-          "pay_on_pickup_cents",
-          "status",
-          "created_at",
-          "cancelled_at",
-          "cancel_reason",
-        ].join(",")
-      )
-      .eq("id", orderId)
-      .maybeSingle();
-
-    if (!error && data) setSelected(data as any);
+    try {
+      const { order } = await postAdminOrders<{ order: OrderRow | null }>({
+        action: "get_order",
+        orderId,
+      });
+      if (order) setSelected(order);
+    } catch {
+      // no-op
+    }
   }
 
   async function loadHistory(orderId: string) {
     setHistoryLoading(true);
-    const { data, error } = await supabase
-      .from("order_admin_actions")
-      .select("*")
-      .eq("order_id", orderId)
-      .order("created_at", { ascending: false });
-
-    if (error) setHistory([]);
-    else setHistory(Array.isArray(data) ? (data as AdminActionRow[]) : []);
+    try {
+      const { history } = await postAdminOrders<{ history: AdminActionRow[] }>({
+        action: "history",
+        orderId,
+      });
+      setHistory(history);
+    } catch {
+      setHistory([]);
+    }
     setHistoryLoading(false);
   }
 
@@ -470,51 +415,10 @@ export default function AdminOrders() {
     setItemsErr(null);
 
     try {
-      // 1) tenta ordenar por created_at (se existir)
-      let res = await supabase
-        .from("order_items")
-        .select("*, products(name)")
-        .eq("order_id", orderId)
-        .order("created_at", { ascending: true });
-
-      // 2) fallback: schema não tem created_at
-      if (res.error && String(res.error.message || "").toLowerCase().includes("created_at")) {
-        res = await supabase
-          .from("order_items")
-          .select("*, products(name)")
-          .eq("order_id", orderId)
-          .order("id", { ascending: true });
-      }
-
-      if (res.error) throw new Error(res.error.message);
-
-      const rows = (Array.isArray(res.data) ? res.data : []) as any[];
-
-      const mapped: OrderItemRow[] = rows.map((r) => {
-        const q = Number(r?.quantity ?? r?.qtd ?? r?.amount ?? r?.qty ?? 0);
-
-        const unitCents =
-          Number(r?.unit_price_cents ?? 0) ||
-          Number(r?.price_cents ?? 0) ||
-          Math.round(Number(r?.unit_price ?? 0) * 100) ||
-          Math.round(Number(r?.price ?? 0) * 100) ||
-          Math.round(Number(r?.unit_value ?? 0) * 100) ||
-          Math.round(Number(r?.value ?? 0) * 100) ||
-          0;
-
-        const name = r?.products?.name ?? r?.product_name ?? r?.name ?? null;
-
-        return {
-          id: r.id,
-          order_id: r.order_id,
-          product_id: r.product_id ?? null,
-          product_name: name,
-          quantity: q,
-          unit_price_cents: unitCents,
-          total_cents: q * unitCents,
-        };
+      const { items: mapped } = await postAdminOrders<{ items: OrderItemRow[] }>({
+        action: "items",
+        orderId,
       });
-
       setOrderItems(mapped);
 
       // ✅ inicializa qty padrão (1) para itens com quantidade > 1
@@ -527,8 +431,8 @@ export default function AdminOrders() {
         }
         return next;
       });
-    } catch (e: any) {
-      setItemsErr(e?.message || "Erro ao carregar itens do pedido");
+    } catch (e: unknown) {
+      setItemsErr(e instanceof Error ? e.message : "Erro ao carregar itens do pedido");
       setOrderItems([]);
     } finally {
       setItemsLoading(false);
@@ -551,14 +455,15 @@ export default function AdminOrders() {
     }
 
     setCanceling(true);
-    const { error } = await supabase.rpc("admin_cancel_order_v2", {
-      p_order_id: selected.id,
-      p_reason: cancelReason,
-      p_actor_cpf: actorCpf,
-    });
-
-    if (error) {
-      alert(error.message);
+    try {
+      await postAdminOrders({
+        action: "cancel",
+        orderId: selected.id,
+        reason: cancelReason,
+        actorCpf,
+      });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Erro ao cancelar pedido.");
       setCanceling(false);
       return;
     }
@@ -593,15 +498,16 @@ export default function AdminOrders() {
 
     setRemovingItemId(item.id);
 
-    const { error } = await supabase.rpc("admin_remove_order_item_v3", {
-      p_order_id: selected.id,
-      p_order_item_id: item.id,
-      p_reason: removeReason,
-      p_actor_cpf: actorCpf,
-    });
-
-    if (error) {
-      alert(error.message);
+    try {
+      await postAdminOrders({
+        action: "remove_item",
+        orderId: selected.id,
+        orderItemId: item.id,
+        reason: removeReason,
+        actorCpf,
+      });
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Erro ao remover item.");
       setRemovingItemId(null);
       return;
     }
@@ -653,22 +559,23 @@ export default function AdminOrders() {
     setRemovingItemId(item.id);
 
     // ⚠️ Esse RPC precisa existir no banco: decrementa quantity e recalcula/estorna proporcional.
-    const { error } = await supabase.rpc("admin_remove_order_item_qty_v1", {
-      p_order_id: selected.id,
-      p_order_item_id: item.id,
-      p_remove_qty: qty,
-      p_reason: removeReason,
-      p_actor_cpf: actorCpf,
-    });
-
-    if (error) {
-      const msg = String(error.message || "");
+    try {
+      await postAdminOrders({
+        action: "remove_qty",
+        orderId: selected.id,
+        orderItemId: item.id,
+        qty,
+        reason: removeReason,
+        actorCpf,
+      });
+    } catch (error) {
+      const msg = String(error instanceof Error ? error.message : "");
       if (msg.toLowerCase().includes("function") && msg.toLowerCase().includes("does not exist")) {
         alert(
           "Falta criar o RPC do banco para remover quantidade parcial.\n\nCrie a função:\nadmin_remove_order_item_qty_v1(p_order_id, p_order_item_id, p_remove_qty, p_reason, p_actor_cpf)\n\nDepois tente novamente."
         );
       } else {
-        alert(error.message);
+        alert(msg || "Erro ao remover quantidade do item.");
       }
       setRemovingItemId(null);
       return;
@@ -687,57 +594,12 @@ export default function AdminOrders() {
     setCancelLogsErr(null);
 
     try {
-      const cpfMap = await fetchEmployeeMap();
-
-      const { data: actions, error: aErr } = await supabase
-        .from("order_admin_actions")
-        .select("order_id, actor_cpf, reason, created_at, action")
-        .eq("action", "cancel_order")
-        .order("created_at", { ascending: false })
-        .limit(200);
-
-      if (aErr) throw new Error(aErr.message);
-
-      const actionRows = (Array.isArray(actions) ? actions : []) as any[];
-      const orderIds = Array.from(new Set(actionRows.map((x) => x.order_id).filter(Boolean)));
-
-      const { data: ords, error: oErr } = await supabase
-        .from("orders")
-        .select(
-          "id, order_number, employee_cpf, employee_name, total_value, total_cents, wallet_used_cents, spent_from_balance_cents, pay_on_pickup_cents, cancelled_at"
-        )
-        .in("id", orderIds);
-
-      if (oErr) throw new Error(oErr.message);
-
-      const orderMap = new Map<string, any>();
-      for (const o of (Array.isArray(ords) ? ords : []) as any[]) orderMap.set(o.id, o);
-
-      const merged: CancellationLogRow[] = actionRows.map((a) => {
-        const ord = orderMap.get(a.order_id);
-        const empCpfKey = onlyDigits(ord?.employee_cpf || "");
-        const actorCpfKey = onlyDigits(a?.actor_cpf || "");
-
-        return {
-          order_id: a.order_id,
-          order_number: ord?.order_number ?? null,
-          employee_cpf: ord?.employee_cpf ?? null,
-          employee_name: ord?.employee_name ?? cpfMap.get(empCpfKey) ?? null,
-          actor_cpf: a?.actor_cpf ?? null,
-          actor_name: cpfMap.get(actorCpfKey) ?? null,
-          cancelled_at: ord?.cancelled_at ?? a?.created_at ?? null,
-          reason: a?.reason ?? null,
-          total_value: ord?.total_value ?? null,
-          total_cents: ord?.total_cents ?? null,
-          wallet_used_cents: ord?.wallet_used_cents ?? null,
-          spent_from_balance_cents: ord?.spent_from_balance_cents ?? null,
-          pay_on_pickup_cents: ord?.pay_on_pickup_cents ?? null,
-        };
+      const { cancelLogs } = await postAdminOrders<{ cancelLogs: CancellationLogRow[] }>({
+        action: "cancellations",
       });
-
-      setCancelLogs(merged);
-    } catch (e: any) {
-      setCancelLogsErr(e?.message || "Erro ao carregar histórico de cancelamentos");
+      setCancelLogs(cancelLogs);
+    } catch (e: unknown) {
+      setCancelLogsErr(e instanceof Error ? e.message : "Erro ao carregar histórico de cancelamentos");
       setCancelLogs([]);
     } finally {
       setCancelLogsLoading(false);

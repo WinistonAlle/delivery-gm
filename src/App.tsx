@@ -1,5 +1,5 @@
 // src/App.tsx
-import { useEffect } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -14,30 +14,21 @@ import EscolhaUsuario from "./pages/EscolhaUsuario";
 import Login from "./pages/Login";
 import Cadastro from "./pages/Cadastro";
 import Index from "./pages/Index";
-import Avisos from "./pages/Avisos";
-import Checkout from "./pages/Checkout";
-import MyOrdersPage from "./pages/MyOrdersPage";
 import NotFound from "./pages/NotFound";
-
-// ✅ Favoritos
-import FavoritesPage from "./pages/Favorites";
-
-// ✅ Destaques (Admin)
-import Destaques from "./pages/Destaques";
-
-// Admin / RH / Relatórios / Separação
-import Admin from "./pages/Admin";
-import AdminOffers from "./pages/AdminOffers";
-import ReportsDashboard from "./pages/ReportsDashboard";
-import DeliveryOps from "./pages/DeliveryOps";
-
-// ✅ NOVO: AdminOrders
-import AdminOrders from "./pages/AdminOrders"; 
 import { applyTheme, getLocalTheme, loadTheme } from "./lib/appTheme";
 import { trackCustomerEventOnce } from "./lib/customerInsights";
 import { getCustomerSession } from "./lib/customerAuth";
-// Se o seu arquivo estiver em: src/pages/admin/AdminOrders.tsx, use:
-// import AdminOrders from "./pages/admin/AdminOrders";
+
+const Avisos = lazy(() => import("./pages/Avisos"));
+const Checkout = lazy(() => import("./pages/Checkout"));
+const MyOrdersPage = lazy(() => import("./pages/MyOrdersPage"));
+const FavoritesPage = lazy(() => import("./pages/Favorites"));
+const Destaques = lazy(() => import("./pages/Destaques"));
+const Admin = lazy(() => import("./pages/Admin"));
+const AdminOffers = lazy(() => import("./pages/AdminOffers"));
+const ReportsDashboard = lazy(() => import("./pages/ReportsDashboard"));
+const DeliveryOps = lazy(() => import("./pages/DeliveryOps"));
+const AdminOrders = lazy(() => import("./pages/AdminOrders"));
 
 const queryClient = new QueryClient();
 
@@ -102,6 +93,16 @@ function RouteTracker() {
   return null;
 }
 
+function RouteFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-white px-4">
+      <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm font-semibold text-slate-600 shadow-sm">
+        Carregando...
+      </div>
+    </div>
+  );
+}
+
 /* --------------------------------------------------------
    APP
 -------------------------------------------------------- */
@@ -138,124 +139,121 @@ function App() {
         <CartProvider>
           <BrowserRouter>
             <RouteTracker />
-            <Routes>
-              {/* Home */}
-              <Route path="/" element={<Navigate to="/catalogo" replace />} />
-              <Route path="/entrada" element={<EscolhaUsuario />} />
+            <Suspense fallback={<RouteFallback />}>
+              <Routes>
+                {/* Home */}
+                <Route path="/" element={<Navigate to="/catalogo" replace />} />
+                <Route path="/entrada" element={<EscolhaUsuario />} />
 
-              {/* Login */}
-              <Route path="/login" element={<Login />} />
-              <Route path="/cadastro" element={<Cadastro />} />
+                {/* Login */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/cadastro" element={<Cadastro />} />
 
-              {/* Catálogo */}
-              <Route
-                path="/catalogo"
-                element={
-                  <Index />
-                }
-              />
+                {/* Catálogo */}
+                <Route path="/catalogo" element={<Index />} />
 
-              {/* Favoritos */}
-              <Route
-                path="/favoritos"
-                element={
-                  <RequireAuth>
-                    <FavoritesPage />
-                  </RequireAuth>
-                }
-              />
+                {/* Favoritos */}
+                <Route
+                  path="/favoritos"
+                  element={
+                    <RequireAuth>
+                      <FavoritesPage />
+                    </RequireAuth>
+                  }
+                />
 
-              {/* Avisos */}
-              <Route
-                path="/avisos"
-                element={
-                  <RequireAuth>
-                    <Avisos />
-                  </RequireAuth>
-                }
-              />
+                {/* Avisos */}
+                <Route
+                  path="/avisos"
+                  element={
+                    <RequireAuth>
+                      <Avisos />
+                    </RequireAuth>
+                  }
+                />
 
-              {/* ✅ Destaques (Admin) */}
-              <Route
-                path="/destaques"
-                element={
-                  <RequireRole allow={["admin"]} redirectTo="/catalogo">
-                    <Destaques />
-                  </RequireRole>
-                }
-              />
+                {/* ✅ Destaques (Admin) */}
+                <Route
+                  path="/destaques"
+                  element={
+                    <RequireRole allow={["admin"]} redirectTo="/catalogo">
+                      <Destaques />
+                    </RequireRole>
+                  }
+                />
 
-              {/* Meus pedidos */}
-              <Route
-                path="/meus-pedidos"
-                element={
-                  <RequireAuth>
-                    <MyOrdersPage />
-                  </RequireAuth>
-                }
-              />
+                {/* Meus pedidos */}
+                <Route
+                  path="/meus-pedidos"
+                  element={
+                    <RequireAuth>
+                      <MyOrdersPage />
+                    </RequireAuth>
+                  }
+                />
 
-              {/* Checkout */}
-              <Route
-                path="/checkout"
-                element={
-                  <RequireAuth>
-                    <Checkout />
-                  </RequireAuth>
-                }
-              />
+                {/* Checkout */}
+                <Route
+                  path="/checkout"
+                  element={
+                    <RequireAuth>
+                      <Checkout />
+                    </RequireAuth>
+                  }
+                />
 
-              {/* Admin */}
-              <Route
-                path="/admin"
-                element={
-                  <RequireRole allow={["admin"]} redirectTo="/catalogo">
-                    <Admin />
-                  </RequireRole>
-                }
-              />
+                {/* Admin */}
+                <Route
+                  path="/admin"
+                  element={
+                    <RequireRole allow={["admin"]} redirectTo="/catalogo">
+                      <Admin />
+                    </RequireRole>
+                  }
+                />
 
-              <Route
-                path="/admin/ofertas"
-                element={
-                  <RequireRole allow={["admin"]} redirectTo="/catalogo">
-                    <AdminOffers />
-                  </RequireRole>
-                }
-              />
+                <Route
+                  path="/admin/ofertas"
+                  element={
+                    <RequireRole allow={["admin"]} redirectTo="/catalogo">
+                      <AdminOffers />
+                    </RequireRole>
+                  }
+                />
 
-              {/* ✅ NOVO: Admin - Pedidos (cancelar/editar + histórico) */}
-              <Route
-                path="/admin/pedidos"
-                element={
-                  <RequireRole allow={["admin"]} redirectTo="/catalogo">
-                    <AdminOrders />
-                  </RequireRole>
-                }
-              />
+                {/* ✅ NOVO: Admin - Pedidos (cancelar/editar + histórico) */}
+                <Route
+                  path="/admin/pedidos"
+                  element={
+                    <RequireRole allow={["admin"]} redirectTo="/catalogo">
+                      <AdminOrders />
+                    </RequireRole>
+                  }
+                />
 
-              <Route
-                path="/operacao-delivery"
-                element={
-                  <RequireRole allow={["admin"]} redirectTo="/catalogo">
-                    <DeliveryOps />
-                  </RequireRole>
-                }
-              />
+                <Route
+                  path="/operacao-delivery"
+                  element={
+                    <RequireRole allow={["admin"]} redirectTo="/catalogo">
+                      <DeliveryOps />
+                    </RequireRole>
+                  }
+                />
 
-              {/* Relatórios (Admin + RH) */}
-              <Route
-                path="/relatorios"
-                element={
-                  <RequireRole allow={["admin"]} redirectTo="/catalogo">
-                    <ReportsDashboard />
-                  </RequireRole>
-                }
-              />
+                {/* Relatórios (Admin + RH) */}
+                <Route
+                  path="/relatorios"
+                  element={
+                    <RequireRole allow={["admin"]} redirectTo="/catalogo">
+                      <ReportsDashboard />
+                    </RequireRole>
+                  }
+                />
 
-              {/* 404 */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+                {/* 404 */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
           </BrowserRouter>
         </CartProvider>
       </TooltipProvider>

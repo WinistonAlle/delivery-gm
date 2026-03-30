@@ -21,11 +21,12 @@ import logo from "../images/logoc.png";
 import { incrementMetric } from "@/lib/deliveryEnhancements";
 import { loadPlacementRecommendations } from "@/lib/deliveryOffers";
 import { FREE_SHIPPING_THRESHOLD, SHIPPING_RATES } from "@/data/shipping";
-import { findCustomerByPhone, getCustomerSession, CUSTOMER_SESSION_KEY, LEGACY_SESSION_KEY } from "@/lib/customerAuth";
+import { STORE_WHATSAPP } from "@/data/products";
+import { type CustomerSession, findCustomerByPhone, getCustomerSession, saveCustomerSession } from "@/lib/customerAuth";
 import { trackCustomerEvent, trackCustomerEventOnce } from "@/lib/customerInsights";
 
 function safeGetSession() {
-  return getCustomerSession();
+  return getCustomerSession() as CustomerSession | null;
 }
 
 const onlyDigits = (v: string) => v.replace(/\D/g, "");
@@ -87,11 +88,11 @@ const Checkout: React.FC = () => {
   const navigate = useNavigate();
   const { cartItems, cartTotal, clearCart, addToCart } = useCart();
 
-  const session = useMemo(() => safeGetSession() ?? {}, []);
-  const customerDocumentCpf = (session as any)?.document_cpf?.toString?.() ?? "";
-  const customerCep = (session as any)?.cep?.toString?.() ?? "";
-  const customerHowFoundUs = (session as any)?.how_found_us?.toString?.() ?? "";
-  const customerHowFoundUsDetails = (session as any)?.how_found_us_details?.toString?.() ?? "";
+  const session = useMemo<CustomerSession | null>(() => safeGetSession(), []);
+  const customerDocumentCpf = session?.document_cpf?.toString?.() ?? "";
+  const customerCep = session?.cep?.toString?.() ?? "";
+  const customerHowFoundUs = session?.how_found_us?.toString?.() ?? "";
+  const customerHowFoundUsDetails = session?.how_found_us_details?.toString?.() ?? "";
 
   const [customerName, setCustomerName] = useState(session?.full_name ?? session?.name ?? "");
   const [customerPhone, setCustomerPhone] = useState(session?.phone ?? session?.cpf ?? "");
@@ -222,10 +223,10 @@ const Checkout: React.FC = () => {
         cep: customerCep,
         address: deliveryAddress.trim(),
         addresses: Array.from(new Set([deliveryAddress.trim()].filter(Boolean))),
-        role: (session as any)?.role ?? "customer",
+        role: session?.role ?? "customer",
+        is_admin: session?.is_admin ?? false,
       };
-      localStorage.setItem(CUSTOMER_SESSION_KEY, JSON.stringify(updatedSession));
-      localStorage.setItem(LEGACY_SESSION_KEY, JSON.stringify(updatedSession));
+      saveCustomerSession(updatedSession);
 
       clearCart();
       incrementMetric("finishedOrderCount");
@@ -285,7 +286,7 @@ const Checkout: React.FC = () => {
       }
 
       const msg = encodeURIComponent(messageLines.join("\n"));
-      const whatsappUrl = `https://wa.me/5561985941557?text=${msg}`;
+      const whatsappUrl = `https://wa.me/${STORE_WHATSAPP}?text=${msg}`;
 
       if (whatsappWindow) {
         whatsappWindow.location.href = whatsappUrl;
@@ -294,12 +295,12 @@ const Checkout: React.FC = () => {
       }
 
       navigate("/meus-pedidos", { replace: true });
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (whatsappWindow && !whatsappWindow.closed) {
         whatsappWindow.close();
       }
       toast.error("Erro ao finalizar pedido", {
-        description: err?.message || "Tente novamente em alguns instantes.",
+        description: err instanceof Error ? err.message : "Tente novamente em alguns instantes.",
       });
     } finally {
       setIsSubmitting(false);

@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
 import {
   Home,
   BarChart2,
@@ -29,8 +28,6 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
-import jsPDF from "jspdf";
-import "jspdf-autotable";
 import {
   Dialog,
   DialogContent,
@@ -39,6 +36,23 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { getCustomerSession } from "@/lib/customerAuth";
+
+async function postReportsDashboard<T>(payload: Record<string, unknown>): Promise<T> {
+  const response = await fetch("/api/reports-dashboard", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const body = (await response.json().catch(() => null)) as (T & { error?: string }) | null;
+  if (!response.ok) {
+    throw new Error(body?.error || "Erro ao carregar dashboard.");
+  }
+
+  return body as T;
+}
 
 /** Helper: sessão do cliente/admin */
 function safeGetEmployee() {
@@ -68,6 +82,11 @@ type Summary = {
   totalRevenue: number;
   totalItems: number;
   avgTicket: number;
+};
+
+type SummaryInput = {
+  total_items?: number | null;
+  total_value?: number | null;
 };
 
 type CustomerSummary = {
@@ -177,7 +196,7 @@ const getMonthStartEnd = (value: string): { start: Date; end: Date } => {
   return { start, end };
 };
 
-const buildSummaryFromOrders = (orders: any[]): Summary => {
+const buildSummaryFromOrders = (orders: SummaryInput[]): Summary => {
   const totalOrders = orders.length;
   let totalRevenue = 0;
   let totalItems = 0;
@@ -202,7 +221,7 @@ const initialMonthOptions = buildLastMonthsOptions();
 
 const ReportsPage: React.FC = () => {
   const navigate = useNavigate();
-  const employee: any = safeGetEmployee();
+  const employee = safeGetEmployee() as Record<string, unknown>;
   const isAdmin =
     employee?.is_admin ||
     employee?.role === "admin" ||
@@ -268,288 +287,34 @@ const ReportsPage: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        const now = new Date();
-
-        // ---------- PERÍODO SELECIONADO ----------
-        let rangeStart: Date;
-        let rangeEnd: Date;
-
-        if (selectedRange === "mes_atual") {
-          rangeStart = new Date(now.getFullYear(), now.getMonth(), 1);
-          rangeEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-        } else if (selectedRange === "mes_anterior") {
-          const firstDayCurrent = new Date(
-            now.getFullYear(),
-            now.getMonth(),
-            1
-          );
-          const firstDayPrev = new Date(
-            now.getFullYear(),
-            now.getMonth() - 1,
-            1
-          );
-          rangeStart = firstDayPrev;
-          rangeEnd = firstDayCurrent;
-        } else {
-          // últimos 90 dias
-          rangeEnd = new Date();
-          rangeStart = new Date();
-          rangeStart.setDate(rangeStart.getDate() - 90);
-        }
-
-        setCurrentRange({
-          start: rangeStart.toISOString(),
-          end: rangeEnd.toISOString(),
+        const payload = await postReportsDashboard<{
+          currentRange: { start: string; end: string };
+          ordersRaw: RawOrder[];
+          summary: Summary;
+          comparisonSummary: Summary | null;
+          dailySummary: DailySummary | null;
+          topCustomers: CustomerSummary[];
+          topProducts: ProductSummary[];
+          visitorFunnel: VisitorFunnelSummary | null;
+          leadsWithoutPurchase: LeadWithoutPurchase[];
+        }>({
+          action: "overview",
+          selectedRange,
         });
 
-        // ---------- QUERY PRINCIPAL (PERÍODO ATUAL) ----------
-        const { data, error } = await supabase
-          .from("orders")
-          .select(
-            `
-            id,
-            *,
-            total_items,
-            total_value,
-            status,
-            created_at,
-            order_items (
-              product_id,
-              product_name,
-              quantity,
-              subtotal
-            )
-          `
-          )
-          .gte("created_at", rangeStart.toISOString())
-          .lt("created_at", rangeEnd.toISOString());
-
-        if (error) {
-          console.error("Erro ao carregar dashboard:", error);
-          setError(error.message || "Erro ao carregar dados do dashboard.");
-          return;
-        }
-
-        const orders: RawOrder[] = (data as any[]) ?? [];
-        setOrdersRaw(orders);
-
-        const { data: eventsData, error: eventsError } = await supabase
-          .from("delivery_customer_events")
-          .select("id, visitor_id, event_name, customer_name, phone, document_cpf, path, created_at")
-          .gte("created_at", rangeStart.toISOString())
-          .lt("created_at", rangeEnd.toISOString())
-          .order("created_at", { ascending: false });
-
-        if (eventsError) {
-          console.error("Erro ao carregar eventos de visitantes:", eventsError);
-          setVisitorFunnel(null);
-          setLeadsWithoutPurchase([]);
-        } else {
-          const events = ((eventsData as CustomerEventRow[]) ?? []).filter((event) => event.visitor_id);
-          const visitors = new Set<string>();
-          const registered = new Set<string>();
-          const checkoutStarted = new Set<string>();
-          const buyers = new Set<string>();
-          const latestByVisitor = new Map<string, LeadWithoutPurchase>();
-
-          for (const event of events) {
-            visitors.add(event.visitor_id);
-
-            if (event.event_name === "signup_completed") {
-              registered.add(event.visitor_id);
-            }
-
-            if (event.event_name === "checkout_started" || event.event_name === "checkout_view") {
-              checkoutStarted.add(event.visitor_id);
-            }
-
-            if (event.event_name === "order_completed") {
-              buyers.add(event.visitor_id);
-            }
-
-            if (!latestByVisitor.has(event.visitor_id)) {
-              latestByVisitor.set(event.visitor_id, {
-                visitorId: event.visitor_id,
-                customerName: event.customer_name,
-                phone: event.phone,
-                documentCpf: event.document_cpf,
-                lastEventName: event.event_name,
-                lastPath: event.path,
-                lastSeenAt: event.created_at,
-              });
-            }
-          }
-
-          const withoutPurchase = Array.from(latestByVisitor.values())
-            .filter((lead) => !buyers.has(lead.visitorId))
-            .sort(
-              (a, b) =>
-                new Date(b.lastSeenAt).getTime() - new Date(a.lastSeenAt).getTime()
-            )
-            .slice(0, 12);
-
-          setVisitorFunnel({
-            uniqueVisitors: visitors.size,
-            registeredVisitors: registered.size,
-            checkoutVisitors: checkoutStarted.size,
-            buyers: buyers.size,
-            visitorsWithoutPurchase: Math.max(0, visitors.size - buyers.size),
-          });
-          setLeadsWithoutPurchase(withoutPurchase);
-        }
-
-        // ---- agregações para período atual ----
-        let totalOrders = orders.length;
-        let totalRevenue = 0;
-        let totalItems = 0;
-
-        const customerMap = new Map<string, CustomerSummary>();
-        const prodMap = new Map<string, ProductSummary>();
-
-        for (const o of orders) {
-          const orderValue = Number(o.total_value ?? 0);
-          const itemsCount = Number(o.total_items ?? 0);
-
-          totalRevenue += orderValue;
-          totalItems += itemsCount;
-
-          // cliente
-          const customerKey = o.customer_phone || "sem-telefone";
-          const customerExisting =
-            customerMap.get(customerKey) ??
-            ({
-              phone: o.customer_phone ?? null,
-              name:
-                o.customer_name ??
-                o.customer_phone ??
-                "Cliente não identificado",
-              totalValue: 0,
-              totalOrders: 0,
-            } as CustomerSummary);
-
-          customerExisting.totalValue += orderValue;
-          customerExisting.totalOrders += 1;
-          customerMap.set(customerKey, customerExisting);
-
-          // produtos
-          (o.order_items ?? []).forEach((it) => {
-            const pKey =
-              it.product_id !== null && it.product_id !== undefined
-                ? String(it.product_id)
-                : it.product_name ?? "sem-produto";
-
-            const prodExisting =
-              prodMap.get(pKey) ??
-              ({
-                productId: it.product_id ?? null,
-                productName: it.product_name ?? "Produto sem nome",
-                totalQuantity: 0,
-                totalValue: 0,
-              } as ProductSummary);
-
-            prodExisting.totalQuantity += Number(it.quantity ?? 0);
-            prodExisting.totalValue += Number(it.subtotal ?? 0);
-            prodMap.set(pKey, prodExisting);
-          });
-        }
-
-        const avgTicket = totalOrders > 0 ? totalRevenue / totalOrders : 0;
-
-        const summaryCurrent: Summary = {
-          totalOrders,
-          totalRevenue,
-          totalItems,
-          avgTicket,
-        };
-
-        setSummary(summaryCurrent);
-
-        const customerList = Array.from(customerMap.values()).sort(
-          (a, b) => b.totalValue - a.totalValue
-        );
-        const prodList = Array.from(prodMap.values()).sort(
-          (a, b) => b.totalQuantity - a.totalQuantity
-        );
-
-        setTopCustomers(customerList.slice(0, 5));
-        setTopProducts(prodList.slice(0, 5));
-
-        // ---------- COMPARAÇÃO COM PERÍODO ANTERIOR ----------
-        const rangeMs = rangeEnd.getTime() - rangeStart.getTime();
-        const compEnd = new Date(rangeStart);
-        const compStart = new Date(compEnd.getTime() - rangeMs);
-
-        const { data: compData, error: compError } = await supabase
-          .from("orders")
-          .select("id, total_items, total_value, created_at")
-          .gte("created_at", compStart.toISOString())
-          .lt("created_at", compEnd.toISOString());
-
-        if (compError) {
-          console.error("Erro ao carregar período de comparação:", compError);
-          setComparisonSummary(null);
-        } else {
-          const compOrders: any[] = compData ?? [];
-          let compTotalOrders = compOrders.length;
-          let compTotalRevenue = 0;
-          let compTotalItems = 0;
-
-          for (const o of compOrders) {
-            compTotalRevenue += Number(o.total_value ?? 0);
-            compTotalItems += Number(o.total_items ?? 0);
-          }
-
-          const compAvgTicket =
-            compTotalOrders > 0 ? compTotalRevenue / compTotalOrders : 0;
-
-          setComparisonSummary({
-            totalOrders: compTotalOrders,
-            totalRevenue: compTotalRevenue,
-            totalItems: compTotalItems,
-            avgTicket: compAvgTicket,
-          });
-        }
-
-        // ---------- RESUMO DO DIA (sempre hoje) ----------
-        const today = new Date();
-        const todayStart = new Date(
-          today.getFullYear(),
-          today.getMonth(),
-          today.getDate()
-        );
-        const tomorrow = new Date(todayStart);
-        tomorrow.setDate(todayStart.getDate() + 1);
-
-        const { data: todayOrders, error: todayError } = await supabase
-          .from("orders")
-          .select("id, total_items, total_value, created_at")
-          .gte("created_at", todayStart.toISOString())
-          .lt("created_at", tomorrow.toISOString());
-
-        if (todayError) {
-          console.error("Erro ao carregar resumo do dia:", todayError);
-          setDailySummary(null);
-        } else {
-          const list = (todayOrders as any[]) ?? [];
-          let totalOrdersToday = list.length;
-          let totalRevenueToday = 0;
-          let totalItemsToday = 0;
-
-          for (const o of list) {
-            totalRevenueToday += Number(o.total_value ?? 0);
-            totalItemsToday += Number(o.total_items ?? 0);
-          }
-
-          setDailySummary({
-            totalOrdersToday,
-            totalRevenueToday,
-            totalItemsToday,
-          });
-        }
-      } catch (err: any) {
+        setCurrentRange(payload.currentRange);
+        setOrdersRaw(payload.ordersRaw);
+        setSummary(payload.summary);
+        setComparisonSummary(payload.comparisonSummary);
+        setDailySummary(payload.dailySummary);
+        setTopCustomers(payload.topCustomers);
+        setTopProducts(payload.topProducts);
+        setVisitorFunnel(payload.visitorFunnel);
+        setLeadsWithoutPurchase(payload.leadsWithoutPurchase);
+      } catch (err: unknown) {
         console.error("Erro inesperado ao carregar dashboard:", err);
         setError(
-          err?.message || "Ocorreu um erro inesperado ao carregar o dashboard."
+          err instanceof Error ? err.message : "Ocorreu um erro inesperado ao carregar o dashboard."
         );
       } finally {
         setLoading(false);
@@ -568,41 +333,15 @@ const ReportsPage: React.FC = () => {
       setMonthComparisonError(null);
 
       try {
-        const { start: start1, end: end1 } = getMonthStartEnd(compareMonth1);
-        const { start: start2, end: end2 } = getMonthStartEnd(compareMonth2);
+        const payload = await postReportsDashboard<{
+          monthComparison: { month1: Summary; month2: Summary };
+        }>({
+          action: "monthComparison",
+          compareMonth1,
+          compareMonth2,
+        });
 
-        const [res1, res2] = await Promise.all([
-          supabase
-            .from("orders")
-            .select("id, total_items, total_value, created_at")
-            .gte("created_at", start1.toISOString())
-            .lt("created_at", end1.toISOString()),
-          supabase
-            .from("orders")
-            .select("id, total_items, total_value, created_at")
-            .gte("created_at", start2.toISOString())
-            .lt("created_at", end2.toISOString()),
-        ]);
-
-        if (res1.error || res2.error) {
-          console.error("Erro ao carregar comparação de meses:", {
-            error1: res1.error,
-            error2: res2.error,
-          });
-          setMonthComparison(null);
-          setMonthComparisonError(
-            "Não foi possível carregar a comparação entre os meses selecionados."
-          );
-          return;
-        }
-
-        const orders1: any[] = (res1.data as any[]) ?? [];
-        const orders2: any[] = (res2.data as any[]) ?? [];
-
-        const summary1 = buildSummaryFromOrders(orders1);
-        const summary2 = buildSummaryFromOrders(orders2);
-
-        setMonthComparison({ month1: summary1, month2: summary2 });
+        setMonthComparison(payload.monthComparison);
       } catch (err) {
         console.error("Erro inesperado na comparação de meses:", err);
         setMonthComparison(null);
@@ -745,10 +484,15 @@ const ReportsPage: React.FC = () => {
   };
 
   // --- EXPORTAR PDF ---
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (!summary) return;
 
-    const doc = new jsPDF();
+    const [{ default: JsPDF }] = await Promise.all([
+      import("jspdf"),
+      import("jspdf-autotable"),
+    ]);
+
+    const doc = new JsPDF();
     const dateStr = new Date().toLocaleString("pt-BR");
 
     // Título
@@ -801,10 +545,14 @@ const ReportsPage: React.FC = () => {
     }
 
     let currentY = dailySummary ? 97 : 77;
+    const autoTableDoc = doc as unknown as {
+      autoTable: (options: Record<string, unknown>) => void;
+      lastAutoTable?: { finalY: number };
+    };
 
     // Tabela de clientes
     if (topCustomers.length > 0) {
-      (doc as any).autoTable({
+      autoTableDoc.autoTable({
         startY: currentY,
         head: [["#", "Cliente", "Telefone", "Pedidos", "Total (R$)"]],
         body: topCustomers.map((customer, index) => [
@@ -818,12 +566,12 @@ const ReportsPage: React.FC = () => {
         headStyles: { fillColor: [239, 68, 68] },
         theme: "striped",
       });
-      currentY = (doc as any).lastAutoTable.finalY + 10;
+      currentY = (autoTableDoc.lastAutoTable?.finalY ?? currentY) + 10;
     }
 
     // Tabela de produtos
     if (topProducts.length > 0) {
-      (doc as any).autoTable({
+      autoTableDoc.autoTable({
         startY: currentY,
         head: [["#", "Produto", "Qtd", "Total (R$)", "ID Produto"]],
         body: topProducts.map((prod, index) => [
@@ -852,20 +600,13 @@ const ReportsPage: React.FC = () => {
     setCustomerDrill({ phone: customer.phone ?? null, name: customer.name });
     setCustomerDrillLoading(true);
     try {
-      let query = supabase
-        .from("orders")
-        .select("id, total_items, total_value, status, created_at")
-        .gte("created_at", currentRange.start)
-        .lt("created_at", currentRange.end)
-        .order("created_at", { ascending: false });
-
-      if (customer.phone) {
-        query = query.eq("customer_phone", customer.phone);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-      setCustomerOrders((data as any[]) ?? []);
+      const payload = await postReportsDashboard<{ customerOrders: SimpleOrder[] }>({
+        action: "customerOrders",
+        start: currentRange.start,
+        end: currentRange.end,
+        phone: customer.phone ?? "",
+      });
+      setCustomerOrders(payload.customerOrders);
     } catch (err) {
       console.error("Erro ao carregar pedidos do cliente:", err);
       setCustomerOrders([]);

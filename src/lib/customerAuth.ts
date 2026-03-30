@@ -11,9 +11,26 @@ export type CustomerRecord = {
   created_at: string;
 };
 
+export type CustomerSession = {
+  id: string;
+  full_name: string;
+  name: string;
+  cpf: string;
+  phone: string;
+  document_cpf: string;
+  cep: string;
+  address: string;
+  addresses: string[];
+  how_found_us: string;
+  how_found_us_details: string;
+  role: "admin" | "customer";
+  is_admin: boolean;
+};
+
 const CUSTOMERS_KEY = "gm_customers_v1";
 export const CUSTOMER_SESSION_KEY = "customer_session";
 export const LEGACY_SESSION_KEY = "employee_session";
+export const CUSTOMER_SESSION_EVENT = "gm:customer-session-changed";
 const ADMIN_PHONES_KEY = "gm_admin_phones_v1";
 
 export const normalizePhone = (value: string) => value.replace(/\D/g, "");
@@ -21,7 +38,7 @@ export const normalizeCpf = (value: string) => value.replace(/\D/g, "").slice(0,
 
 function readEnvAdminPhones(): string[] {
   try {
-    const raw = (import.meta as any)?.env?.VITE_ADMIN_PHONES;
+    const raw = import.meta.env.VITE_ADMIN_PHONES;
     if (!raw || typeof raw !== "string") return [];
     return raw
       .split(",")
@@ -111,6 +128,25 @@ export function saveCustomers(customers: CustomerRecord[]) {
   localStorage.setItem(CUSTOMERS_KEY, JSON.stringify(customers));
 }
 
+function dispatchCustomerSessionChanged() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(CUSTOMER_SESSION_EVENT));
+}
+
+export function normalizeRedirectPath(value: unknown, fallback = "/catalogo") {
+  if (typeof value !== "string") return fallback;
+  const normalized = value.trim();
+  if (!normalized.startsWith("/")) return fallback;
+  if (normalized.startsWith("//")) return fallback;
+  return normalized;
+}
+
+function persistCustomerSession(session: CustomerSession) {
+  localStorage.setItem(CUSTOMER_SESSION_KEY, JSON.stringify(session));
+  localStorage.setItem(LEGACY_SESSION_KEY, JSON.stringify(session));
+  dispatchCustomerSessionChanged();
+}
+
 export function findCustomerByPhone(phone: string): CustomerRecord | null {
   const clean = normalizePhone(phone);
   if (!clean) return null;
@@ -165,7 +201,7 @@ export function upsertCustomer(record: Omit<CustomerRecord, "id" | "created_at">
 export function createCustomerSession(customer: CustomerRecord) {
   const cleanPhone = normalizePhone(customer.phone);
   const isAdmin = isAdminPhone(cleanPhone);
-  const session = {
+  const session: CustomerSession = {
     id: customer.id,
     full_name: customer.full_name,
     name: customer.full_name,
@@ -182,18 +218,40 @@ export function createCustomerSession(customer: CustomerRecord) {
   };
 
   // Mantemos a chave legada por compatibilidade durante a transição.
-  localStorage.setItem(CUSTOMER_SESSION_KEY, JSON.stringify(session));
-  localStorage.setItem(LEGACY_SESSION_KEY, JSON.stringify(session));
+  persistCustomerSession(session);
   return session;
 }
 
-export function getCustomerSession() {
+export function saveCustomerSession(session: CustomerSession) {
+  persistCustomerSession(session);
+}
+
+export function getCustomerSession(): CustomerSession | null {
   try {
     const raw =
       localStorage.getItem(CUSTOMER_SESSION_KEY) ??
       localStorage.getItem(LEGACY_SESSION_KEY);
     if (!raw) return null;
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw) as Partial<CustomerSession>;
+    if (!parsed || typeof parsed !== "object") return null;
+    if (!parsed.role || (!parsed.phone && !parsed.cpf)) return null;
+    return {
+      id: String(parsed.id ?? ""),
+      full_name: String(parsed.full_name ?? parsed.name ?? ""),
+      name: String(parsed.name ?? parsed.full_name ?? ""),
+      cpf: normalizePhone(String(parsed.cpf ?? parsed.phone ?? "")),
+      phone: normalizePhone(String(parsed.phone ?? parsed.cpf ?? "")),
+      document_cpf: normalizeCpf(String(parsed.document_cpf ?? "")),
+      cep: String(parsed.cep ?? "").replace(/\D/g, "").slice(0, 8),
+      address: String(parsed.address ?? ""),
+      addresses: Array.isArray(parsed.addresses)
+        ? parsed.addresses.map((address) => String(address)).filter(Boolean)
+        : [String(parsed.address ?? "")].filter(Boolean),
+      how_found_us: String(parsed.how_found_us ?? ""),
+      how_found_us_details: String(parsed.how_found_us_details ?? ""),
+      role: parsed.role === "admin" ? "admin" : "customer",
+      is_admin: Boolean(parsed.is_admin ?? parsed.role === "admin"),
+    };
   } catch {
     return null;
   }
@@ -202,4 +260,5 @@ export function getCustomerSession() {
 export function clearCustomerSession() {
   localStorage.removeItem(CUSTOMER_SESSION_KEY);
   localStorage.removeItem(LEGACY_SESSION_KEY);
+  dispatchCustomerSessionChanged();
 }

@@ -9,10 +9,9 @@
 -- 3. Permitir rodar localmente com o frontend atual.
 --
 -- Observacao importante:
--- Este script usa politicas RLS permissivas em varias tabelas para
--- nao quebrar o frontend atual, que ainda faz muita coisa com a anon key
--- e com "admin" controlado no cliente/localStorage.
--- Em producao, o ideal e endurecer essas politicas.
+-- Este script esta configurado para um padrao seguro de producao.
+-- Fluxos administrativos e dados sensiveis devem passar por API server-side
+-- ou por usuarios autenticados no Supabase com vinculo em auth.users.
 -- ============================================================
 
 begin;
@@ -72,6 +71,14 @@ as $$
     when coalesce(p_pickup_cents, 0) > 0 then 'pickup'
     else null
   end;
+$$;
+
+create or replace function public.is_authenticated_user()
+returns boolean
+language sql
+stable
+as $$
+  select auth.uid() is not null;
 $$;
 
 -- ============================================================
@@ -233,6 +240,33 @@ create table if not exists public.hr_users (
   employee_id uuid null references public.employees(id) on delete set null,
   created_at timestamptz not null default now()
 );
+
+create or replace function public.is_admin_user()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.hr_users h
+    where h.user_id = auth.uid()
+  );
+$$;
+
+create or replace function public.current_employee_cpf()
+returns text
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select e.cpf
+  from public.employees e
+  where e.user_id = auth.uid()
+  limit 1
+$$;
 
 -- ============================================================
 -- Pedidos
@@ -715,6 +749,7 @@ set search_path = public
 as $$
   select e.id, e.cpf, e.full_name
   from public.employees e
+  where public.is_admin_user()
   order by e.full_name asc;
 $$;
 
@@ -729,6 +764,10 @@ security definer
 set search_path = public
 as $$
 begin
+  if not public.is_admin_user() then
+    raise exception 'Permissao negada';
+  end if;
+
   if p_order_id is null then
     raise exception 'p_order_id obrigatorio';
   end if;
@@ -776,6 +815,10 @@ declare
   v_qty integer;
   v_total_cents bigint;
 begin
+  if not public.is_admin_user() then
+    raise exception 'Permissao negada';
+  end if;
+
   select product_name, quantity, total_cents
     into v_product_name, v_qty, v_total_cents
   from public.order_items
@@ -832,6 +875,10 @@ declare
   v_product_name text;
   v_unit_cents bigint;
 begin
+  if not public.is_admin_user() then
+    raise exception 'Permissao negada';
+  end if;
+
   if coalesce(p_remove_qty, 0) <= 0 then
     raise exception 'Quantidade a remover deve ser maior que zero';
   end if;
@@ -888,7 +935,8 @@ begin
 end;
 $$;
 
-create or replace view public.customer_orders_report as
+create or replace view public.customer_orders_report
+with (security_invoker = true) as
 select
   coalesce(o.customer_phone, o.employee_cpf) as customer_phone,
   coalesce(
@@ -910,7 +958,8 @@ group by
   coalesce(nullif(o.customer_document_cpf, ''), nullif(o.employee_cpf, '')),
   to_char(date_trunc('month', o.created_at), 'YYYY-MM');
 
-create or replace view public.rh_spending_report as
+create or replace view public.rh_spending_report
+with (security_invoker = true) as
 select
   null::uuid as employee_id,
   customer_name as employee_name,
@@ -955,167 +1004,238 @@ drop policy if exists products_select_all on public.products;
 create policy products_select_all on public.products
 for select to anon, authenticated using (true);
 
-drop policy if exists products_write_all_local on public.products;
-create policy products_write_all_local on public.products
-for all to anon, authenticated using (true) with check (true);
+drop policy if exists products_admin_write on public.products;
+create policy products_admin_write on public.products
+for all to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
 
 drop policy if exists weight_select_all on public.weight;
 create policy weight_select_all on public.weight
 for select to anon, authenticated using (true);
 
-drop policy if exists weight_write_all_local on public.weight;
-create policy weight_write_all_local on public.weight
-for all to anon, authenticated using (true) with check (true);
+drop policy if exists weight_admin_write on public.weight;
+create policy weight_admin_write on public.weight
+for all to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
 
 -- Funcionarios / RH
-drop policy if exists employees_select_all_local on public.employees;
-create policy employees_select_all_local on public.employees
-for select to anon, authenticated using (true);
+drop policy if exists employees_select_scoped on public.employees;
+create policy employees_select_scoped on public.employees
+for select to authenticated
+using (
+  public.is_admin_user()
+  or user_id = auth.uid()
+);
 
-drop policy if exists employees_write_all_local on public.employees;
-create policy employees_write_all_local on public.employees
-for all to anon, authenticated using (true) with check (true);
+drop policy if exists employees_admin_write on public.employees;
+create policy employees_admin_write on public.employees
+for all to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
 
 drop policy if exists hr_users_select_authenticated on public.hr_users;
 create policy hr_users_select_authenticated on public.hr_users
-for select to authenticated using (true);
+for select to authenticated
+using (
+  public.is_admin_user()
+  or user_id = auth.uid()
+);
 
 drop policy if exists hr_users_write_authenticated on public.hr_users;
 create policy hr_users_write_authenticated on public.hr_users
-for all to authenticated using (true) with check (true);
+for all to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
 
 -- Pedidos
-drop policy if exists orders_select_all_local on public.orders;
-create policy orders_select_all_local on public.orders
-for select to anon, authenticated using (true);
+drop policy if exists orders_select_scoped on public.orders;
+create policy orders_select_scoped on public.orders
+for select to authenticated
+using (
+  public.is_admin_user()
+  or (
+    public.current_employee_cpf() is not null
+    and customer_phone = public.current_employee_cpf()
+  )
+);
 
-drop policy if exists orders_insert_all_local on public.orders;
-create policy orders_insert_all_local on public.orders
-for insert to anon, authenticated with check (true);
+drop policy if exists orders_admin_write on public.orders;
+create policy orders_admin_write on public.orders
+for all to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
 
-drop policy if exists orders_update_all_local on public.orders;
-create policy orders_update_all_local on public.orders
-for update to anon, authenticated using (true) with check (true);
+drop policy if exists order_items_select_scoped on public.order_items;
+create policy order_items_select_scoped on public.order_items
+for select to authenticated
+using (
+  public.is_admin_user()
+  or exists (
+    select 1
+    from public.orders o
+    where o.id = order_items.order_id
+      and o.customer_phone = public.current_employee_cpf()
+  )
+);
 
-drop policy if exists order_items_select_all_local on public.order_items;
-create policy order_items_select_all_local on public.order_items
-for select to anon, authenticated using (true);
+drop policy if exists order_items_admin_write on public.order_items;
+create policy order_items_admin_write on public.order_items
+for all to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
 
-drop policy if exists order_items_insert_all_local on public.order_items;
-create policy order_items_insert_all_local on public.order_items
-for insert to anon, authenticated with check (true);
+drop policy if exists order_admin_actions_select_admin on public.order_admin_actions;
+create policy order_admin_actions_select_admin on public.order_admin_actions
+for select to authenticated
+using (public.is_admin_user());
 
-drop policy if exists order_items_update_all_local on public.order_items;
-create policy order_items_update_all_local on public.order_items
-for update to anon, authenticated using (true) with check (true);
-
-drop policy if exists order_items_delete_all_local on public.order_items;
-create policy order_items_delete_all_local on public.order_items
-for delete to anon, authenticated using (true);
-
-drop policy if exists order_admin_actions_select_all_local on public.order_admin_actions;
-create policy order_admin_actions_select_all_local on public.order_admin_actions
-for select to anon, authenticated using (true);
-
-drop policy if exists order_admin_actions_insert_all_local on public.order_admin_actions;
-create policy order_admin_actions_insert_all_local on public.order_admin_actions
-for insert to anon, authenticated with check (true);
+drop policy if exists order_admin_actions_insert_admin on public.order_admin_actions;
+create policy order_admin_actions_insert_admin on public.order_admin_actions
+for insert to authenticated
+with check (public.is_admin_user());
 
 -- Conteudo / avisos / destaques
 drop policy if exists carousel_settings_select_all on public.carousel_settings;
 create policy carousel_settings_select_all on public.carousel_settings
 for select to anon, authenticated using (true);
 
-drop policy if exists carousel_settings_write_all_local on public.carousel_settings;
-create policy carousel_settings_write_all_local on public.carousel_settings
-for all to anon, authenticated using (true) with check (true);
+drop policy if exists carousel_settings_admin_write on public.carousel_settings;
+create policy carousel_settings_admin_write on public.carousel_settings
+for all to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
 
 drop policy if exists featured_products_select_all on public.featured_products;
 create policy featured_products_select_all on public.featured_products
 for select to anon, authenticated using (true);
 
-drop policy if exists featured_products_write_all_local on public.featured_products;
-create policy featured_products_write_all_local on public.featured_products
-for all to anon, authenticated using (true) with check (true);
+drop policy if exists featured_products_admin_write on public.featured_products;
+create policy featured_products_admin_write on public.featured_products
+for all to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
 
 drop policy if exists notices_select_all on public.notices;
 create policy notices_select_all on public.notices
 for select to anon, authenticated using (true);
 
-drop policy if exists notices_write_all_local on public.notices;
-create policy notices_write_all_local on public.notices
-for all to anon, authenticated using (true) with check (true);
+drop policy if exists notices_admin_write on public.notices;
+create policy notices_admin_write on public.notices
+for all to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
 
 drop policy if exists app_theme_settings_read_all on public.app_theme_settings;
 create policy app_theme_settings_read_all on public.app_theme_settings
 for select to anon, authenticated using (true);
 
-drop policy if exists app_theme_settings_write_all_local on public.app_theme_settings;
-create policy app_theme_settings_write_all_local on public.app_theme_settings
-for all to anon, authenticated using (true) with check (true);
+drop policy if exists app_theme_settings_admin_write on public.app_theme_settings;
+create policy app_theme_settings_admin_write on public.app_theme_settings
+for all to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
 
 -- Ofertas
 drop policy if exists delivery_combos_read_all on public.delivery_combos;
 create policy delivery_combos_read_all on public.delivery_combos
 for select to anon, authenticated using (true);
 
-drop policy if exists delivery_combos_write_all_local on public.delivery_combos;
-create policy delivery_combos_write_all_local on public.delivery_combos
-for all to anon, authenticated using (true) with check (true);
+drop policy if exists delivery_combos_admin_write on public.delivery_combos;
+create policy delivery_combos_admin_write on public.delivery_combos
+for all to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
 
 drop policy if exists delivery_combo_items_read_all on public.delivery_combo_items;
 create policy delivery_combo_items_read_all on public.delivery_combo_items
 for select to anon, authenticated using (true);
 
-drop policy if exists delivery_combo_items_write_all_local on public.delivery_combo_items;
-create policy delivery_combo_items_write_all_local on public.delivery_combo_items
-for all to anon, authenticated using (true) with check (true);
+drop policy if exists delivery_combo_items_admin_write on public.delivery_combo_items;
+create policy delivery_combo_items_admin_write on public.delivery_combo_items
+for all to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
 
 drop policy if exists delivery_recommendations_read_all on public.delivery_recommendations;
 create policy delivery_recommendations_read_all on public.delivery_recommendations
 for select to anon, authenticated using (true);
 
-drop policy if exists delivery_recommendations_write_all_local on public.delivery_recommendations;
-create policy delivery_recommendations_write_all_local on public.delivery_recommendations
-for all to anon, authenticated using (true) with check (true);
+drop policy if exists delivery_recommendations_admin_write on public.delivery_recommendations;
+create policy delivery_recommendations_admin_write on public.delivery_recommendations
+for all to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
 
 drop policy if exists delivery_cross_sell_read_all on public.delivery_cross_sell;
 create policy delivery_cross_sell_read_all on public.delivery_cross_sell
 for select to anon, authenticated using (true);
 
-drop policy if exists delivery_cross_sell_write_all_local on public.delivery_cross_sell;
-create policy delivery_cross_sell_write_all_local on public.delivery_cross_sell
-for all to anon, authenticated using (true) with check (true);
+drop policy if exists delivery_cross_sell_admin_write on public.delivery_cross_sell;
+create policy delivery_cross_sell_admin_write on public.delivery_cross_sell
+for all to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
 
 -- Eventos / clientes
 drop policy if exists delivery_customer_events_insert_anon on public.delivery_customer_events;
 create policy delivery_customer_events_insert_anon on public.delivery_customer_events
 for insert to anon, authenticated with check (true);
 
-drop policy if exists delivery_customer_events_read_all_local on public.delivery_customer_events;
-create policy delivery_customer_events_read_all_local on public.delivery_customer_events
-for select to anon, authenticated using (true);
+drop policy if exists delivery_customer_events_read_admin on public.delivery_customer_events;
+create policy delivery_customer_events_read_admin on public.delivery_customer_events
+for select to authenticated
+using (public.is_admin_user());
 
-drop policy if exists delivery_customers_all_local on public.delivery_customers;
-create policy delivery_customers_all_local on public.delivery_customers
-for all to anon, authenticated using (true) with check (true);
+drop policy if exists delivery_customers_select_admin on public.delivery_customers;
+create policy delivery_customers_select_admin on public.delivery_customers
+for select to authenticated
+using (public.is_admin_user());
 
-drop policy if exists delivery_customer_addresses_all_local on public.delivery_customer_addresses;
-create policy delivery_customer_addresses_all_local on public.delivery_customer_addresses
-for all to anon, authenticated using (true) with check (true);
+drop policy if exists delivery_customers_admin_write on public.delivery_customers;
+create policy delivery_customers_admin_write on public.delivery_customers
+for all to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
+
+drop policy if exists delivery_customer_addresses_select_admin on public.delivery_customer_addresses;
+create policy delivery_customer_addresses_select_admin on public.delivery_customer_addresses
+for select to authenticated
+using (public.is_admin_user());
+
+drop policy if exists delivery_customer_addresses_admin_write on public.delivery_customer_addresses;
+create policy delivery_customer_addresses_admin_write on public.delivery_customer_addresses
+for all to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
 
 -- ============================================================
 -- Permissions on RPCs / Views
 -- ============================================================
 
 grant usage on schema public to anon, authenticated;
-grant select on public.rh_spending_report to anon, authenticated;
-grant execute on function public.current_pay_cycle_key() to anon, authenticated;
+
+revoke all on public.rh_spending_report from public, anon, authenticated;
+grant select on public.rh_spending_report to authenticated;
+
+revoke execute on function public.current_pay_cycle_key() from public, anon, authenticated;
+grant execute on function public.current_pay_cycle_key() to authenticated;
+
+revoke execute on function public.get_top_selling_products(integer) from public, anon, authenticated;
 grant execute on function public.get_top_selling_products(integer) to anon, authenticated;
-grant execute on function public.admin_get_employees_basic() to anon, authenticated;
-grant execute on function public.admin_cancel_order_v2(uuid, text, text) to anon, authenticated;
-grant execute on function public.admin_remove_order_item_v3(uuid, uuid, text, text) to anon, authenticated;
-grant execute on function public.admin_remove_order_item_qty_v1(uuid, uuid, integer, text, text) to anon, authenticated;
+
+revoke execute on function public.admin_get_employees_basic() from public, anon, authenticated;
+grant execute on function public.admin_get_employees_basic() to authenticated;
+
+revoke execute on function public.admin_cancel_order_v2(uuid, text, text) from public, anon, authenticated;
+grant execute on function public.admin_cancel_order_v2(uuid, text, text) to authenticated;
+
+revoke execute on function public.admin_remove_order_item_v3(uuid, uuid, text, text) from public, anon, authenticated;
+grant execute on function public.admin_remove_order_item_v3(uuid, uuid, text, text) to authenticated;
+
+revoke execute on function public.admin_remove_order_item_qty_v1(uuid, uuid, integer, text, text) from public, anon, authenticated;
+grant execute on function public.admin_remove_order_item_qty_v1(uuid, uuid, integer, text, text) to authenticated;
 
 -- ============================================================
 -- Realtime
@@ -1150,12 +1270,18 @@ to anon, authenticated
 using (bucket_id = 'products');
 
 drop policy if exists "products_bucket_public_write" on storage.objects;
-create policy "products_bucket_public_write"
+create policy "products_bucket_admin_write"
 on storage.objects
 for all
-to anon, authenticated
-using (bucket_id = 'products')
-with check (bucket_id = 'products');
+to authenticated
+using (
+  bucket_id = 'products'
+  and public.is_admin_user()
+)
+with check (
+  bucket_id = 'products'
+  and public.is_admin_user()
+);
 
 drop policy if exists "notice_images_bucket_public_read" on storage.objects;
 create policy "notice_images_bucket_public_read"
@@ -1165,12 +1291,18 @@ to anon, authenticated
 using (bucket_id = 'notice-images');
 
 drop policy if exists "notice_images_bucket_public_write" on storage.objects;
-create policy "notice_images_bucket_public_write"
+create policy "notice_images_bucket_admin_write"
 on storage.objects
 for all
-to anon, authenticated
-using (bucket_id = 'notice-images')
-with check (bucket_id = 'notice-images');
+to authenticated
+using (
+  bucket_id = 'notice-images'
+  and public.is_admin_user()
+)
+with check (
+  bucket_id = 'notice-images'
+  and public.is_admin_user()
+);
 
 commit;
 

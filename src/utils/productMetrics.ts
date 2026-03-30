@@ -20,7 +20,7 @@ function parseKgFromText(text: string): number | null {
 }
 
 export function deriveWeightKg(product: Partial<Product> & { name?: string; packageInfo?: string }): number {
-  const direct = Number((product as any).weight ?? 0);
+  const direct = Number(product.weight ?? 0);
   if (Number.isFinite(direct) && direct > 0) return direct;
 
   const fromPackageInfo = parseKgFromText((product.packageInfo || "").toString());
@@ -33,7 +33,7 @@ export function deriveWeightKg(product: Partial<Product> & { name?: string; pack
 }
 
 export function deriveIsPackage(product: Partial<Product> & { name?: string; packageInfo?: string }): boolean {
-  const explicit = (product as any).isPackage;
+  const explicit = product.isPackage;
   if (typeof explicit === "boolean" && explicit) return true;
 
   const weight = deriveWeightKg(product);
