@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-import { clearCustomerSession, getCustomerSession } from "@/lib/customerAuth";
+import { getCustomerSession, logoutCustomerSession } from "@/lib/customerAuth";
 import FeaturedProductsCarousel from "@/components/FeaturedProductsCarousel";
 import ProductCard from "@/components/ProductCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import PageLoader from "@/components/PageLoader";
 
 import logoGostinho from "@/images/logoc.png";
 
@@ -28,6 +29,7 @@ import {
   AlertTriangle,
   Eye,
   GripVertical,
+  Palette,
 } from "lucide-react";
 
 /* --------------------------------------------------------
@@ -85,6 +87,15 @@ type FeaturedPosRow = {
   product_id: string;
   active: boolean;
 };
+
+async function readJson<T>(response: Response): Promise<T> {
+  return (await response.json()) as T;
+}
+
+function buildApiUrl(path: string) {
+  if (typeof window === "undefined") return path;
+  return new URL(path, window.location.origin).toString();
+}
 
 /* --------------------------------------------------------
    BOTTOM NAV (mobile)
@@ -348,7 +359,7 @@ const Destaques: React.FC = () => {
   };
 
   const handleLogout = () => {
-    clearCustomerSession();
+    void logoutCustomerSession();
     setMenuOpen(false);
     navigate("/catalogo", { replace: true });
   };
@@ -359,15 +370,26 @@ const Destaques: React.FC = () => {
 
     (async () => {
       try {
-        const { data } = await supabase
-          .from("carousel_settings")
-          .select("mode")
-          .eq("id", 1)
-          .maybeSingle();
+        const response = await fetch(buildApiUrl("/api/admin-featured"), {
+          method: "GET",
+          credentials: "same-origin",
+          headers: {
+            Accept: "application/json",
+          },
+        });
+
+        const payload = await readJson<{
+          mode?: CarouselMode;
+          featured?: FeaturedPosRow[];
+          error?: string;
+        }>(response);
+
+        if (!response.ok) {
+          throw new Error(payload.error || "Não foi possível carregar os destaques.");
+        }
 
         if (!mounted) return;
-        const m = (data?.mode as CarouselMode) || "auto";
-        setMode(m);
+        setMode(payload.mode || "auto");
       } catch {
         // ok
       }
@@ -393,21 +415,6 @@ const Destaques: React.FC = () => {
 
   /* -------- MANUAL: verifica se tabela existe/acessível -------- */
   async function checkManualStorage() {
-    const { error } = await supabase
-      .from("featured_products")
-      .select("position")
-      .limit(1);
-
-    if (error) {
-      setManualStorageOk(false);
-      setValidationMsg(
-        `O modo manual não consegue salvar/carregar porque a tabela "featured_products" não está acessível ou não existe.\n` +
-          `Erro: ${error.message}\n` +
-          `→ Crie a tabela no Supabase ou ajuste o nome da tabela no código.`
-      );
-      return false;
-    }
-
     setManualStorageOk(true);
     return true;
   }
@@ -461,19 +468,25 @@ const Destaques: React.FC = () => {
   async function loadManualSaved() {
     setManualLoadingSaved(true);
     try {
-      const { data: rows, error: err1 } = await supabase
-        .from("featured_products")
-        .select("position, product_id, active")
-        .eq("active", true)
-        .order("position", { ascending: true })
-        .limit(LIMIT);
+      const response = await fetch(buildApiUrl("/api/admin-featured"), {
+        method: "GET",
+        credentials: "same-origin",
+        headers: {
+          Accept: "application/json",
+        },
+      });
 
-      if (err1) {
-        console.error("Erro loadManualSaved (step1):", err1);
+      const payload = await readJson<{
+        featured?: FeaturedPosRow[];
+        error?: string;
+      }>(response);
+
+      if (!response.ok) {
+        console.error("Erro loadManualSaved:", payload.error);
         return;
       }
 
-      const ordered = ((rows as FeaturedPosRow[]) ?? []).filter(Boolean);
+      const ordered = (payload.featured ?? []).filter(Boolean);
       if (!ordered.length) return;
 
       const ids = ordered.map((r) => r.product_id).filter(Boolean);
@@ -616,11 +629,28 @@ const Destaques: React.FC = () => {
   async function saveMode() {
     setSavingMode(true);
     try {
-      await supabase
-        .from("carousel_settings")
-        .upsert({ id: 1, mode }, { onConflict: "id" });
+      const response = await fetch(buildApiUrl("/api/admin-featured"), {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ mode }),
+      });
+
+      const payload = await readJson<{ error?: string }>(response);
+      if (!response.ok) {
+        throw new Error(payload.error || "Não foi possível salvar o modo.");
+      }
+
       setModeSaved(true);
       setTimeout(() => setModeSaved(false), 2000);
+    } catch (error: any) {
+      setValidationMsg(
+        error?.message
+          ? `Não foi possível salvar o modo: ${error.message}`
+          : "Não foi possível salvar o modo."
+      );
     } finally {
       setSavingMode(false);
     }
@@ -644,39 +674,21 @@ const Destaques: React.FC = () => {
 
     setSavingManual(true);
     try {
-      // desativa atuais
-      const { error: errDisable } = await supabase
-        .from("featured_products")
-        .update({ active: false })
-        .neq("active", false);
+      const response = await fetch(buildApiUrl("/api/admin-featured"), {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          mode,
+          featuredProductIds: manualSelected.map((p) => p.id),
+        }),
+      });
 
-      if (errDisable) throw errDisable;
-
-      const payload = manualSelected.map((p, idx) => ({
-        position: idx + 1,
-        product_id: p.id,
-        active: true,
-      }));
-
-      // tenta upsert por position
-      const { error: errUpsert } = await supabase
-        .from("featured_products")
-        .upsert(payload, { onConflict: "position" });
-
-      if (errUpsert) {
-        // fallback: limpa posições 1..5 e insere
-        const { error: errDelete } = await supabase
-          .from("featured_products")
-          .delete()
-          .in("position", [1, 2, 3, 4, 5]);
-
-        if (errDelete) throw errUpsert;
-
-        const { error: errInsert } = await supabase
-          .from("featured_products")
-          .insert(payload);
-
-        if (errInsert) throw errInsert;
+      const payload = await readJson<{ error?: string }>(response);
+      if (!response.ok) {
+        throw new Error(payload.error || "Não foi possível salvar as escolhas.");
       }
 
       setManualSaved(true);
@@ -892,35 +904,39 @@ const Destaques: React.FC = () => {
             Alertas
           </button>
 
-          {/* 3) Favoritos */}
-          <button
-            onClick={() => goTo("/favoritos")}
-            className={`flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 ${
-              activeTab("/favoritos")
-                ? "bg-red-50 text-red-700 font-semibold"
-                : "text-gray-800"
-            }`}
-          >
-            <span className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
-              <Heart className="h-4 w-4 text-red-600" />
-            </span>
-            Favoritos
-          </button>
+          {!isAdmin && (
+            <>
+              {/* 3) Favoritos */}
+              <button
+                onClick={() => goTo("/favoritos")}
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 ${
+                  activeTab("/favoritos")
+                    ? "bg-red-50 text-red-700 font-semibold"
+                    : "text-gray-800"
+                }`}
+              >
+                <span className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
+                  <Heart className="h-4 w-4 text-red-600" />
+                </span>
+                Favoritos
+              </button>
 
-          {/* 4) Pedidos */}
-          <button
-            onClick={() => goTo("/meus-pedidos")}
-            className={`flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 ${
-              activeTab("/meus-pedidos")
-                ? "bg-red-50 text-red-700 font-semibold"
-                : "text-gray-800"
-            }`}
-          >
-            <span className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
-              <ClipboardList className="h-4 w-4 text-red-600" />
-            </span>
-            Pedidos
-          </button>
+              {/* 4) Pedidos */}
+              <button
+                onClick={() => goTo("/meus-pedidos")}
+                className={`flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 ${
+                  activeTab("/meus-pedidos")
+                    ? "bg-red-50 text-red-700 font-semibold"
+                    : "text-gray-800"
+                }`}
+              >
+                <span className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
+                  <ClipboardList className="h-4 w-4 text-red-600" />
+                </span>
+                Pedidos
+              </button>
+            </>
+          )}
 
           {/* 5) Relatórios */}
           {isAdmin && (
@@ -968,6 +984,22 @@ const Destaques: React.FC = () => {
                 <ClipboardList className="h-4 w-4 text-red-600" />
               </span>
               Pedidos (Admin)
+            </button>
+          )}
+
+          {isAdmin && (
+            <button
+              onClick={() => goTo("/admin/temas")}
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 ${
+                activeTab("/admin/temas")
+                  ? "bg-red-50 text-red-700 font-semibold"
+                  : "text-gray-800"
+              }`}
+            >
+              <span className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
+                <Palette className="h-4 w-4 text-red-600" />
+              </span>
+              Temas do Site
             </button>
           )}
 
@@ -1078,7 +1110,7 @@ const Destaques: React.FC = () => {
             </div>
 
             {autoLoading ? (
-              <div className="text-sm text-gray-600">Carregando...</div>
+              <PageLoader fullscreen={false} label="Carregando..." />
             ) : topProducts.length === 0 ? (
               <Banner
                 tone="info"

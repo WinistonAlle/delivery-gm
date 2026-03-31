@@ -24,6 +24,11 @@ const LS_THEME_KEY = "gm_app_theme_v1";
 const isThemeKey = (value: string): value is AppThemeKey =>
   APP_THEMES.some((theme) => theme.key === value);
 
+function buildApiUrl(path: string) {
+  if (typeof window === "undefined") return path;
+  return new URL(path, window.location.origin).toString();
+}
+
 export function getLocalTheme(): AppThemeKey {
   try {
     const raw = localStorage.getItem(LS_THEME_KEY);
@@ -65,18 +70,20 @@ export async function saveTheme(theme: AppThemeKey): Promise<"supabase" | "local
   applyTheme(theme);
 
   try {
-    const { error } = await supabase
-      .from("app_theme_settings")
-      .upsert(
-        {
-          id: 1,
-          theme_key: theme,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "id" }
-      );
+    const response = await fetch(buildApiUrl("/api/admin-theme"), {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ theme }),
+    });
 
-    if (error) throw error;
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(payload?.error || "Não foi possível salvar o tema.");
+    }
+
     return "supabase";
   } catch {
     return "local";

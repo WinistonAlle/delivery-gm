@@ -192,22 +192,22 @@ body {
 }
 
 :root[data-app-theme="pascoa"] {
-  --brand-50: #fdf8fc;
-  --brand-100: #f7c6d9;
+  --brand-50: #fff8fb;
+  --brand-100: #f8d7e6;
   --brand-200: #f6e6a7;
-  --brand-300: #bee7d0;
-  --brand-500: #d8c7f3;
-  --brand-600: #cfe8ff;
-  --brand-700: #b79be6;
-  --brand-800: #9ecde8;
-  --brand-900: #8fb7d4;
+  --brand-300: #cdebd9;
+  --brand-500: #c4b5fd;
+  --brand-600: #8b5cf6;
+  --brand-700: #7c3aed;
+  --brand-800: #6d28d9;
+  --brand-900: #5b21b6;
   --theme-bg-start: #fdf8fc;
   --theme-bg-mid: #fffbea;
   --theme-bg-end: #f4fbf7;
   --theme-panel-bg: rgba(255, 255, 255, 0.82);
-  --theme-panel-border: rgba(216, 199, 243, 0.32);
-  --theme-glow: rgba(247, 198, 217, 0.22);
-  --theme-accent-soft: rgba(190, 231, 208, 0.18);
+  --theme-panel-border: rgba(196, 181, 253, 0.4);
+  --theme-glow: rgba(244, 114, 182, 0.18);
+  --theme-accent-soft: rgba(196, 181, 253, 0.14);
 }
 
 :root[data-app-theme="anonovo"] {

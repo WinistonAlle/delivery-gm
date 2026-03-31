@@ -1,4 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { isSessionError, requireCustomerSession } from "./_lib/authSession";
+import { upsertCustomerProfile } from "./_lib/customerProfiles";
 import { getSupabaseAdminClient } from "./_lib/supabaseAdmin";
 
 type ProductSnapshot = {
@@ -6,6 +8,7 @@ type ProductSnapshot = {
   old_id?: number | null;
   name: string;
   employee_price: number;
+  in_stock?: boolean | null;
 };
 
 type CreateOrderParams = {
@@ -190,6 +193,52 @@ async function createOrderInDatabase(params: CreateOrderParams) {
   };
 }
 
+async function resolveOrderItems(
+  items: CreateOrderParams["items"]
+): Promise<CreateOrderParams["items"]> {
+  if (!items.length) {
+    throw new Error("Nenhum item no carrinho.");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const uniqueIds = Array.from(new Set(items.map((item) => String(item.product.id ?? "")).filter(Boolean)));
+  const { data, error } = await supabase
+    .from("products")
+    .select("id, old_id, name, employee_price, in_stock")
+    .in("id", uniqueIds);
+
+  if (error) throw error;
+
+  const productMap = new Map<string, ProductSnapshot>();
+  for (const row of data ?? []) {
+    productMap.set(String(row.id), {
+      id: String(row.id),
+      old_id: row.old_id ?? null,
+      name: String(row.name ?? ""),
+      employee_price: Number(row.employee_price ?? 0),
+      in_stock: row.in_stock !== false,
+    });
+  }
+
+  return items.map((item) => {
+    const productId = String(item.product.id ?? "");
+    const product = productMap.get(productId);
+
+    if (!product) {
+      throw new Error(`Produto inválido no pedido: ${productId}.`);
+    }
+
+    if (product.in_stock === false) {
+      throw new Error(`Produto sem estoque: ${product.name}.`);
+    }
+
+    return {
+      quantity: Number(item.quantity ?? 0),
+      product,
+    };
+  });
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Cache-Control", "no-store");
 
@@ -199,10 +248,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    const session = await requireCustomerSession(req);
     const payload = normalizePayload(req.body);
-    const order = await createOrderInDatabase(payload);
+    const safeItems = await resolveOrderItems(payload.items);
+
+    const normalizedPayload: CreateOrderParams = {
+      ...payload,
+      customerPhone: session.phone,
+      customerName: payload.customerName || session.full_name,
+      customerDocumentCpf: session.document_cpf || payload.customerDocumentCpf,
+      items: safeItems,
+    };
+
+    const order = await createOrderInDatabase(normalizedPayload);
+
+    try {
+      await upsertCustomerProfile({
+        fullName: normalizedPayload.customerName,
+        phone: session.phone,
+        documentCpf: normalizedPayload.customerDocumentCpf,
+        cep: normalizedPayload.customerCep,
+        address: normalizedPayload.customerAddress,
+        city: normalizedPayload.customerCity,
+        howFoundUs: session.how_found_us,
+        howFoundUsDetails: session.how_found_us_details,
+      });
+    } catch (profileError) {
+      console.error("Order created but customer profile sync failed", profileError);
+    }
+
     return res.status(200).json(order);
   } catch (error) {
+    if (isSessionError(error)) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     const message = error instanceof Error ? error.message : "Erro ao criar pedido.";
     return res.status(400).json({ error: message });
   }

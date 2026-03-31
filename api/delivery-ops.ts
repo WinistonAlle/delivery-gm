@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { isSessionError, requireAdminSession } from "./_lib/authSession";
 import { getSupabaseAdminClient } from "./_lib/supabaseAdmin";
 
 type DeliveryEvent = {
@@ -54,6 +55,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    await requireAdminSession(req);
     const supabase = getSupabaseAdminClient();
     const days = Math.min(Math.max(Number(req.query.days ?? 14), 1), 60);
     const rangeStart = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
@@ -212,6 +214,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       stageBreakdown,
     });
   } catch (error) {
+    if (isSessionError(error)) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     const message =
       error instanceof Error ? error.message : "Erro ao carregar operacao delivery.";
     return res.status(400).json({ error: message });

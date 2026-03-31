@@ -22,7 +22,13 @@ import { incrementMetric } from "@/lib/deliveryEnhancements";
 import { loadPlacementRecommendations } from "@/lib/deliveryOffers";
 import { FREE_SHIPPING_THRESHOLD, SHIPPING_RATES } from "@/data/shipping";
 import { STORE_WHATSAPP } from "@/data/products";
-import { type CustomerSession, findCustomerByPhone, getCustomerSession, saveCustomerSession } from "@/lib/customerAuth";
+import {
+  createAdditionalCustomerAddress,
+  type CustomerSession,
+  findCustomerByPhone,
+  getCustomerSession,
+  saveCustomerSession,
+} from "@/lib/customerAuth";
 import { trackCustomerEvent, trackCustomerEventOnce } from "@/lib/customerInsights";
 
 function safeGetSession() {
@@ -54,6 +60,11 @@ const inferShippingCityFromAddress = (address: string) => {
   });
 
   return match?.city ?? "";
+};
+
+const normalizeApiUrl = (path: string) => {
+  if (typeof window === "undefined") return path;
+  return new URL(path, window.location.origin).toString();
 };
 
 const formatPaymentMethodLabel = (paymentMethod: string) => {
@@ -88,16 +99,26 @@ const Checkout: React.FC = () => {
   const navigate = useNavigate();
   const { cartItems, cartTotal, clearCart, addToCart } = useCart();
 
-  const session = useMemo<CustomerSession | null>(() => safeGetSession(), []);
+  const [session, setSession] = useState<CustomerSession | null>(() => safeGetSession());
   const customerDocumentCpf = session?.document_cpf?.toString?.() ?? "";
   const customerCep = session?.cep?.toString?.() ?? "";
+  const customerCity = session?.city?.toString?.() ?? "";
   const customerHowFoundUs = session?.how_found_us?.toString?.() ?? "";
   const customerHowFoundUsDetails = session?.how_found_us_details?.toString?.() ?? "";
 
   const [customerName, setCustomerName] = useState(session?.full_name ?? session?.name ?? "");
   const [customerPhone, setCustomerPhone] = useState(session?.phone ?? session?.cpf ?? "");
   const [deliveryAddress, setDeliveryAddress] = useState(session?.address ?? "");
-  const [selectedCity, setSelectedCity] = useState("");
+  const [selectedCity, setSelectedCity] = useState(customerCity);
+  const [selectedSavedAddressId, setSelectedSavedAddressId] = useState(
+    session?.saved_addresses?.find((item) => item.is_primary)?.id ??
+      session?.saved_addresses?.[0]?.id ??
+      ""
+  );
+  const [showNewAddressForm, setShowNewAddressForm] = useState(false);
+  const [newAddress, setNewAddress] = useState("");
+  const [newAddressCity, setNewAddressCity] = useState("");
+  const [isSavingAddress, setIsSavingAddress] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("");
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -118,6 +139,20 @@ const Checkout: React.FC = () => {
     selectedCity.trim().length > 0 &&
     paymentMethod.trim().length > 0 &&
     cartItems.length > 0;
+  const savedAddresses = useMemo(() => {
+    if (session?.saved_addresses?.length) return session.saved_addresses;
+    if (!session?.address) return [];
+    return [
+      {
+        id: "fallback-address",
+        address: session.address,
+        city: customerCity,
+        cep: customerCep,
+        label: "",
+        is_primary: true,
+      },
+    ];
+  }, [customerCep, customerCity, session]);
 
   useEffect(() => {
     trackCustomerEventOnce("checkout_view", {
@@ -142,12 +177,33 @@ const Checkout: React.FC = () => {
   }, [customerPhone, deliveryAddress, session]);
 
   useEffect(() => {
+    if (!savedAddresses.length) return;
+
+    const selectedAddress =
+      savedAddresses.find((item) => item.id === selectedSavedAddressId) ??
+      savedAddresses.find((item) => item.is_primary) ??
+      savedAddresses[0];
+
+    if (!selectedAddress) return;
+
+    setSelectedSavedAddressId(selectedAddress.id);
+    setDeliveryAddress(selectedAddress.address);
+    setSelectedCity(selectedAddress.city);
+  }, [savedAddresses, selectedSavedAddressId]);
+
+  useEffect(() => {
+    if (selectedSavedAddressId) return;
+    if (customerCity.trim()) {
+      setSelectedCity(customerCity.trim());
+      return;
+    }
+
     if (!deliveryAddress.trim()) return;
     const inferredCity = inferShippingCityFromAddress(deliveryAddress);
     if (inferredCity) {
       setSelectedCity(inferredCity);
     }
-  }, [deliveryAddress]);
+  }, [customerCity, deliveryAddress, selectedSavedAddressId]);
 
   useEffect(() => {
     let mounted = true;
@@ -212,7 +268,7 @@ const Checkout: React.FC = () => {
         })),
       });
 
-      const updatedSession = {
+      const updatedSession: CustomerSession = {
         ...(session ?? {}),
         id: `customer-${cleanPhone}`,
         full_name: customerName.trim(),
@@ -221,12 +277,34 @@ const Checkout: React.FC = () => {
         phone: cleanPhone,
         document_cpf: customerDocumentCpf,
         cep: customerCep,
+        city: selectedCity,
         address: deliveryAddress.trim(),
-        addresses: Array.from(new Set([deliveryAddress.trim()].filter(Boolean))),
+        addresses: Array.from(
+          new Set([
+            deliveryAddress.trim(),
+            ...(session?.saved_addresses?.map((item) => item.address) ?? []),
+          ].filter(Boolean))
+        ),
+        saved_addresses:
+          session?.saved_addresses?.length
+            ? session.saved_addresses
+            : [
+                {
+                  id: "checkout-address",
+                  address: deliveryAddress.trim(),
+                  city: selectedCity,
+                  cep: customerCep,
+                  label: "",
+                  is_primary: true,
+                },
+              ],
         role: session?.role ?? "customer",
         is_admin: session?.is_admin ?? false,
+        how_found_us: session?.how_found_us ?? "",
+        how_found_us_details: session?.how_found_us_details ?? "",
       };
       saveCustomerSession(updatedSession);
+      setSession(updatedSession);
 
       clearCart();
       incrementMetric("finishedOrderCount");
@@ -307,6 +385,49 @@ const Checkout: React.FC = () => {
     }
   };
 
+  const handleSaveAdditionalAddress = async () => {
+    if (newAddress.trim().length < 6 || newAddressCity.trim().length < 2) {
+      toast.error("Endereco incompleto", {
+        description: "Preencha o novo endereco e a cidade para salvar.",
+      });
+      return;
+    }
+
+    setIsSavingAddress(true);
+    try {
+      const updatedSession = await createAdditionalCustomerAddress({
+        address: newAddress.trim(),
+        city: newAddressCity.trim(),
+        setPrimary: false,
+      });
+
+      const createdAddress =
+        updatedSession.saved_addresses.find(
+          (item) =>
+            item.address.trim() === newAddress.trim() && item.city.trim() === newAddressCity.trim()
+        ) ?? updatedSession.saved_addresses[0];
+
+      saveCustomerSession(updatedSession);
+      setSession(updatedSession);
+      setSelectedSavedAddressId(createdAddress?.id ?? "");
+      setDeliveryAddress(createdAddress?.address ?? newAddress.trim());
+      setSelectedCity(createdAddress?.city ?? newAddressCity.trim());
+      setShowNewAddressForm(false);
+      setNewAddress("");
+      setNewAddressCity("");
+
+      toast.success("Endereco salvo", {
+        description: "Novo endereco cadastrado com sucesso.",
+      });
+    } catch (error) {
+      toast.error("Erro ao salvar endereco", {
+        description: error instanceof Error ? error.message : "Tente novamente em alguns instantes.",
+      });
+    } finally {
+      setIsSavingAddress(false);
+    }
+  };
+
   if (cartItems.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
@@ -370,37 +491,122 @@ const Checkout: React.FC = () => {
                 </div>
                 <div>
                   <h2 className="text-xl font-black text-slate-950">Entrega</h2>
-                  <p className="text-sm text-slate-500">Informe o endereco e confirme a cidade para calcular o frete.</p>
+                  <p className="text-sm text-slate-500">Confira o endereco cadastrado e a cidade vinculada ao seu cadastro para calcular o frete.</p>
                 </div>
               </div>
+
+              {savedAddresses.length > 0 ? (
+                <div className="mb-4">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">Enderecos salvos</span>
+                  <div className="grid gap-3">
+                    {savedAddresses.map((item) => {
+                      const isSelected = item.id === selectedSavedAddressId;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedSavedAddressId(item.id);
+                            setShowNewAddressForm(false);
+                          }}
+                          disabled={isSubmitting || isSavingAddress}
+                          className={`rounded-[24px] border px-4 py-4 text-left transition ${
+                            isSelected
+                              ? "border-red-300 bg-red-50 shadow-[0_16px_32px_rgba(239,68,68,0.12)]"
+                              : "border-slate-200 bg-white hover:border-red-200 hover:bg-red-50/40"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-bold text-slate-900">
+                                {item.label || (item.is_primary ? "Endereco principal" : "Outro endereco")}
+                              </p>
+                              <p className="mt-1 text-sm text-slate-600">{item.address}</p>
+                              <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                                {item.city || "Cidade nao informada"}
+                              </p>
+                            </div>
+                            {isSelected ? (
+                              <span className="rounded-full bg-red-600 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-white">
+                                Usando
+                              </span>
+                            ) : null}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="mb-4 flex flex-wrap gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-2xl border-slate-200"
+                  onClick={() => setShowNewAddressForm((current) => !current)}
+                  disabled={isSubmitting || isSavingAddress}
+                >
+                  {showNewAddressForm ? "Cancelar novo endereco" : "Cadastrar outro endereco"}
+                </Button>
+              </div>
+
+              {showNewAddressForm ? (
+                <div className="mb-5 grid gap-4 rounded-[28px] border border-slate-200 bg-slate-50/80 p-4 md:grid-cols-[minmax(0,1fr)_260px]">
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold text-slate-700">Novo endereco</span>
+                    <textarea
+                      className="min-h-[112px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[15px] text-slate-900 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
+                      value={newAddress}
+                      onChange={(e) => setNewAddress(e.target.value)}
+                      disabled={isSubmitting || isSavingAddress}
+                      placeholder="Rua, numero, bairro e referencia"
+                    />
+                  </label>
+
+                  <div className="space-y-4">
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-semibold text-slate-700">Cidade</span>
+                      <select
+                        className="h-[56px] w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] font-medium text-slate-900 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
+                        value={newAddressCity}
+                        onChange={(e) => setNewAddressCity(e.target.value)}
+                        disabled={isSubmitting || isSavingAddress}
+                      >
+                        <option value="">Selecione a cidade</option>
+                        {SHIPPING_RATES.map((rate) => (
+                          <option key={rate.city} value={rate.city}>
+                            {rate.city}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <Button
+                      type="button"
+                      className="h-[52px] w-full rounded-2xl bg-red-600 text-base font-bold hover:bg-red-700"
+                      onClick={handleSaveAdditionalAddress}
+                      disabled={isSubmitting || isSavingAddress}
+                    >
+                      {isSavingAddress ? "Salvando endereco..." : "Salvar endereco"}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_260px]">
                 <label className="block">
                   <span className="mb-2 block text-sm font-semibold text-slate-700">Endereco de entrega</span>
-                  <textarea
-                    className="min-h-[112px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[15px] text-slate-900 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
-                    value={deliveryAddress}
-                    onChange={(e) => setDeliveryAddress(e.target.value)}
-                    disabled={isSubmitting}
-                    placeholder="Rua, numero, bairro e referencia"
-                  />
+                  <div className="min-h-[112px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[15px] text-slate-900">
+                    {deliveryAddress || "Nenhum endereco selecionado"}
+                  </div>
                 </label>
 
                 <label className="block">
                   <span className="mb-2 block text-sm font-semibold text-slate-700">Cidade</span>
-                  <select
-                    className="h-[56px] w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] font-medium text-slate-900 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
-                    value={selectedCity}
-                    onChange={(e) => setSelectedCity(e.target.value)}
-                    disabled={isSubmitting}
-                  >
-                    <option value="">Selecione a cidade</option>
-                    {SHIPPING_RATES.map((rate) => (
-                      <option key={rate.city} value={rate.city}>
-                        {rate.city} {cartTotal >= FREE_SHIPPING_THRESHOLD ? "- frete gratis" : `- ${formatCurrency(Number(rate.cost ?? 0))}`}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="flex min-h-[56px] items-center rounded-2xl border border-slate-200 bg-slate-50 px-4 text-[15px] font-medium text-slate-900">
+                    {selectedCity || "Cidade nao informada no cadastro"}
+                  </div>
 
                   <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                     {selectedCity ? (
@@ -409,7 +615,7 @@ const Checkout: React.FC = () => {
                         <strong className="text-slate-900">{finalShipping > 0 ? formatCurrency(finalShipping) : "Gratis"}</strong>
                       </span>
                     ) : (
-                      <span>Selecione a cidade para liberar a confirmacao do pedido.</span>
+                      <span>Seu cadastro precisa ter uma cidade preenchida para liberar a confirmacao do pedido.</span>
                     )}
                   </div>
                 </label>

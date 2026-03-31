@@ -5,8 +5,8 @@ import { ArrowLeft } from "lucide-react";
 import { Bg, Card } from "../components/ui/app-surface";
 import logo from "../images/logop.jpg";
 import {
-  createCustomerSession,
-  findCustomerByPhone,
+  loginCustomer,
+  normalizeCpf,
   normalizePhone,
   normalizeRedirectPath,
 } from "@/lib/customerAuth";
@@ -279,17 +279,34 @@ const maskPhone = (value: string) => {
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 };
 
+const maskCpf = (value: string) => {
+  const digits = normalizeCpf(value);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+  if (digits.length <= 9) {
+    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+  }
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+};
+
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const redirectTo = normalizeRedirectPath(
     (location.state as { redirectTo?: unknown } | null)?.redirectTo
   );
-  const [phone, setPhone] = useState("");
+  const prefilledPhone = String(
+    (location.state as { prefilledPhone?: unknown } | null)?.prefilledPhone ?? ""
+  );
+  const [phone, setPhone] = useState(prefilledPhone);
+  const [cpf, setCpf] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  const canSubmit = useMemo(() => normalizePhone(phone).length >= 10, [phone]);
+  const canSubmit = useMemo(
+    () => normalizePhone(phone).length >= 10 && normalizeCpf(cpf).length === 11,
+    [cpf, phone]
+  );
 
   useEffect(() => {
     const prev = {
@@ -321,29 +338,19 @@ const Login: React.FC = () => {
     };
   }, []);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError("");
 
     if (!canSubmit) {
-      setError("Informe seu telefone com DDD para continuar.");
+      setError("Informe telefone com DDD e CPF para continuar.");
       return;
     }
 
     setSubmitting(true);
 
     try {
-      const customer = findCustomerByPhone(phone);
-
-      if (!customer) {
-        navigate("/cadastro", {
-          replace: true,
-          state: { prefilledPhone: normalizePhone(phone), redirectTo },
-        });
-        return;
-      }
-
-      createCustomerSession(customer);
+      const customer = await loginCustomer({ phone, cpf });
       void trackCustomerEvent({
         eventName: "login_success",
         customerName: customer.full_name,
@@ -351,6 +358,12 @@ const Login: React.FC = () => {
         documentCpf: customer.document_cpf,
       });
       navigate(redirectTo, { replace: true });
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Não foi possível validar seus dados."
+      );
     } finally {
       setSubmitting(false);
     }
@@ -390,7 +403,7 @@ const Login: React.FC = () => {
 
         <Title>Entrar na sua conta</Title>
         <Subtitle>
-          Use seu telefone cadastrado para continuar.
+          Use seu telefone e CPF cadastrados para continuar.
         </Subtitle>
 
         <Form onSubmit={handleSubmit} noValidate>
@@ -410,7 +423,25 @@ const Login: React.FC = () => {
                 disabled={submitting}
               />
             </InputShell>
-            {error ? <ErrorMsg id="phone-error">{error}</ErrorMsg> : null}
+          </Field>
+
+          <Field>
+            <Label htmlFor="cpf">CPF</Label>
+            <InputShell>
+              <PhoneInput
+                id="cpf"
+                name="cpf"
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="000.000.000-00"
+                value={maskCpf(cpf)}
+                onChange={(e) => setCpf(e.target.value)}
+                aria-invalid={error ? "true" : "false"}
+                aria-describedby={error ? "login-error" : undefined}
+                disabled={submitting}
+              />
+            </InputShell>
+            {error ? <ErrorMsg id="login-error">{error}</ErrorMsg> : null}
           </Field>
 
           <ButtonRow>

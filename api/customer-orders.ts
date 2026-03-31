@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { isSessionError, requireCustomerSession } from "./_lib/authSession";
 import { getSupabaseAdminClient } from "./_lib/supabaseAdmin";
 
 type FetchOrdersBody = {
@@ -25,10 +26,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const body = (req.body ?? {}) as DefaultBody | ReorderBody;
-    const customerPhone = String(body.customerPhone ?? "").replace(/\D/g, "");
-    if (!customerPhone) {
-      return res.status(400).json({ error: "Telefone do cliente é obrigatório." });
-    }
+    const session = await requireCustomerSession(req);
+    const customerPhone = String(session.phone ?? "").replace(/\D/g, "");
 
     const supabase = getSupabaseAdminClient();
 
@@ -81,6 +80,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (error) throw error;
     return res.status(200).json({ orders: data ?? [] });
   } catch (error) {
+    if (isSessionError(error)) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     const message = error instanceof Error ? error.message : "Erro ao buscar pedidos.";
     return res.status(400).json({ error: message });
   }

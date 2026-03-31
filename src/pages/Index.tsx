@@ -33,11 +33,12 @@ import {
   Youtube,
   Star,
   Sparkles,
+  Palette,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { getLocalTheme, type AppThemeKey } from "@/lib/appTheme";
-import { clearCustomerSession, getCustomerSession } from "@/lib/customerAuth";
+import { getCustomerSession, logoutCustomerSession } from "@/lib/customerAuth";
 import {
   Dialog,
   DialogContent,
@@ -180,12 +181,12 @@ const THEME_HEADER_COLORS: Record<
     menuBorder: "rgba(255, 255, 255, 0.25)",
   },
   pascoa: {
-    solid: "#D8C7F3",
-    translucent: "rgba(216, 199, 243, 0.62)",
-    borderSolid: "#D8C7F3",
-    borderTranslucent: "rgba(247, 198, 217, 0.48)",
-    menuBg: "rgba(190, 231, 208, 0.82)",
-    menuBorder: "rgba(207, 232, 255, 0.56)",
+    solid: "#a78bfa",
+    translucent: "rgba(167, 139, 250, 0.58)",
+    borderSolid: "#8b5cf6",
+    borderTranslucent: "rgba(196, 181, 253, 0.44)",
+    menuBg: "rgba(248, 215, 230, 0.92)",
+    menuBorder: "rgba(167, 139, 250, 0.32)",
   },
   anonovo: {
     solid: "#c9971a",
@@ -202,6 +203,97 @@ const THEME_HEADER_COLORS: Record<
     borderTranslucent: "rgba(254, 240, 138, 0.46)",
     menuBg: "rgba(22, 163, 74, 0.82)",
     menuBorder: "rgba(110, 231, 183, 0.52)",
+  },
+};
+
+const THEME_COMBO_STYLES: Record<
+  AppThemeKey,
+  {
+    cardClass: string;
+    glowClass: string;
+    mediaClass: string;
+    totalClass: string;
+    hintClass: string;
+    buttonClass: string;
+    dialogItemClass: string;
+  }
+> = {
+  default: {
+    cardClass:
+      "border-orange-100 bg-[linear-gradient(145deg,rgba(255,247,237,0.96),rgba(255,241,242,0.92))]",
+    glowClass: "bg-orange-200/40",
+    mediaClass: "border-white/80 bg-white/72",
+    totalClass: "border-white/80 bg-white/78",
+    hintClass: "bg-white/75 text-slate-600",
+    buttonClass:
+      "bg-red-600 hover:bg-red-700 text-white shadow-[0_10px_24px_rgba(220,38,38,0.35)]",
+    dialogItemClass: "border-orange-100/70 bg-white",
+  },
+  junino: {
+    cardClass:
+      "border-amber-200 bg-[linear-gradient(145deg,rgba(255,251,235,0.97),rgba(255,237,213,0.94))]",
+    glowClass: "bg-amber-300/35",
+    mediaClass: "border-amber-100 bg-white/80",
+    totalClass: "border-amber-100 bg-white/82",
+    hintClass: "bg-amber-50/90 text-amber-900",
+    buttonClass:
+      "bg-orange-600 hover:bg-orange-700 text-white shadow-[0_10px_24px_rgba(234,88,12,0.32)]",
+    dialogItemClass: "border-amber-100 bg-amber-50/45",
+  },
+  natal: {
+    cardClass:
+      "border-emerald-200 bg-[linear-gradient(145deg,rgba(240,253,244,0.97),rgba(220,252,231,0.94))]",
+    glowClass: "bg-emerald-300/30",
+    mediaClass: "border-emerald-100 bg-white/82",
+    totalClass: "border-emerald-100 bg-white/84",
+    hintClass: "bg-emerald-50/90 text-emerald-900",
+    buttonClass:
+      "bg-emerald-600 hover:bg-emerald-700 text-white shadow-[0_10px_24px_rgba(5,150,105,0.3)]",
+    dialogItemClass: "border-emerald-100 bg-emerald-50/45",
+  },
+  blackfriday: {
+    cardClass:
+      "border-neutral-700 bg-[linear-gradient(145deg,rgba(38,38,38,0.97),rgba(10,10,10,0.94))]",
+    glowClass: "bg-amber-400/15",
+    mediaClass: "border-white/10 bg-white/5",
+    totalClass: "border-white/10 bg-white/10",
+    hintClass: "bg-white/10 text-white/80",
+    buttonClass:
+      "bg-amber-500 hover:bg-amber-400 text-black shadow-[0_10px_24px_rgba(245,158,11,0.28)]",
+    dialogItemClass: "border-neutral-700 bg-neutral-950/80",
+  },
+  pascoa: {
+    cardClass:
+      "border-violet-200 bg-[linear-gradient(145deg,rgba(255,248,251,0.98),rgba(243,232,255,0.95))]",
+    glowClass: "bg-fuchsia-200/35",
+    mediaClass: "border-violet-100 bg-white/85",
+    totalClass: "border-violet-100 bg-white/88",
+    hintClass: "bg-fuchsia-50/90 text-violet-900",
+    buttonClass:
+      "bg-violet-600 hover:bg-violet-700 text-white shadow-[0_10px_24px_rgba(124,58,237,0.28)]",
+    dialogItemClass: "border-violet-100 bg-fuchsia-50/45",
+  },
+  anonovo: {
+    cardClass:
+      "border-amber-200 bg-[linear-gradient(145deg,rgba(255,253,247,0.98),rgba(248,242,223,0.95))]",
+    glowClass: "bg-amber-300/30",
+    mediaClass: "border-amber-100 bg-white/84",
+    totalClass: "border-amber-100 bg-white/88",
+    hintClass: "bg-amber-50/90 text-amber-900",
+    buttonClass:
+      "bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-[0_10px_24px_rgba(217,169,52,0.28)]",
+    dialogItemClass: "border-amber-100 bg-amber-50/45",
+  },
+  copa: {
+    cardClass:
+      "border-green-200 bg-[linear-gradient(145deg,rgba(236,253,243,0.97),rgba(254,249,195,0.93))]",
+    glowClass: "bg-lime-300/25",
+    mediaClass: "border-green-100 bg-white/82",
+    totalClass: "border-green-100 bg-white/86",
+    hintClass: "bg-green-50/90 text-green-900",
+    buttonClass:
+      "bg-green-600 hover:bg-green-700 text-white shadow-[0_10px_24px_rgba(22,163,74,0.28)]",
+    dialogItemClass: "border-green-100 bg-green-50/45",
   },
 };
 
@@ -572,6 +664,7 @@ const Index: React.FC = () => {
   const [selectedCombo, setSelectedCombo] = useState<SmartCombo | null>(null);
   const [activeTheme, setActiveTheme] = useState<AppThemeKey>(getLocalTheme());
   const headerColors = THEME_HEADER_COLORS[activeTheme] ?? THEME_HEADER_COLORS.default;
+  const comboTheme = THEME_COMBO_STYLES[activeTheme] ?? THEME_COMBO_STYLES.default;
 
   const [notices, setNotices] = useState<Notice[]>([]);
   const [currentNoticeIndex, setCurrentNoticeIndex] = useState(0);
@@ -989,7 +1082,7 @@ const Index: React.FC = () => {
   };
 
   const handleLogout = () => {
-    clearCustomerSession();
+    void logoutCustomerSession();
     setMenuOpen(false);
     navigate("/catalogo", { replace: true });
   };
@@ -1506,25 +1599,29 @@ const Index: React.FC = () => {
             <span>Alertas</span>
           </button>
 
-          <button
-            onClick={() => goTo("/favoritos")}
-            className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-gray-800"
-          >
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
-              <Heart className="h-4 w-4 text-red-600" />
-            </span>
-            <span>Favoritos</span>
-          </button>
+          {!isAdmin && (
+            <button
+              onClick={() => goTo("/favoritos")}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-gray-800"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
+                <Heart className="h-4 w-4 text-red-600" />
+              </span>
+              <span>Favoritos</span>
+            </button>
+          )}
 
-          <button
-            onClick={() => goTo("/meus-pedidos")}
-            className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-gray-800"
-          >
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
-              <ClipboardList className="h-4 w-4 text-red-600" />
-            </span>
-            <span>Pedidos</span>
-          </button>
+          {!isAdmin && (
+            <button
+              onClick={() => goTo("/meus-pedidos")}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-gray-800"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
+                <ClipboardList className="h-4 w-4 text-red-600" />
+              </span>
+              <span>Pedidos</span>
+            </button>
+          )}
 
           {isAdmin && (
             <button
@@ -1586,6 +1683,18 @@ const Index: React.FC = () => {
                 <Sparkles className="h-4 w-4 text-red-600" />
               </span>
               <span>Ofertas Delivery</span>
+            </button>
+          )}
+
+          {isAdmin && (
+            <button
+              onClick={() => goTo("/admin/temas")}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-gray-800"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
+                <Palette className="h-4 w-4 text-red-600" />
+              </span>
+              <span>Temas do Site</span>
             </button>
           )}
 
@@ -1860,15 +1969,17 @@ const Index: React.FC = () => {
                 <article
                   key={combo.id}
                   onClick={() => handleOpenComboDetail(combo)}
-                  className="group relative cursor-pointer overflow-hidden rounded-[1.6rem] border border-orange-100 bg-[linear-gradient(145deg,rgba(255,247,237,0.96),rgba(255,241,242,0.92))] p-3 shadow-[0_16px_44px_rgba(15,23,42,0.12)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_54px_rgba(15,23,42,0.18)] md:rounded-[1.9rem] md:p-4"
+                  className={`group relative cursor-pointer overflow-hidden rounded-[1.6rem] border p-3 shadow-[0_16px_44px_rgba(15,23,42,0.12)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_54px_rgba(15,23,42,0.18)] md:rounded-[1.9rem] md:p-4 ${comboTheme.cardClass}`}
                 >
-                  <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-orange-200/40 blur-2xl transition-transform duration-300 group-hover:scale-110" />
+                  <div
+                    className={`absolute -right-12 -top-12 h-40 w-40 rounded-full blur-2xl transition-transform duration-300 group-hover:scale-110 ${comboTheme.glowClass}`}
+                  />
 
                   <div className="relative z-10">
                     <h3 className="text-[19px] leading-tight font-extrabold text-slate-900 md:text-[22px]">{combo.title}</h3>
 
                     <div className="mt-3 grid grid-cols-[1fr_auto] gap-2.5 items-end md:mt-4 md:gap-3">
-                      <div className="rounded-[1.15rem] border border-white/80 bg-white/72 p-2 shadow-sm md:rounded-2xl">
+                      <div className={`rounded-[1.15rem] border p-2 shadow-sm md:rounded-2xl ${comboTheme.mediaClass}`}>
                         <img
                           src={combo.items[0]?.product.images?.[0] || combo.items[0]?.product.image_path || "/placeholder.png"}
                           alt={combo.title}
@@ -1893,7 +2004,7 @@ const Index: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="rounded-[1.15rem] border border-white/80 bg-white/78 px-2.5 py-2 text-right shadow-sm md:rounded-2xl md:px-3">
+                      <div className={`rounded-[1.15rem] border px-2.5 py-2 text-right shadow-sm md:rounded-2xl md:px-3 ${comboTheme.totalClass}`}>
                         <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">Total</p>
                         <p className="text-[1.35rem] font-black text-slate-900 leading-none md:text-2xl">
                           {combo.total.toLocaleString("pt-BR", {
@@ -1905,7 +2016,7 @@ const Index: React.FC = () => {
                     </div>
 
                     <div className="mt-3 flex items-center justify-between gap-2.5 md:mt-4 md:gap-3">
-                      <span className="rounded-full bg-white/75 px-2.5 py-1 text-[10px] font-semibold text-slate-600 md:px-3 md:text-[11px]">
+                      <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold md:px-3 md:text-[11px] ${comboTheme.hintClass}`}>
                         Toque para ver detalhes
                       </span>
                       <Button
@@ -1915,7 +2026,7 @@ const Index: React.FC = () => {
                           e.stopPropagation();
                           handleAddCombo(combo);
                         }}
-                        className="h-10 rounded-full px-4 text-sm font-bold bg-red-600 hover:bg-red-700 text-white shadow-[0_10px_24px_rgba(220,38,38,0.35)] md:h-11 md:px-6 md:text-base"
+                        className={`h-10 rounded-full px-4 text-sm font-bold md:h-11 md:px-6 md:text-base ${comboTheme.buttonClass}`}
                       >
                         Adicionar combo
                       </Button>
@@ -2062,7 +2173,7 @@ const Index: React.FC = () => {
               return (
                 <div
                   key={item.product.id}
-                  className="flex items-center justify-between gap-3 rounded-xl border bg-white p-3"
+                  className={`flex items-center justify-between gap-3 rounded-xl border p-3 ${comboTheme.dialogItemClass}`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <img
@@ -2098,7 +2209,7 @@ const Index: React.FC = () => {
                 handleAddCombo(selectedCombo);
                 setComboDetailOpen(false);
               }}
-              className="rounded-full bg-red-600 hover:bg-red-700 text-white"
+              className={`rounded-full ${comboTheme.buttonClass}`}
             >
               Adicionar combo
             </Button>

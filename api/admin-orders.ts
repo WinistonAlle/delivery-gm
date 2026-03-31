@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { isSessionError, requireAdminSession } from "./_lib/authSession";
 import { getSupabaseAdminClient } from "./_lib/supabaseAdmin";
 
 function onlyDigits(value: string) {
@@ -93,7 +94,7 @@ async function listOrders(body: Record<string, unknown>) {
   const { data, error } = await query;
   if (error) throw error;
 
-  const orders = Array.isArray(data) ? data : [];
+  const orders = ((Array.isArray(data) ? data : []) as unknown) as Array<Record<string, unknown>>;
   const cpfMap = await fetchEmployeeMap();
 
   return orders.map((order) => {
@@ -246,8 +247,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    const session = await requireAdminSession(req);
     const body = (req.body ?? {}) as Record<string, unknown>;
     const action = String(body.action ?? "list");
+    const actorCpf = onlyDigits(String(session.document_cpf ?? session.phone ?? ""));
 
     if (action === "list") {
       const orders = await listOrders(body);
@@ -274,7 +277,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { error } = await supabase.rpc("admin_cancel_order_v2", {
         p_order_id: String(body.orderId ?? ""),
         p_reason: String(body.reason ?? ""),
-        p_actor_cpf: onlyDigits(String(body.actorCpf ?? "")),
+        p_actor_cpf: actorCpf,
       });
       if (error) throw error;
       return res.status(200).json({ ok: true });
@@ -286,7 +289,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         p_order_id: String(body.orderId ?? ""),
         p_order_item_id: String(body.orderItemId ?? ""),
         p_reason: String(body.reason ?? ""),
-        p_actor_cpf: onlyDigits(String(body.actorCpf ?? "")),
+        p_actor_cpf: actorCpf,
       });
       if (error) throw error;
       return res.status(200).json({ ok: true });
@@ -299,7 +302,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         p_order_item_id: String(body.orderItemId ?? ""),
         p_remove_qty: Number(body.qty ?? 0),
         p_reason: String(body.reason ?? ""),
-        p_actor_cpf: onlyDigits(String(body.actorCpf ?? "")),
+        p_actor_cpf: actorCpf,
       });
       if (error) throw error;
       return res.status(200).json({ ok: true });
@@ -312,6 +315,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(400).json({ error: "Ação inválida." });
   } catch (error) {
+    if (isSessionError(error)) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     const message = error instanceof Error ? error.message : "Erro ao processar pedidos administrativos.";
     return res.status(400).json({ error: message });
   }

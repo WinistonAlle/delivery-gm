@@ -4,11 +4,21 @@ export type CustomerRecord = {
   phone: string;
   document_cpf: string;
   cep?: string;
+  city?: string;
   address: string;
   addresses?: string[];
   how_found_us: string;
   how_found_us_details?: string;
   created_at: string;
+};
+
+export type SavedCustomerAddress = {
+  id: string;
+  address: string;
+  city: string;
+  cep: string;
+  label: string;
+  is_primary: boolean;
 };
 
 export type CustomerSession = {
@@ -19,8 +29,10 @@ export type CustomerSession = {
   phone: string;
   document_cpf: string;
   cep: string;
+  city: string;
   address: string;
   addresses: string[];
+  saved_addresses: SavedCustomerAddress[];
   how_found_us: string;
   how_found_us_details: string;
   role: "admin" | "customer";
@@ -32,9 +44,85 @@ export const CUSTOMER_SESSION_KEY = "customer_session";
 export const LEGACY_SESSION_KEY = "employee_session";
 export const CUSTOMER_SESSION_EVENT = "gm:customer-session-changed";
 const ADMIN_PHONES_KEY = "gm_admin_phones_v1";
+let memorySession: CustomerSession | null = null;
+let memoryHydrated = false;
 
 export const normalizePhone = (value: string) => value.replace(/\D/g, "");
 export const normalizeCpf = (value: string) => value.replace(/\D/g, "").slice(0, 11);
+
+function normalizeAdminPhone(value: string) {
+  const digits = normalizePhone(value);
+  if (digits.startsWith("55") && digits.length >= 12) {
+    return digits.slice(2);
+  }
+  return digits;
+}
+
+function parseStoredSession(raw: string | null): CustomerSession | null {
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<CustomerSession>;
+    if (!parsed || typeof parsed !== "object") return null;
+    if (!parsed.role || (!parsed.phone && !parsed.cpf)) return null;
+
+    return {
+      id: String(parsed.id ?? ""),
+      full_name: String(parsed.full_name ?? parsed.name ?? ""),
+      name: String(parsed.name ?? parsed.full_name ?? ""),
+      cpf: normalizePhone(String(parsed.cpf ?? parsed.phone ?? "")),
+      phone: normalizePhone(String(parsed.phone ?? parsed.cpf ?? "")),
+      document_cpf: normalizeCpf(String(parsed.document_cpf ?? "")),
+      cep: String(parsed.cep ?? "").replace(/\D/g, "").slice(0, 8),
+      city: String(parsed.city ?? "").trim(),
+      address: String(parsed.address ?? ""),
+      addresses: Array.isArray(parsed.addresses)
+        ? parsed.addresses.map((address) => String(address)).filter(Boolean)
+        : [String(parsed.address ?? "")].filter(Boolean),
+      saved_addresses: Array.isArray(parsed.saved_addresses)
+        ? parsed.saved_addresses
+            .map((item) => ({
+              id: String(item?.id ?? ""),
+              address: String(item?.address ?? ""),
+              city: String(item?.city ?? "").trim(),
+              cep: String(item?.cep ?? "").replace(/\D/g, "").slice(0, 8),
+              label: String(item?.label ?? "").trim(),
+              is_primary: Boolean(item?.is_primary),
+            }))
+            .filter((item) => item.address)
+        : [String(parsed.address ?? "")].filter(Boolean).map((address, index) => ({
+            id: `legacy-address-${index}`,
+            address,
+            city: String(parsed.city ?? "").trim(),
+            cep: String(parsed.cep ?? "").replace(/\D/g, "").slice(0, 8),
+            label: "",
+            is_primary: index === 0,
+          })),
+      how_found_us: String(parsed.how_found_us ?? ""),
+      how_found_us_details: String(parsed.how_found_us_details ?? ""),
+      role: parsed.role === "admin" ? "admin" : "customer",
+      is_admin: Boolean(parsed.is_admin ?? parsed.role === "admin"),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function persistLocalSession(session: CustomerSession | null) {
+  if (session) {
+    localStorage.setItem(CUSTOMER_SESSION_KEY, JSON.stringify(session));
+    localStorage.setItem(LEGACY_SESSION_KEY, JSON.stringify(session));
+    return;
+  }
+
+  localStorage.removeItem(CUSTOMER_SESSION_KEY);
+  localStorage.removeItem(LEGACY_SESSION_KEY);
+}
+
+function setMemorySession(session: CustomerSession | null) {
+  memorySession = session;
+  memoryHydrated = true;
+}
 
 function readEnvAdminPhones(): string[] {
   try {
@@ -42,7 +130,7 @@ function readEnvAdminPhones(): string[] {
     if (!raw || typeof raw !== "string") return [];
     return raw
       .split(",")
-      .map((p: string) => normalizePhone(p))
+      .map((p: string) => normalizeAdminPhone(p))
       .filter((p: string) => p.length >= 10);
   } catch {
     return [];
@@ -54,7 +142,7 @@ export function getAdminPhones(): string[] {
     const raw = localStorage.getItem(ADMIN_PHONES_KEY);
     const local = raw ? (JSON.parse(raw) as string[]) : [];
     const normalizedLocal = Array.isArray(local)
-      ? local.map((p) => normalizePhone(String(p))).filter((p) => p.length >= 10)
+      ? local.map((p) => normalizeAdminPhone(String(p))).filter((p) => p.length >= 10)
       : [];
     const merged = Array.from(new Set([...normalizedLocal, ...readEnvAdminPhones()]));
     return merged;
@@ -67,7 +155,7 @@ export function saveAdminPhones(phones: string[]) {
   const normalized = Array.from(
     new Set(
       (phones ?? [])
-        .map((p) => normalizePhone(String(p)))
+        .map((p) => normalizeAdminPhone(String(p)))
         .filter((p) => p.length >= 10)
     )
   );
@@ -75,7 +163,7 @@ export function saveAdminPhones(phones: string[]) {
 }
 
 export function addAdminPhone(phone: string) {
-  const normalized = normalizePhone(phone);
+  const normalized = normalizeAdminPhone(phone);
   if (normalized.length < 10) return;
   const current = getAdminPhones();
   if (current.includes(normalized)) return;
@@ -83,14 +171,14 @@ export function addAdminPhone(phone: string) {
 }
 
 export function removeAdminPhone(phone: string) {
-  const normalized = normalizePhone(phone);
+  const normalized = normalizeAdminPhone(phone);
   if (normalized.length < 10) return;
   const current = getAdminPhones();
   saveAdminPhones(current.filter((p) => p !== normalized));
 }
 
 export function isAdminPhone(phone: string) {
-  const normalized = normalizePhone(phone);
+  const normalized = normalizeAdminPhone(phone);
   if (!normalized) return false;
   return getAdminPhones().includes(normalized);
 }
@@ -110,6 +198,7 @@ export function getCustomers(): CustomerRecord[] {
         phone,
         document_cpf: normalizeCpf(String(item?.document_cpf ?? legacyCpf)),
         cep: String(item?.cep ?? "").replace(/\D/g, "").slice(0, 8),
+        city: String(item?.city ?? "").trim(),
         address: String(item?.address ?? ""),
         addresses: Array.isArray(item?.addresses)
           ? item.addresses.map((address) => String(address)).filter(Boolean)
@@ -142,8 +231,8 @@ export function normalizeRedirectPath(value: unknown, fallback = "/catalogo") {
 }
 
 function persistCustomerSession(session: CustomerSession) {
-  localStorage.setItem(CUSTOMER_SESSION_KEY, JSON.stringify(session));
-  localStorage.setItem(LEGACY_SESSION_KEY, JSON.stringify(session));
+  setMemorySession(session);
+  persistLocalSession(session);
   dispatchCustomerSessionChanged();
 }
 
@@ -158,6 +247,7 @@ export function upsertCustomer(record: Omit<CustomerRecord, "id" | "created_at">
   const phone = normalizePhone(record.phone);
   const documentCpf = normalizeCpf(record.document_cpf);
   const cep = String(record.cep ?? "").replace(/\D/g, "").slice(0, 8);
+  const city = String(record.city ?? "").trim();
   const customers = getCustomers();
   const existing = customers.find((c) => normalizePhone(c.phone) === phone);
 
@@ -173,6 +263,7 @@ export function upsertCustomer(record: Omit<CustomerRecord, "id" | "created_at">
       phone,
       document_cpf: documentCpf,
       cep,
+      city,
       addresses: dedup,
       how_found_us: record.how_found_us.trim(),
       how_found_us_details: record.how_found_us_details?.trim() ?? "",
@@ -187,6 +278,7 @@ export function upsertCustomer(record: Omit<CustomerRecord, "id" | "created_at">
     phone,
     document_cpf: documentCpf,
     cep,
+    city,
     address: record.address.trim(),
     addresses: [record.address.trim()],
     how_found_us: record.how_found_us.trim(),
@@ -209,8 +301,19 @@ export function createCustomerSession(customer: CustomerRecord) {
     phone: cleanPhone,
     document_cpf: customer.document_cpf,
     cep: customer.cep ?? "",
+    city: customer.city ?? "",
     address: customer.address,
     addresses: customer.addresses ?? [customer.address],
+    saved_addresses: [
+      {
+        id: "local-primary-address",
+        address: customer.address,
+        city: customer.city ?? "",
+        cep: customer.cep ?? "",
+        label: "",
+        is_primary: true,
+      },
+    ],
     how_found_us: customer.how_found_us,
     how_found_us_details: customer.how_found_us_details ?? "",
     role: isAdmin ? "admin" : "customer",
@@ -227,38 +330,196 @@ export function saveCustomerSession(session: CustomerSession) {
 }
 
 export function getCustomerSession(): CustomerSession | null {
+  if (memoryHydrated) return memorySession;
+
   try {
     const raw =
       localStorage.getItem(CUSTOMER_SESSION_KEY) ??
       localStorage.getItem(LEGACY_SESSION_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<CustomerSession>;
-    if (!parsed || typeof parsed !== "object") return null;
-    if (!parsed.role || (!parsed.phone && !parsed.cpf)) return null;
-    return {
-      id: String(parsed.id ?? ""),
-      full_name: String(parsed.full_name ?? parsed.name ?? ""),
-      name: String(parsed.name ?? parsed.full_name ?? ""),
-      cpf: normalizePhone(String(parsed.cpf ?? parsed.phone ?? "")),
-      phone: normalizePhone(String(parsed.phone ?? parsed.cpf ?? "")),
-      document_cpf: normalizeCpf(String(parsed.document_cpf ?? "")),
-      cep: String(parsed.cep ?? "").replace(/\D/g, "").slice(0, 8),
-      address: String(parsed.address ?? ""),
-      addresses: Array.isArray(parsed.addresses)
-        ? parsed.addresses.map((address) => String(address)).filter(Boolean)
-        : [String(parsed.address ?? "")].filter(Boolean),
-      how_found_us: String(parsed.how_found_us ?? ""),
-      how_found_us_details: String(parsed.how_found_us_details ?? ""),
-      role: parsed.role === "admin" ? "admin" : "customer",
-      is_admin: Boolean(parsed.is_admin ?? parsed.role === "admin"),
-    };
+    return parseStoredSession(raw);
   } catch {
     return null;
   }
 }
 
-export function clearCustomerSession() {
-  localStorage.removeItem(CUSTOMER_SESSION_KEY);
-  localStorage.removeItem(LEGACY_SESSION_KEY);
+export function hydrateCustomerSession(session: CustomerSession | null) {
+  setMemorySession(session);
+  persistLocalSession(session);
   dispatchCustomerSessionChanged();
+}
+
+export function isCustomerSessionHydrated() {
+  return memoryHydrated;
+}
+
+export function clearCustomerSession() {
+  setMemorySession(null);
+  persistLocalSession(null);
+  dispatchCustomerSessionChanged();
+}
+
+async function readJson<T>(response: Response): Promise<T> {
+  return (await response.json()) as T;
+}
+
+function buildApiUrl(path: string) {
+  if (typeof window === "undefined") return path;
+  return new URL(path, window.location.origin).toString();
+}
+
+function toUserFacingAuthError(error: unknown, fallback: string) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  const normalized = message.trim();
+
+  if (!normalized) return fallback;
+
+  if (
+    error instanceof TypeError ||
+    normalized === "Failed to fetch" ||
+    normalized === "fetch failed" ||
+    normalized.includes("expected pattern")
+  ) {
+    return "A API de autenticação não está disponível neste ambiente. Use `npm run dev` ou `npm run start:prod`.";
+  }
+
+  return normalized;
+}
+
+export async function syncCustomerSessionFromServer() {
+  try {
+    const response = await fetch(buildApiUrl("/api/auth/session"), {
+      method: "GET",
+      credentials: "same-origin",
+      headers: {
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      return getCustomerSession();
+    }
+
+    const payload = await readJson<{ session?: CustomerSession | null }>(response);
+    const session = payload.session ?? null;
+    hydrateCustomerSession(session);
+    return session;
+  } catch {
+    return getCustomerSession();
+  }
+}
+
+export async function loginCustomer(params: { phone: string; cpf: string }) {
+  try {
+    const response = await fetch(buildApiUrl("/api/auth/login"), {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        phone: normalizePhone(params.phone),
+        cpf: normalizeCpf(params.cpf),
+      }),
+    });
+
+    const payload = await readJson<{ session?: CustomerSession; error?: string }>(response);
+    if (!response.ok || !payload.session) {
+      throw new Error(payload.error || "Não foi possível entrar.");
+    }
+
+    hydrateCustomerSession(payload.session);
+    return payload.session;
+  } catch (error) {
+    throw new Error(toUserFacingAuthError(error, "Não foi possível entrar."));
+  }
+}
+
+export async function signupCustomer(params: {
+  full_name: string;
+  phone: string;
+  document_cpf: string;
+  cep?: string;
+  address: string;
+  city?: string;
+  how_found_us: string;
+  how_found_us_details?: string;
+}) {
+  try {
+    const response = await fetch(buildApiUrl("/api/auth/signup"), {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ...params,
+        phone: normalizePhone(params.phone),
+        document_cpf: normalizeCpf(params.document_cpf),
+        cep: String(params.cep ?? "").replace(/\D/g, "").slice(0, 8),
+      }),
+    });
+
+    const payload = await readJson<{ session?: CustomerSession; error?: string }>(response);
+    if (!response.ok || !payload.session) {
+      throw new Error(payload.error || "Não foi possível concluir o cadastro.");
+    }
+
+    hydrateCustomerSession(payload.session);
+    return payload.session;
+  } catch (error) {
+    throw new Error(
+      toUserFacingAuthError(error, "Não foi possível concluir o cadastro.")
+    );
+  }
+}
+
+export async function logoutCustomerSession() {
+  try {
+    await fetch(buildApiUrl("/api/auth/logout"), {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+  } finally {
+    clearCustomerSession();
+  }
+}
+
+export async function createAdditionalCustomerAddress(params: {
+  address: string;
+  city: string;
+  cep?: string;
+  label?: string;
+  setPrimary?: boolean;
+}) {
+  try {
+    const response = await fetch(buildApiUrl("/api/customer-addresses"), {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        address: params.address,
+        city: params.city,
+        cep: String(params.cep ?? "").replace(/\D/g, "").slice(0, 8),
+        label: params.label ?? "",
+        setPrimary: Boolean(params.setPrimary),
+      }),
+    });
+
+    const payload = await readJson<{ session?: CustomerSession; error?: string }>(response);
+    if (!response.ok || !payload.session) {
+      throw new Error(payload.error || "Nao foi possivel salvar o endereco.");
+    }
+
+    hydrateCustomerSession(payload.session);
+    return payload.session;
+  } catch (error) {
+    throw new Error(
+      toUserFacingAuthError(error, "Nao foi possivel salvar o endereco.")
+    );
+  }
 }

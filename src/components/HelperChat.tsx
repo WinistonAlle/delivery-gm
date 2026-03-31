@@ -1,10 +1,16 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Bot, MessageCircle, Send, Sparkles, X } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MIN_ORDER_VALUE, MIN_PACKAGES } from "@/data/products";
+import {
+  MIN_ORDER_VALUE,
+  MIN_PACKAGES,
+  PRODUCTS,
+  TOP_SELLING_PRODUCTS,
+} from "@/data/products";
 import { FREE_SHIPPING_THRESHOLD, SHIPPING_RATES } from "@/data/shipping";
 import { normalizeText } from "@/utils/stringUtils";
+import type { Product } from "@/types/products";
 
 type ChatMessage = {
   id: string;
@@ -13,12 +19,23 @@ type ChatMessage = {
 };
 
 const QUICK_QUESTIONS = [
+  "Quais pães de queijo vocês têm?",
+  "Qual pão de queijo é mais vendido?",
   "Quantos salgados para 50 pessoas?",
-  "Quais salgados vocês sugerem para festa?",
-  "Quanto tempo o pão de queijo fica no forno?",
   "Vocês entregam em Taguatinga?",
   "Qual é o pedido mínimo?",
-  "Tem frete grátis?",
+  "Me indique produtos para festa",
+];
+
+const CATEGORY_ALIASES = [
+  { category: "Pão de Queijo", aliases: ["pao de queijo", "paes de queijo", "pdq"] },
+  { category: "Salgados Assados", aliases: ["assado", "assados", "forno"] },
+  { category: "Salgados P/ Fritar", aliases: ["fritar", "fritos", "fritura"] },
+  { category: "Pães e Massas Doces", aliases: ["doce", "doces", "massa doce"] },
+  { category: "Biscoito de Queijo", aliases: ["biscoito de queijo", "biscoito"] },
+  { category: "Salgados Grandes", aliases: ["salgado grande", "salgados grandes"] },
+  { category: "Kits e Combos", aliases: ["combo", "combos", "kit", "kits"] },
+  { category: "Alho em creme", aliases: ["alho em creme", "alho"] },
 ];
 
 function normalizeQuestion(question: string) {
@@ -30,6 +47,10 @@ function tokenizeQuestion(question: string) {
     .split(/[^a-z0-9]+/)
     .map((token) => token.trim())
     .filter(Boolean);
+}
+
+function formatCurrency(value: number) {
+  return `R$ ${value.toFixed(2).replace(".", ",")}`;
 }
 
 function levenshteinDistance(a: string, b: string) {
@@ -110,21 +131,99 @@ function roundUpPackages(quantity: number, packageSize = 50) {
   return Math.ceil(quantity / packageSize);
 }
 
+function getProductPrice(product: Product) {
+  const value = Number(product.employee_price ?? product.price ?? 0);
+  return formatCurrency(value);
+}
+
+function inferCategory(question: string) {
+  const match = CATEGORY_ALIASES.find(({ aliases }) => questionHasAny(question, aliases));
+  return match?.category ?? null;
+}
+
+function getCategoryProducts(category: string, limit = 4) {
+  return PRODUCTS.filter(
+    (product) => product.category === category && product.inStock !== false
+  )
+    .sort(
+      (a, b) =>
+        Number(b.featured ?? false) - Number(a.featured ?? false) ||
+        Number(a.employee_price ?? a.price ?? 0) -
+          Number(b.employee_price ?? b.price ?? 0)
+    )
+    .slice(0, limit);
+}
+
+function scoreProductMatch(question: string, product: Product) {
+  const normalizedQuestion = normalizeQuestion(question);
+  const questionTokens = tokenizeQuestion(question);
+  const productTokens = tokenizeQuestion(product.name);
+  let score = 0;
+
+  if (normalizedQuestion.includes(normalizeQuestion(product.name))) score += 10;
+  if (normalizedQuestion.includes(normalizeQuestion(product.category))) score += 4;
+  if (normalizedQuestion.includes(normalizeQuestion(product.packageInfo))) score += 2;
+
+  for (const questionToken of questionTokens) {
+    if (questionToken.length < 2) continue;
+
+    if (productTokens.some((productToken) => productToken === questionToken)) {
+      score += 3;
+      continue;
+    }
+
+    if (productTokens.some((productToken) => isApproxWordMatch(productToken, questionToken))) {
+      score += 1;
+    }
+  }
+
+  return score;
+}
+
+function findProductMatches(question: string, limit = 3) {
+  return PRODUCTS.filter((product) => product.inStock !== false)
+    .map((product) => ({ product, score: scoreProductMatch(question, product) }))
+    .filter(({ score }) => score >= 3)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(({ product }) => product);
+}
+
 function buildSavorySuggestions(question: string) {
   if (questionHasAny(question, ["assado", "forno"])) {
-    return "Uma boa seleção de assados costuma incluir mini esfirra de carne, enroladinho de salsicha assado e outros salgados assados para variar sabor e textura.";
+    const options = getCategoryProducts("Salgados Assados", 3);
+    if (options.length) {
+      return `Para assados, uma boa seleção é ${options
+        .map((item) => item.name)
+        .join(", ")}.`;
+    }
   }
 
   if (questionHasAny(question, ["fritar", "frito", "fritura"])) {
-    return "Para fritura, uma sugestão segura é combinar coxinha, risoles, quibe e bolinha de queijo. Esse mix costuma funcionar bem em festa e dá variedade sem complicar a escolha.";
+    const options = getCategoryProducts("Salgados P/ Fritar", 4);
+    if (options.length) {
+      return `Para fritura, um mix seguro é ${options
+        .map((item) => item.name)
+        .join(", ")}.`;
+    }
   }
 
-  return "Para festa, um mix equilibrado costuma funcionar muito bem: coxinha, mini esfirra de carne, enroladinho de salsicha, quibe e bolinha de queijo. Se quiser, eu também posso sugerir uma divisão entre fritos e assados.";
+  const partyMix = [
+    ...getCategoryProducts("Salgados P/ Fritar", 2),
+    ...getCategoryProducts("Salgados Assados", 2),
+  ].slice(0, 4);
+
+  if (partyMix.length) {
+    return `Para festa, eu sugeriria um mix com ${partyMix
+      .map((item) => item.name)
+      .join(", ")}.`;
+  }
+
+  return "Para festa, um mix equilibrado entre fritos e assados costuma funcionar melhor.";
 }
 
 function buildPartyAnswer(question: string) {
-  const normalized = normalizeQuestion(question);
-  const peopleCount = extractNumber(normalized);
+  const peopleCount = extractNumber(question);
   const isCheeseBread = questionHasAny(question, ["pao de queijo", "pao queijo"]);
 
   if (!peopleCount) {
@@ -153,7 +252,7 @@ function buildPartyAnswer(question: string) {
   const highPackages = roundUpPackages(high);
   const suggestions = buildSavorySuggestions(question);
 
-  return `Para ${peopleCount} pessoas, uma boa base é entre ${low} e ${high} salgados, o que dá cerca de ${lowPackages} a ${highPackages} pacotes de 50. Se quiser uma conta equilibrada, use cerca de ${mid} unidades, ou ${midPackages} pacotes. Se a festa tiver outras comidas, fique mais perto de ${lowPackages} pacotes. Se o salgado for a estrela principal, aproxime-se de ${highPackages} pacotes. ${suggestions}`;
+  return `Para ${peopleCount} pessoas, uma boa base é entre ${low} e ${high} salgados, o que dá cerca de ${lowPackages} a ${highPackages} pacotes de 50. Se quiser uma conta equilibrada, use cerca de ${mid} unidades, ou ${midPackages} pacotes. ${suggestions}`;
 }
 
 function buildOvenAnswer(question: string) {
@@ -170,28 +269,28 @@ function buildOvenAnswer(question: string) {
   }
 
   if (isFrying) {
-    return "Para salgado de fritura, o ideal é óleo quente, em fogo médio, até dourar por fora sem queimar. Em geral, o tempo fica entre 3 e 6 minutos, dependendo do tamanho e do recheio.";
+    return "Para salgado de fritura, o ideal é óleo quente em fogo médio até dourar por fora sem queimar. Em geral, o tempo fica entre 3 e 6 minutos, dependendo do tamanho e do recheio.";
   }
 
   if (isCheeseBread) {
     return "Para pão de queijo, uma referência prática é entre 25 e 35 minutos em forno preaquecido a 180°C ou 200°C. O ponto ideal é quando crescer e dourar levemente.";
   }
 
-  return "Como média geral, pães e salgados assados costumam ficar entre 20 e 40 minutos em forno preaquecido, variando com tamanho, recheio e temperatura. Se quiser, eu posso responder com uma faixa mais exata para um produto específico.";
+  return "Como média geral, pães e salgados assados costumam ficar entre 20 e 40 minutos em forno preaquecido, variando com tamanho, recheio e temperatura.";
 }
 
 function buildDeliveryAnswer(question: string) {
   const city = findShippingCity(question);
 
   if (city) {
-    return `Sim, atendemos ${city.city}. No carrinho, o frete dessa região está configurado em R$ ${city.cost.toFixed(2).replace(".", ",")}.`;
+    return `Sim, atendemos ${city.city}. No carrinho, o frete dessa região está configurado em ${formatCurrency(city.cost)}.`;
   }
 
-  return `Sim, você pode montar o pedido e seguir para o carrinho para consultar entrega e frete. O frete grátis é liberado a partir de R$ ${FREE_SHIPPING_THRESHOLD.toFixed(2).replace(".", ",")}. Se quiser, eu também posso te dizer se atendemos sua região.`;
+  return `Você pode montar o pedido e seguir para o carrinho para consultar entrega e frete. O frete grátis é liberado a partir de ${formatCurrency(FREE_SHIPPING_THRESHOLD)}.`;
 }
 
 function buildMinimumOrderAnswer() {
-  return `Hoje o carrinho trabalha com pedido mínimo de ${MIN_PACKAGES} pacotes ou R$ ${MIN_ORDER_VALUE.toFixed(2).replace(".", ",")}. Conforme você adiciona os itens, o próprio carrinho mostra o que ainda falta para atingir o mínimo.`;
+  return `Hoje o carrinho trabalha com pedido mínimo de ${MIN_PACKAGES} pacotes ou ${formatCurrency(MIN_ORDER_VALUE)}. Conforme você adiciona os itens, o próprio carrinho mostra o que ainda falta para atingir o mínimo.`;
 }
 
 function buildStorageAnswer(question: string) {
@@ -201,23 +300,119 @@ function buildStorageAnswer(question: string) {
     return "O ideal é manter os produtos congelados até o preparo, preservando a embalagem bem fechada. Depois de descongelar, a recomendação mais segura é preparar sem recongelar.";
   }
 
-  return "Para conservar bem, mantenha o produto congelado até a hora do preparo e evite recongelar depois de descongelado. Se quiser, eu também posso orientar sobre forno, air fryer ou fritura.";
+  return "Para conservar bem, mantenha o produto congelado até a hora do preparo e evite recongelar depois de descongelado.";
 }
 
-function buildPriceAnswer() {
-  return "Os preços aparecem diretamente nos cards dos produtos e no carrinho. Se você quiser economizar, eu posso sugerir uma conta base para festa ou para café da tarde.";
+function buildCatalogAnswer(question: string) {
+  const category = inferCategory(question);
+  const matches = findProductMatches(question, 4);
+
+  if (matches.length > 0) {
+    return `Encontrei estes itens no catálogo: ${matches
+      .map(
+        (product) =>
+          `${product.name} (${getProductPrice(product)}, ${product.packageInfo})`
+      )
+      .join("; ")}.`;
+  }
+
+  if (category) {
+    const products = getCategoryProducts(category, 4);
+    if (products.length) {
+      return `Na categoria ${category}, eu encontrei: ${products
+        .map((product) => `${product.name} (${getProductPrice(product)})`)
+        .join("; ")}.`;
+    }
+  }
+
+  return "";
 }
 
-function buildBestSellerAnswer() {
-  return "Entre os itens de maior saída, pão de queijo e salgados de festa costumam ser escolhas fortes para giro rápido. Se você quiser, posso te orientar por ocasião: festa, café da tarde ou revenda.";
+function buildPriceAnswer(question: string) {
+  const matches = findProductMatches(question, 3);
+
+  if (matches.length > 0) {
+    return `Os preços mais próximos do que você pediu são: ${matches
+      .map(
+        (product) =>
+          `${product.name}: ${getProductPrice(product)} (${product.packageInfo})`
+      )
+      .join("; ")}.`;
+  }
+
+  const category = inferCategory(question);
+  if (category) {
+    const products = getCategoryProducts(category, 4);
+    if (products.length) {
+      return `Na categoria ${category}, os itens que mais fazem sentido para você olhar agora são: ${products
+        .map((product) => `${product.name}: ${getProductPrice(product)}`)
+        .join("; ")}.`;
+    }
+  }
+
+  return "Os preços aparecem nos cards dos produtos e no carrinho. Se você me disser o nome do item, eu tento localizar o valor exato aqui no catálogo.";
 }
 
-function buildComboAnswer() {
-  return "Sim. O catálogo mostra combos prontos quando eles estiverem disponíveis, e você também pode montar um pedido misto com pão de queijo, assados e fritos para equilibrar variedade e ticket.";
+function buildBestSellerAnswer(question: string) {
+  const topProducts = TOP_SELLING_PRODUCTS.map((name) =>
+    PRODUCTS.find((product) => normalizeQuestion(product.name) === normalizeQuestion(name))
+  ).filter(Boolean) as Product[];
+
+  if (questionHasAny(question, ["pao de queijo", "pao queijo"])) {
+    const cheeseBread = topProducts.filter((product) => product.category === "Pão de Queijo");
+    if (cheeseBread.length > 0) {
+      return `Entre os pães de queijo com maior saída, eu destacaria ${cheeseBread
+        .slice(0, 3)
+        .map((product) => `${product.name} (${getProductPrice(product)})`)
+        .join("; ")}.`;
+    }
+  }
+
+  if (topProducts.length > 0) {
+    return `Os campeões de venda do catálogo incluem ${topProducts
+      .slice(0, 4)
+      .map((product) => `${product.name} (${getProductPrice(product)})`)
+      .join("; ")}.`;
+  }
+
+  return "Entre os itens de maior saída, pão de queijo e salgados de festa costumam ser escolhas fortes.";
+}
+
+function buildRecommendationAnswer(question: string) {
+  if (questionHasAny(question, ["cafe", "cafe da tarde", "lanche"])) {
+    const recommendations = [
+      ...getCategoryProducts("Pão de Queijo", 2),
+      ...getCategoryProducts("Pães e Massas Doces", 2),
+    ].slice(0, 4);
+
+    if (recommendations.length) {
+      return `Para café da tarde, eu sugiro ${recommendations
+        .map((product) => `${product.name} (${getProductPrice(product)})`)
+        .join("; ")}.`;
+    }
+  }
+
+  if (questionHasAny(question, ["festa", "evento", "aniversario"])) {
+    return buildSavorySuggestions(question);
+  }
+
+  const general = [
+    ...getCategoryProducts("Pão de Queijo", 2),
+    ...getCategoryProducts("Salgados Assados", 1),
+    ...getCategoryProducts("Salgados P/ Fritar", 1),
+  ].slice(0, 4);
+
+  if (general.length) {
+    return `Se você quer começar pelos itens mais fáceis de vender ou servir, eu olharia estes: ${general
+      .map((product) => `${product.name} (${getProductPrice(product)})`)
+      .join("; ")}.`;
+  }
+
+  return "Posso te indicar opções para festa, café da tarde, revenda ou pão de queijo. Se quiser, me diga a ocasião.";
 }
 
 function buildGreetingAnswer() {
-  return "Oi! Posso ajudar com quantidade para festa, preparo, frete, pedido mínimo, conservação e dúvidas rápidas sobre compra.";
+  return "Oi! Agora eu consigo ajudar com dúvidas do catálogo, preço de produtos, sugestões para festa, preparo, frete, pedido mínimo e cidades atendidas.";
 }
 
 function buildHoursAnswer() {
@@ -228,26 +423,40 @@ function buildPaymentAnswer() {
   return "As formas de pagamento aparecem na finalização do pedido. Se quiser, monte o carrinho que eu te oriento no restante do fluxo.";
 }
 
-function buildFallbackAnswer() {
-  return "Eu consigo ajudar com perguntas simples sobre quantidade para festa, tempo de preparo, conservação, frete, cidades atendidas, pedido mínimo e frete grátis. Tente algo como: 'vocês entregam em Taguatinga?' ou 'quantos salgados para 80 pessoas?'.";
+function buildFallbackAnswer(question: string) {
+  const category = inferCategory(question);
+  const matches = findProductMatches(question, 3);
+
+  if (matches.length > 0) {
+    return `Não achei uma resposta pronta para isso, mas encontrei itens relacionados: ${matches
+      .map((product) => product.name)
+      .join(", ")}. Você pode me perguntar preço, preparo ou qual deles combina melhor com sua ocasião.`;
+  }
+
+  if (category) {
+    return `Posso te ajudar melhor dentro da categoria ${category}. Por exemplo: "qual o preço desse item?", "quais vocês indicam?" ou "tem entrega para minha região?".`;
+  }
+
+  return "Eu consigo ajudar com catálogo, preço, sugestão de produtos, quantidade para festa, preparo, frete, cidades atendidas, pedido mínimo e frete grátis. Tente algo como: 'quais pães de queijo vocês têm?', 'qual o preço do pão de queijo GG?' ou 'quantos salgados para 80 pessoas?'.";
 }
 
 function buildFaqAnswer(question: string) {
-  if (
-    questionHasAny(question, ["oi", "ola", "bom dia", "boa tarde", "boa noite"])
-  ) {
+  if (questionHasAny(question, ["oi", "ola", "bom dia", "boa tarde", "boa noite"])) {
     return buildGreetingAnswer();
   }
 
   if (
     questionHasAny(question, [
       "quais salgados",
-      "sugere salgados",
-      "sugestao de salgado",
-      "quais voces sugerem",
+      "sugere",
+      "sugestao",
+      "indique",
+      "recomenda",
+      "melhor para festa",
+      "melhor para cafe",
     ])
   ) {
-    return buildSavorySuggestions(question);
+    return buildRecommendationAnswer(question);
   }
 
   if (
@@ -290,13 +499,7 @@ function buildFaqAnswer(question: string) {
     return buildDeliveryAnswer(question);
   }
 
-  if (
-    questionHasAny(question, [
-      "pedido minimo",
-      "minimo",
-      "quantidade minima",
-    ])
-  ) {
+  if (questionHasAny(question, ["pedido minimo", "minimo", "quantidade minima"])) {
     return buildMinimumOrderAnswer();
   }
 
@@ -320,21 +523,19 @@ function buildFaqAnswer(question: string) {
       "quanto custa",
     ])
   ) {
-    return buildPriceAnswer();
+    return buildPriceAnswer(question);
   }
 
-  if (
-    questionHasAny(question, [
-      "mais vendido",
-      "campeao de vendas",
-      "mais sai",
-    ])
-  ) {
-    return buildBestSellerAnswer();
+  if (questionHasAny(question, ["mais vendido", "campeao de vendas", "mais sai"])) {
+    return buildBestSellerAnswer(question);
   }
 
   if (questionHasAny(question, ["combo", "kit", "pedido misto"])) {
-    return buildComboAnswer();
+    const categoryAnswer = buildCatalogAnswer(question);
+    return (
+      categoryAnswer ||
+      "O catálogo mostra combos prontos quando eles estiverem disponíveis, e você também pode montar um pedido misto com pão de queijo, assados e fritos."
+    );
   }
 
   if (questionHasAny(question, ["horario", "funciona", "atendimento"])) {
@@ -346,26 +547,56 @@ function buildFaqAnswer(question: string) {
   }
 
   if (questionHasAny(question, ["frete gratis", "gratis"])) {
-    return `O frete grátis é liberado a partir de R$ ${FREE_SHIPPING_THRESHOLD.toFixed(2).replace(".", ",")}. Abaixo disso, o valor varia conforme a região de entrega.`;
+    return `O frete grátis é liberado a partir de ${formatCurrency(FREE_SHIPPING_THRESHOLD)}. Abaixo disso, o valor varia conforme a região de entrega.`;
   }
 
-  return buildFallbackAnswer();
+  const catalogAnswer = buildCatalogAnswer(question);
+  if (catalogAnswer) return catalogAnswer;
+
+  return buildFallbackAnswer(question);
 }
 
 const HelperChat: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [draft, setDraft] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
       role: "bot",
       content:
-        "Oi! Eu respondo dúvidas rápidas sobre quantidade para festa, preparo, conservação, frete, cidades atendidas, frete grátis e pedido mínimo.",
+        "Oi! Eu consigo responder dúvidas do catálogo, encontrar produtos, sugerir itens para festa e informar preço, preparo, frete e pedido mínimo.",
     },
   ]);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const replyTimeoutRef = useRef<number | null>(null);
 
   const canSend = draft.trim().length > 0;
   const quickQuestions = useMemo(() => QUICK_QUESTIONS, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const scrollToBottom = () => {
+      messagesEndRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "end",
+      });
+    };
+
+    scrollToBottom();
+    const frameId = window.requestAnimationFrame(scrollToBottom);
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [isOpen, messages]);
+
+  useEffect(() => {
+    return () => {
+      if (replyTimeoutRef.current !== null) {
+        window.clearTimeout(replyTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const pushQuestion = (question: string) => {
     const cleanQuestion = question.trim();
@@ -374,6 +605,10 @@ const HelperChat: React.FC = () => {
     const answer = buildFaqAnswer(cleanQuestion);
     const timestamp = Date.now();
 
+    if (replyTimeoutRef.current !== null) {
+      window.clearTimeout(replyTimeoutRef.current);
+    }
+
     setMessages((current) => [
       ...current,
       {
@@ -381,12 +616,22 @@ const HelperChat: React.FC = () => {
         role: "user",
         content: cleanQuestion,
       },
-      {
-        id: `${timestamp}-bot`,
-        role: "bot",
-        content: answer,
-      },
     ]);
+
+    setIsTyping(true);
+
+    replyTimeoutRef.current = window.setTimeout(() => {
+      setMessages((current) => [
+        ...current,
+        {
+          id: `${timestamp}-bot`,
+          role: "bot",
+          content: answer,
+        },
+      ]);
+      setIsTyping(false);
+      replyTimeoutRef.current = null;
+    }, 450);
 
     setDraft("");
     setIsOpen(true);
@@ -407,10 +652,10 @@ const HelperChat: React.FC = () => {
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-white">
                   <Bot className="h-5 w-5 text-white" />
-                  <p className="font-black">Assistente de dúvidas</p>
+                  <p className="font-black">Assistente inteligente</p>
                 </div>
                 <p className="mt-1 text-xs text-slate-300">
-                  Respostas rápidas para dúvidas frequentes do catálogo.
+                  Respostas com base no catálogo, frete e dúvidas frequentes.
                 </p>
               </div>
 
@@ -446,6 +691,18 @@ const HelperChat: React.FC = () => {
                     </div>
                   );
                 })}
+                {isTyping ? (
+                  <div className="flex justify-start">
+                    <div className="max-w-[88%] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-relaxed text-slate-500 shadow-sm">
+                      <span className="flex items-center gap-1.5" aria-label="Assistente digitando">
+                        <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.3s]" />
+                        <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.15s]" />
+                        <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400" />
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
+                <div ref={messagesEndRef} aria-hidden="true" />
               </div>
             </ScrollArea>
 
@@ -474,7 +731,7 @@ const HelperChat: React.FC = () => {
                   type="text"
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
-                  placeholder="Digite sua pergunta..."
+                  placeholder="Pergunte sobre produtos, preço, preparo ou frete..."
                   className="h-11 flex-1 rounded-full border border-slate-300 bg-white px-4 text-sm text-slate-800 outline-none transition focus:border-slate-500"
                 />
 
@@ -498,7 +755,7 @@ const HelperChat: React.FC = () => {
           onClick={() => setIsOpen((current) => !current)}
           className="group inline-flex h-12 w-12 items-center justify-center rounded-full border border-slate-200/80 bg-white/88 text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.14)] backdrop-blur transition-[width,box-shadow,background-color] duration-500 ease-out md:h-16 md:w-16 md:justify-start md:overflow-hidden md:hover:w-[280px] md:hover:bg-white md:hover:shadow-[0_22px_42px_rgba(15,23,42,0.20)]"
           aria-expanded={isOpen}
-          aria-label="Abrir assistente de dúvidas"
+          aria-label="Abrir assistente inteligente"
         >
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-700 md:ml-2 md:h-12 md:w-12 md:shrink-0 md:bg-slate-100 md:text-slate-700">
             <MessageCircle className="h-4.5 w-4.5 md:h-6 md:w-6" />
@@ -506,13 +763,13 @@ const HelperChat: React.FC = () => {
 
           <span className="hidden min-w-0 pointer-events-none text-left md:ml-3 md:block">
             <span className="block max-w-0 -translate-x-3 whitespace-nowrap opacity-0 transition-[max-width,opacity,transform] duration-500 ease-out md:group-hover:max-w-[190px] md:group-hover:translate-x-0 md:group-hover:opacity-100">
-            <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-              <Sparkles className="h-3.5 w-3.5" />
-              Assistente
-            </span>
-            <span className="block text-base font-semibold leading-tight">
-              Tire dúvidas rápidas
-            </span>
+              <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                <Sparkles className="h-3.5 w-3.5" />
+                IA do catálogo
+              </span>
+              <span className="block text-base font-semibold leading-tight">
+                Tire dúvidas com contexto
+              </span>
             </span>
           </span>
         </button>

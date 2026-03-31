@@ -7,30 +7,13 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/sonner";
 import type { Product } from "@/types/products";
+import PageLoader from "@/components/PageLoader";
 import {
   type CrossSellRule,
   type DeliveryComboConfig,
-  loadAdminOfferConfig,
-  saveAdminOfferConfig,
 } from "@/lib/deliveryOffers";
-import {
-  addAdminPhone,
-  getAdminPhones,
-  normalizePhone,
-  removeAdminPhone,
-} from "@/lib/customerAuth";
-import { APP_THEMES, type AppThemeKey, applyTheme, getLocalTheme, saveTheme } from "@/lib/appTheme";
 
 const FALLBACK_IMG = "/placeholder.png";
-const THEME_SWATCHES: Record<AppThemeKey, [string, string, string]> = {
-  default: ["#dc2626", "#f3f6fb", "#334155"],
-  junino: ["#f97316", "#facc15", "#ea580c"],
-  natal: ["#059669", "#dc2626", "#ecfdf5"],
-  blackfriday: ["#000000", "#27272a", "#f59e0b"],
-  pascoa: ["#ec4899", "#a78bfa", "#fbcfe8"],
-  anonovo: ["#f59e0b", "#1e293b", "#fef3c7"],
-  copa: ["#16a34a", "#facc15", "#2563eb"],
-};
 
 function createCombo(): DeliveryComboConfig {
   return {
@@ -54,6 +37,64 @@ function createCrossSellRule(): CrossSellRule {
   };
 }
 
+async function readJson<T>(response: Response): Promise<T> {
+  return (await response.json()) as T;
+}
+
+function buildApiUrl(path: string) {
+  if (typeof window === "undefined") return path;
+  return new URL(path, window.location.origin).toString();
+}
+
+async function fetchAdminOffersConfig() {
+  const response = await fetch(buildApiUrl("/api/admin-offers"), {
+    method: "GET",
+    credentials: "same-origin",
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  const payload = await readJson<{
+    products?: Product[];
+    combos?: DeliveryComboConfig[];
+    cartRecommendationIds?: string[];
+    checkoutRecommendationIds?: string[];
+    crossSellRules?: CrossSellRule[];
+    mode?: "supabase" | "local";
+    error?: string;
+  }>(response);
+
+  if (!response.ok) {
+    throw new Error(payload.error || "Não foi possível carregar as configurações.");
+  }
+
+  return payload;
+}
+
+async function persistAdminOffersConfig(input: {
+  combos: DeliveryComboConfig[];
+  cartRecommendationIds: string[];
+  checkoutRecommendationIds: string[];
+  crossSellRules: CrossSellRule[];
+}) {
+  const response = await fetch(buildApiUrl("/api/admin-offers"), {
+    method: "POST",
+    credentials: "same-origin",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+
+  const payload = await readJson<{ mode?: "supabase" | "local"; error?: string }>(response);
+  if (!response.ok) {
+    throw new Error(payload.error || "Não foi possível salvar as configurações.");
+  }
+
+  return payload;
+}
+
 export default function AdminOffers() {
   const navigate = useNavigate();
 
@@ -62,28 +103,24 @@ export default function AdminOffers() {
   const [cartRecommendationIds, setCartRecommendationIds] = useState<string[]>([]);
   const [checkoutRecommendationIds, setCheckoutRecommendationIds] = useState<string[]>([]);
   const [crossSellRules, setCrossSellRules] = useState<CrossSellRule[]>([]);
-  const [adminPhones, setAdminPhones] = useState<string[]>([]);
-  const [newAdminPhone, setNewAdminPhone] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [storageMode, setStorageMode] = useState<"supabase" | "local">("supabase");
-  const [selectedTheme, setSelectedTheme] = useState<AppThemeKey>(getLocalTheme());
 
   useEffect(() => {
     let mounted = true;
     (async () => {
       setLoading(true);
       try {
-        const config = await loadAdminOfferConfig();
+        const config = await fetchAdminOffersConfig();
         if (!mounted) return;
         setProducts(config.products ?? []);
         setCombos(config.combos ?? []);
         setCartRecommendationIds(config.cartRecommendationIds ?? []);
         setCheckoutRecommendationIds(config.checkoutRecommendationIds ?? []);
         setCrossSellRules(config.crossSellRules ?? []);
-        setStorageMode(config.mode);
-        setAdminPhones(getAdminPhones());
+        setStorageMode(config.mode ?? "supabase");
       } catch {
         if (!mounted) return;
         toast.error("Não foi possível carregar as ofertas");
@@ -95,10 +132,6 @@ export default function AdminOffers() {
       mounted = false;
     };
   }, []);
-
-  useEffect(() => {
-    applyTheme(selectedTheme);
-  }, [selectedTheme]);
 
   const productsById = useMemo(
     () => new Map(products.map((product) => [String(product.id), product])),
@@ -137,25 +170,14 @@ export default function AdminOffers() {
   const onSaveAll = async () => {
     setSaving(true);
     try {
-      const [offersResult, themeResult] = await Promise.all([
-        saveAdminOfferConfig({
-          combos,
-          cartRecommendationIds,
-          checkoutRecommendationIds,
-          crossSellRules,
-        }),
-        saveTheme(selectedTheme),
-      ]);
-      if (offersResult.mode === "supabase" && themeResult === "supabase") {
-        setStorageMode("supabase");
-      } else {
-        setStorageMode("local");
-      }
-      toast.success(
-        offersResult.mode === "supabase" && themeResult === "supabase"
-          ? "Ofertas salvas no Supabase"
-          : "Configurações salvas em modo local"
-      );
+      const result = await persistAdminOffersConfig({
+        combos,
+        cartRecommendationIds,
+        checkoutRecommendationIds,
+        crossSellRules,
+      });
+      setStorageMode(result.mode ?? "supabase");
+      toast.success("Configurações salvas no Supabase");
     } catch (err: any) {
       toast.error("Erro ao salvar ofertas", {
         description: err?.message ?? "Tente novamente em instantes.",
@@ -171,11 +193,7 @@ export default function AdminOffers() {
       : "grid grid-cols-1 gap-3 2xl:grid-cols-2";
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50 p-4 md:p-6">
-        <p className="text-sm text-slate-600">Carregando configurações...</p>
-      </div>
-    );
+    return <PageLoader label="Carregando configurações..." />;
   }
 
   return (
@@ -204,102 +222,6 @@ export default function AdminOffers() {
         </header>
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[360px_minmax(0,1fr)] 2xl:grid-cols-[390px_minmax(0,1fr)] xl:items-start">
           <div className="space-y-4 xl:sticky xl:top-4">
-            <section className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-slate-900">Tema do site</h2>
-              </div>
-              <Card className="rounded-3xl border-white/80 bg-white/85 backdrop-blur-xl">
-                <CardContent className="space-y-3 p-4">
-                  <p className="text-xs text-slate-500">
-                    O tema escolhido é aplicado no site inteiro (catálogo, carrinho e checkout).
-                  </p>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                    {APP_THEMES.map((theme) => (
-                      <button
-                        key={theme.key}
-                        type="button"
-                        onClick={() => setSelectedTheme(theme.key)}
-                        className={`rounded-2xl border p-3 text-left transition ${
-                          selectedTheme === theme.key
-                            ? "border-red-400 bg-red-50 shadow-sm"
-                            : "border-slate-200 bg-white hover:bg-slate-50"
-                        }`}
-                      >
-                        <div className="mb-2 flex items-center gap-1.5">
-                          {THEME_SWATCHES[theme.key].map((color) => (
-                            <span
-                              key={`${theme.key}-${color}`}
-                              className="h-3 w-3 rounded-full border border-white/70 shadow-sm"
-                              style={{ backgroundColor: color }}
-                            />
-                          ))}
-                        </div>
-                        <p className="text-sm font-semibold text-slate-900">{theme.label}</p>
-                        <p className="mt-1 text-xs text-slate-500">{theme.subtitle}</p>
-                      </button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </section>
-
-            <section className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-slate-900">Perfis Admin</h2>
-              </div>
-              <Card className="rounded-3xl border-white/80 bg-white/85 backdrop-blur-xl">
-                <CardContent className="space-y-3 p-4">
-                  <p className="text-xs text-slate-500">
-                    Telefones com privilégio de admin (menu completo, ofertas, pedidos e configurações).
-                  </p>
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <Input
-                      value={newAdminPhone}
-                      onChange={(e) => setNewAdminPhone(e.target.value)}
-                      placeholder="Ex: 61999999999"
-                    />
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        const phone = normalizePhone(newAdminPhone);
-                        if (phone.length < 10) {
-                          toast.error("Telefone inválido");
-                          return;
-                        }
-                        addAdminPhone(phone);
-                        setAdminPhones(getAdminPhones());
-                        setNewAdminPhone("");
-                        toast.success("Telefone promovido para admin");
-                      }}
-                    >
-                      Adicionar admin
-                    </Button>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {adminPhones.length === 0 ? (
-                      <p className="text-sm text-slate-500">Nenhum telefone admin.</p>
-                    ) : null}
-                    {adminPhones.map((phone) => (
-                      <button
-                        key={phone}
-                        type="button"
-                        onClick={() => {
-                          removeAdminPhone(phone);
-                          setAdminPhones(getAdminPhones());
-                          toast.message("Admin removido");
-                        }}
-                        className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-700"
-                      >
-                        {phone}
-                        <span className="text-slate-400">x</span>
-                      </button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </section>
-
             <section className="grid grid-cols-1 gap-3">
               <RecommendationEditor
                 title="Recomendados do carrinho"

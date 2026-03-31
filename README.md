@@ -79,6 +79,20 @@ npm run dev
 npm run build
 ```
 
+## Producao em servidor proprio
+
+Para subir em um servidor Node atras do Cloudflare:
+
+```bash
+npm ci
+npm run build
+npm run start:prod
+```
+
+Documentacao completa:
+
+- [DEPLOY-CLOUDFLARE.md](/Users/winistonalle/Desktop/copia-para-delivery/docs/DEPLOY-CLOUDFLARE.md)
+
 ## Banco
 
 O schema atual de `orders` foi ajustado para o modelo de cliente:

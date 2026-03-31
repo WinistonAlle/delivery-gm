@@ -20,6 +20,7 @@ import {
   Instagram,
   Youtube,
   Star,
+  Palette,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +35,7 @@ import {
 
 // ✅ LOGO (mesmo do Index)
 import logoGostinho from "@/images/logoc.png";
-import { clearCustomerSession, getCustomerSession } from "@/lib/customerAuth";
+import { getCustomerSession, logoutCustomerSession } from "@/lib/customerAuth";
 
 // Mesmo helper do Index
 function safeGetEmployee() {
@@ -477,7 +478,7 @@ const Avisos: React.FC = () => {
   };
 
   const handleLogout = () => {
-    clearCustomerSession();
+    void logoutCustomerSession();
     setMenuOpen(false);
     navigate("/catalogo", { replace: true });
   };
@@ -622,25 +623,29 @@ const Avisos: React.FC = () => {
             <span>Alertas</span>
           </button>
 
-          <button
-            onClick={() => goTo("/favoritos")}
-            className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-gray-800"
-          >
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
-              <Heart className="h-4 w-4 text-red-600" />
-            </span>
-            <span>Favoritos</span>
-          </button>
+          {!isAdmin && (
+            <button
+              onClick={() => goTo("/favoritos")}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-gray-800"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
+                <Heart className="h-4 w-4 text-red-600" />
+              </span>
+              <span>Favoritos</span>
+            </button>
+          )}
 
-          <button
-            onClick={() => goTo("/meus-pedidos")}
-            className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-gray-800"
-          >
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
-              <ClipboardList className="h-4 w-4 text-red-600" />
-            </span>
-            <span>Pedidos</span>
-          </button>
+          {!isAdmin && (
+            <button
+              onClick={() => goTo("/meus-pedidos")}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-gray-800"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
+                <ClipboardList className="h-4 w-4 text-red-600" />
+              </span>
+              <span>Pedidos</span>
+            </button>
+          )}
 
           {isAdmin && (
             <button
@@ -675,6 +680,18 @@ const Avisos: React.FC = () => {
                 <ClipboardList className="h-4 w-4 text-red-600" />
               </span>
               <span>Pedidos (Admin)</span>
+            </button>
+          )}
+
+          {isAdmin && (
+            <button
+              onClick={() => goTo("/admin/temas")}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-gray-800"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
+                <Palette className="h-4 w-4 text-red-600" />
+              </span>
+              <span>Temas do Site</span>
             </button>
           )}
 

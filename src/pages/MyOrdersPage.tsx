@@ -21,12 +21,17 @@ import {
   Instagram,
   Youtube,
   Star,
+  Palette,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import CartToggle from "@/components/CartToggle";
 import Cart from "@/components/Cart";
 import { statusLabel } from "@/lib/deliveryEnhancements";
-import { clearCustomerSession, getCustomerSession, type CustomerSession } from "@/lib/customerAuth";
+import {
+  getCustomerSession,
+  logoutCustomerSession,
+  type CustomerSession,
+} from "@/lib/customerAuth";
 
 /* --------------------------------------------------------
    HELPER: SESSION
@@ -61,6 +66,11 @@ type ReorderApiItem = {
   quantity: number | null;
   products: Record<string, unknown> | null;
 };
+
+function buildApiUrl(path: string) {
+  if (typeof window === "undefined") return path;
+  return new URL(path, window.location.origin).toString();
+}
 
 /* --------------------------------------------------------
    BOTTOM NAV (MOBILE)
@@ -237,7 +247,7 @@ const MyOrdersPage: React.FC = () => {
 
     (async () => {
       try {
-        const response = await fetch("/api/customer-orders", {
+        const response = await fetch(buildApiUrl("/api/customer-orders"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -266,7 +276,7 @@ const MyOrdersPage: React.FC = () => {
   };
 
   const handleLogout = () => {
-    clearCustomerSession();
+    void logoutCustomerSession();
     setMenuOpen(false);
     navigate("/catalogo", { replace: true });
   };
@@ -278,7 +288,7 @@ const MyOrdersPage: React.FC = () => {
     try {
       setRefazendoId(orderId);
 
-      const response = await fetch("/api/customer-orders", {
+      const response = await fetch(buildApiUrl("/api/customer-orders"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -476,27 +486,31 @@ const MyOrdersPage: React.FC = () => {
             <span>Alertas</span>
           </button>
 
-          {/* 3) Favoritos */}
-          <button
-            onClick={() => goTo("/favoritos")}
-            className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-gray-800"
-          >
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
-              <Heart className="h-4 w-4 text-red-600" />
-            </span>
-            <span>Favoritos</span>
-          </button>
+          {!isAdmin && (
+            <>
+              {/* 3) Favoritos */}
+              <button
+                onClick={() => goTo("/favoritos")}
+                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-gray-800"
+              >
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
+                  <Heart className="h-4 w-4 text-red-600" />
+                </span>
+                <span>Favoritos</span>
+              </button>
 
-          {/* 4) Pedidos (ativo) */}
-          <button
-            onClick={() => goTo("/meus-pedidos")}
-            className="flex items-center gap-3 px-3 py-2 rounded-lg bg-red-50 text-red-700 font-medium"
-          >
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-600">
-              <ClipboardList className="h-4 w-4 text-white" />
-            </span>
-            <span>Pedidos</span>
-          </button>
+              {/* 4) Pedidos (ativo) */}
+              <button
+                onClick={() => goTo("/meus-pedidos")}
+                className="flex items-center gap-3 px-3 py-2 rounded-lg bg-red-50 text-red-700 font-medium"
+              >
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-600">
+                  <ClipboardList className="h-4 w-4 text-white" />
+                </span>
+                <span>Pedidos</span>
+              </button>
+            </>
+          )}
 
           {/* 5) Relatórios (Admin) */}
           {isAdmin && (
@@ -534,6 +548,18 @@ const MyOrdersPage: React.FC = () => {
                 <ClipboardList className="h-4 w-4 text-red-600" />
               </span>
               <span>Pedidos (Admin)</span>
+            </button>
+          )}
+
+          {isAdmin && (
+            <button
+              onClick={() => goTo("/admin/temas")}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-gray-800"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
+                <Palette className="h-4 w-4 text-red-600" />
+              </span>
+              <span>Temas do Site</span>
             </button>
           )}
 

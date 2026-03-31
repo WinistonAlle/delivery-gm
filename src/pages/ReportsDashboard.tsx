@@ -38,7 +38,12 @@ import {
 import { getCustomerSession } from "@/lib/customerAuth";
 
 async function postReportsDashboard<T>(payload: Record<string, unknown>): Promise<T> {
-  const response = await fetch("/api/reports-dashboard", {
+  const baseUrl =
+    typeof window === "undefined"
+      ? "/api/reports-dashboard"
+      : new URL("/api/reports-dashboard", window.location.origin).toString();
+
+  const response = await fetch(baseUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

@@ -1,7 +1,8 @@
 // src/App.tsx
-import { Suspense, lazy, useEffect } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import styled, { keyframes } from "styled-components";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
@@ -17,7 +18,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import { applyTheme, getLocalTheme, loadTheme } from "./lib/appTheme";
 import { trackCustomerEventOnce } from "./lib/customerInsights";
-import { getCustomerSession } from "./lib/customerAuth";
+import { getCustomerSession, syncCustomerSessionFromServer } from "./lib/customerAuth";
 
 const Avisos = lazy(() => import("./pages/Avisos"));
 const Checkout = lazy(() => import("./pages/Checkout"));
@@ -26,6 +27,7 @@ const FavoritesPage = lazy(() => import("./pages/Favorites"));
 const Destaques = lazy(() => import("./pages/Destaques"));
 const Admin = lazy(() => import("./pages/Admin"));
 const AdminOffers = lazy(() => import("./pages/AdminOffers"));
+const AdminThemes = lazy(() => import("./pages/AdminThemes"));
 const ReportsDashboard = lazy(() => import("./pages/ReportsDashboard"));
 const DeliveryOps = lazy(() => import("./pages/DeliveryOps"));
 const AdminOrders = lazy(() => import("./pages/AdminOrders"));
@@ -93,13 +95,87 @@ function RouteTracker() {
   return null;
 }
 
+const shimmer = keyframes`
+  0%, 70% {
+    box-shadow: 2px 2px 3px 2px rgba(0, 0, 0, 0.18);
+    transform: scale(0);
+  }
+  100% {
+    box-shadow: 10px 10px 15px 0 rgba(0, 0, 0, 0.28);
+    transform: scale(1);
+  }
+`;
+
+const shimmerMid = keyframes`
+  0%, 40% {
+    box-shadow: 2px 2px 3px 2px rgba(0, 0, 0, 0.18);
+    transform: scale(0);
+  }
+  100% {
+    box-shadow: 10px 10px 15px 0 rgba(0, 0, 0, 0.28);
+    transform: scale(1);
+  }
+`;
+
+const shimmerBase = keyframes`
+  0%, 10% {
+    box-shadow: 2px 2px 3px 2px rgba(0, 0, 0, 0.18);
+    transform: scale(0);
+  }
+  100% {
+    box-shadow: 10px 10px 15px 0 rgba(0, 0, 0, 0.28);
+    transform: scale(1);
+  }
+`;
+
+const LoadingShell = styled.div`
+  min-height: 100vh;
+  background: radial-gradient(circle at top left, #f8d7da 0%, #fdf2f2 42%, #ffffff 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+`;
+
+const Frame = styled.div`
+  position: relative;
+  width: 220px;
+  height: 220px;
+`;
+
+const Dot = styled.div<{ $size: number; $top: number; $left: number; $bg: string; $z: number; $anim: ReturnType<typeof keyframes>; }>`
+  position: absolute;
+  z-index: ${({ $z }) => $z};
+  width: ${({ $size }) => `${$size}px`};
+  height: ${({ $size }) => `${$size}px`};
+  top: ${({ $top }) => `${$top}px`};
+  left: ${({ $left }) => `${$left}px`};
+  background: ${({ $bg }) => $bg};
+  border-radius: 999px;
+  animation: ${({ $anim }) => $anim} 2s cubic-bezier(0.21, 0.98, 0.6, 0.99)
+    infinite alternate;
+`;
+
+const LoadingText = styled.div`
+  position: absolute;
+  bottom: -36px;
+  width: 100%;
+  text-align: center;
+  color: #7d1717;
+  font-size: 0.95rem;
+  font-weight: 700;
+`;
+
 function RouteFallback() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-white px-4">
-      <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm font-semibold text-slate-600 shadow-sm">
-        Carregando...
-      </div>
-    </div>
+    <LoadingShell>
+      <Frame aria-label="Carregando aplicativo">
+        <Dot $size={90} $top={65} $left={65} $bg="#d33100" $z={1} $anim={shimmerBase} />
+        <Dot $size={60} $top={80} $left={80} $bg="#f0be00" $z={2} $anim={shimmerMid} />
+        <Dot $size={30} $top={95} $left={95} $bg="#ffffff" $z={3} $anim={shimmer} />
+        <LoadingText>Carregando...</LoadingText>
+      </Frame>
+    </LoadingShell>
   );
 }
 
@@ -108,6 +184,8 @@ function RouteFallback() {
 -------------------------------------------------------- */
 
 function App() {
+  const [authReady, setAuthReady] = useState(false);
+
   useEffect(() => {
     applyTheme(getLocalTheme());
 
@@ -129,6 +207,23 @@ function App() {
       window.removeEventListener("storage", onStorage);
     };
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      await syncCustomerSessionFromServer();
+      if (mounted) setAuthReady(true);
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  if (!authReady) {
+    return <RouteFallback />;
+  }
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -217,6 +312,15 @@ function App() {
                   element={
                     <RequireRole allow={["admin"]} redirectTo="/catalogo">
                       <AdminOffers />
+                    </RequireRole>
+                  }
+                />
+
+                <Route
+                  path="/admin/temas"
+                  element={
+                    <RequireRole allow={["admin"]} redirectTo="/catalogo">
+                      <AdminThemes />
                     </RequireRole>
                   }
                 />

@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { isSessionError, requireAdminSession } from "./_lib/authSession";
 import { getSupabaseAdminClient } from "./_lib/supabaseAdmin";
 
 type Summary = {
@@ -92,6 +93,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    await requireAdminSession(req);
     const body = (req.body ?? {}) as Record<string, unknown>;
     const action = String(body.action ?? "overview");
     const supabase = getSupabaseAdminClient();
@@ -302,6 +304,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(400).json({ error: "Ação inválida." });
   } catch (error) {
+    if (isSessionError(error)) {
+      return res.status(error.statusCode).json({ error: error.message });
+    }
     const message = error instanceof Error ? error.message : "Erro ao carregar dashboard.";
     return res.status(400).json({ error: message });
   }

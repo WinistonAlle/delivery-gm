@@ -11,6 +11,16 @@ export default defineConfig(({ mode }) => ({
     port: 4174,
     strictPort: true,
     allowedHosts: ["funcionarios.gostinhomineiro.com"],
+    proxy: {
+      "/api": {
+        target: "http://127.0.0.1:4175",
+        changeOrigin: true,
+      },
+      "/healthz": {
+        target: "http://127.0.0.1:4175",
+        changeOrigin: true,
+      },
+    },
   },
 
   plugins: [
@@ -22,8 +32,9 @@ export default defineConfig(({ mode }) => ({
       injectRegister: "auto",
       registerType: "autoUpdate",
 
-      // ✅ se quiser que funcione também no npm run dev
-      devOptions: { enabled: true },
+      // Em desenvolvimento, evitamos service worker para não cachear bundles
+      // e rotas /api durante ajustes locais.
+      devOptions: { enabled: false },
 
       includeAssets: ["apple-touch-icon.png"],
       manifest: {

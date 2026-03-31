@@ -5,11 +5,10 @@ import { ArrowLeft } from "lucide-react";
 import { Bg, Card } from "../components/ui/app-surface";
 import logo from "../images/logop.jpg";
 import {
-  createCustomerSession,
   normalizeCpf,
   normalizeRedirectPath,
   normalizePhone,
-  upsertCustomer,
+  signupCustomer,
 } from "@/lib/customerAuth";
 import { trackCustomerEvent } from "@/lib/customerInsights";
 import { createFullAddress, fetchAddressFromCEP, formatCEP, formatCPF } from "@/utils/formatUtils";
@@ -375,7 +374,7 @@ const Cadastro: React.FC = () => {
     };
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
@@ -387,17 +386,17 @@ const Cadastro: React.FC = () => {
     setSubmitting(true);
 
     try {
-      const customer = upsertCustomer({
+      const customer = await signupCustomer({
         full_name: name,
         phone,
         document_cpf: cpf,
         cep,
         address: fullAddress,
+        city,
         how_found_us: howFoundUs,
         how_found_us_details: requiresDetails ? howFoundUsDetails : "",
       });
 
-      createCustomerSession(customer);
       void trackCustomerEvent({
         eventName: "signup_completed",
         customerName: customer.full_name,

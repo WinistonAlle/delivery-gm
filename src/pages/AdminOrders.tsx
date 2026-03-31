@@ -147,7 +147,12 @@ function clampInt(n: number | string | null | undefined, min: number, max: numbe
 }
 
 async function postAdminOrders<T>(payload: Record<string, unknown>): Promise<T> {
-  const response = await fetch("/api/admin-orders", {
+  const baseUrl =
+    typeof window === "undefined"
+      ? "/api/admin-orders"
+      : new URL("/api/admin-orders", window.location.origin).toString();
+
+  const response = await fetch(baseUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

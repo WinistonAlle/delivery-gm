@@ -15,6 +15,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import PageLoader from "@/components/PageLoader";
 import {
   Dialog,
   DialogContent,
@@ -573,6 +574,14 @@ export default function Admin() {
           >
             Gerenciar Ofertas Delivery
           </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              window.location.href = "/admin/temas";
+            }}
+          >
+            Gerenciar Temas
+          </Button>
           <h1 className="text-xl font-semibold">Painel de Produtos (Admin)</h1>
         </div>
 
@@ -605,7 +614,7 @@ export default function Admin() {
       </header>
 
       {loading ? (
-        <div className="text-sm text-muted-foreground">Carregando produtos...</div>
+        <PageLoader fullscreen={false} label="Carregando produtos..." />
       ) : filtrados.length === 0 ? (
         <Card>
           <CardContent className="p-6 text-sm text-muted-foreground">

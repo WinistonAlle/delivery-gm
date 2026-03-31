@@ -140,7 +140,12 @@ function paymentLabel(value: string | null) {
 }
 
 async function getOpsData(days: number): Promise<DeliveryOpsPayload> {
-  const response = await fetch(`/api/delivery-ops?days=${days}`);
+  const baseUrl =
+    typeof window === "undefined"
+      ? `/api/delivery-ops?days=${days}`
+      : new URL(`/api/delivery-ops?days=${days}`, window.location.origin).toString();
+
+  const response = await fetch(baseUrl);
   const contentType = response.headers.get("content-type") || "";
 
   if (!contentType.toLowerCase().includes("application/json")) {
