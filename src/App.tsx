@@ -10,16 +10,15 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 
 import { CartProvider } from "@/contexts/CartContext";
 
-// Páginas base
-import EscolhaUsuario from "./pages/EscolhaUsuario";
-import Login from "./pages/Login";
-import Cadastro from "./pages/Cadastro";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
 import { applyTheme, getLocalTheme, loadTheme } from "./lib/appTheme";
 import { trackCustomerEventOnce } from "./lib/customerInsights";
 import { getCustomerSession, syncCustomerSessionFromServer } from "./lib/customerAuth";
 
+const EscolhaUsuario = lazy(() => import("./pages/EscolhaUsuario"));
+const Login = lazy(() => import("./pages/Login"));
+const Cadastro = lazy(() => import("./pages/Cadastro"));
+const Index = lazy(() => import("./pages/Index"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 const Avisos = lazy(() => import("./pages/Avisos"));
 const Checkout = lazy(() => import("./pages/Checkout"));
 const MyOrdersPage = lazy(() => import("./pages/MyOrdersPage"));

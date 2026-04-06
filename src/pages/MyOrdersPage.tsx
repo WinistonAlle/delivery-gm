@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useCart } from "@/contexts/CartContext";
+import { useCart } from "@/contexts/useCart";
 import type { Product } from "@/types/products";
 
 // ✅ LOGO (mesmo padrão do Index/Avisos/Favoritos)

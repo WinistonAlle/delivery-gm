@@ -241,7 +241,7 @@ function Badge({ kind, tooltip }: { kind: PaymentKind; tooltip: string }) {
   }, [kind]);
 
   return (
-    <span className="gm-tip" data-tip={tooltip} style={{ ...styles.badge, ...(cfg.style as any) }}>
+    <span className="gm-tip" data-tip={tooltip} style={{ ...styles.badge, ...cfg.style }}>
       <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
         {cfg.icon}
         <span>{cfg.label}</span>
@@ -1010,7 +1010,7 @@ export default function AdminOrders() {
               ...styles.modal,
               width: isMobile ? "100%" : "min(920px, 100%)",
               height: isMobile ? "min(100vh - 24px, 900px)" : undefined,
-              borderRadius: isMobile ? 18 : (styles.modal.borderRadius as any),
+              borderRadius: isMobile ? 18 : styles.modal.borderRadius,
             }}
           >
             <div style={styles.modalTop}>
@@ -1464,7 +1464,7 @@ export default function AdminOrders() {
               ...styles.modal,
               width: isMobile ? "100%" : "min(1100px, 100%)",
               height: isMobile ? "min(100vh - 24px, 900px)" : undefined,
-              borderRadius: isMobile ? 18 : (styles.modal.borderRadius as any),
+              borderRadius: isMobile ? 18 : styles.modal.borderRadius,
             }}
           >
             <div style={styles.modalTop}>
@@ -1533,7 +1533,7 @@ export default function AdminOrders() {
 
                           <tbody>
                             {cancelLogs.map((r) => {
-                              const meta = getPaymentMeta(r as any);
+                              const meta = getPaymentMeta(r);
                               const total = r.total_cents ? brlFromCents(r.total_cents) : brlFromReais(r.total_value);
 
                               return (
@@ -1577,7 +1577,7 @@ export default function AdminOrders() {
                   ) : (
                     <div style={styles.mobileList}>
                       {cancelLogs.map((r) => {
-                        const meta = getPaymentMeta(r as any);
+                        const meta = getPaymentMeta(r);
                         const total = r.total_cents ? brlFromCents(r.total_cents) : brlFromReais(r.total_value);
 
                         return (

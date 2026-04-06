@@ -2,12 +2,24 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { isSessionError, requireCustomerSession } from "./_lib/authSession";
 import { upsertCustomerProfile } from "./_lib/customerProfiles";
 import { getSupabaseAdminClient } from "./_lib/supabaseAdmin";
+import {
+  FREE_SHIPPING_THRESHOLD,
+  MIN_ORDER_VALUE,
+  MIN_PACKAGES,
+  SHIPPING_RATES,
+  getShippingRateByCity,
+  meetsMinimumOrder,
+  normalizeMatch,
+} from "../shared/orderRules";
 
 type ProductSnapshot = {
   id: string;
   old_id?: number | null;
   name: string;
   employee_price: number;
+  weight?: number | null;
+  is_package?: boolean | null;
+  package_info?: string | null;
   in_stock?: boolean | null;
 };
 
@@ -26,6 +38,8 @@ type CreateOrderParams = {
     quantity: number;
   }>;
 };
+
+const ALLOWED_PAYMENT_METHODS = new Set(["pix", "card", "cash"]);
 
 function generateOrderNumber() {
   const now = new Date();
@@ -74,6 +88,68 @@ function normalizePayload(body: unknown): CreateOrderParams {
   };
 }
 
+function parseKgFromText(text: string) {
+  const normalized = normalizeMatch(text).replace(",", ".");
+  if (!normalized) return null;
+
+  const kgMatch = normalized.match(/(\d+(?:\.\d+)?)\s*kg\b/);
+  if (kgMatch) {
+    const parsed = Number(kgMatch[1]);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+
+  const gramMatch = normalized.match(/(\d+(?:\.\d+)?)\s*g\b/);
+  if (gramMatch) {
+    const grams = Number(gramMatch[1]);
+    if (Number.isFinite(grams) && grams > 0) return grams / 1000;
+  }
+
+  return null;
+}
+
+function deriveWeightKg(product: ProductSnapshot) {
+  const direct = Number(product.weight ?? 0);
+  if (Number.isFinite(direct) && direct > 0) return direct;
+
+  const fromPackageInfo = parseKgFromText(String(product.package_info ?? ""));
+  if (fromPackageInfo) return fromPackageInfo;
+
+  const fromName = parseKgFromText(product.name);
+  if (fromName) return fromName;
+
+  return 0;
+}
+
+function deriveIsPackage(product: ProductSnapshot) {
+  if (product.is_package === true) return true;
+
+  const weight = deriveWeightKg(product);
+  if (weight > 0 && weight <= 1.05) return true;
+
+  const text = normalizeMatch(`${product.name} ${product.package_info ?? ""}`);
+  return (
+    /\bpct\b/.test(text) ||
+    /\bpacote\b/.test(text) ||
+    /\bpac\s*\d+/.test(text) ||
+    /\bpote\b/.test(text) ||
+    /\bkit\b/.test(text) ||
+    /\bcombo\b/.test(text) ||
+    /\d+\s*unid/.test(text) ||
+    /\d+\s*un\b/.test(text)
+  );
+}
+
+function resolveShippingCost(city: string, itemsTotal: number) {
+  const rate = getShippingRateByCity(city);
+  if (!rate) {
+    throw new Error("Cidade de entrega invalida ou nao atendida.");
+  }
+
+  if (itemsTotal >= FREE_SHIPPING_THRESHOLD) return 0;
+
+  return rate.cost;
+}
+
 async function createOrderInDatabase(params: CreateOrderParams) {
   const {
     customerPhone,
@@ -84,12 +160,16 @@ async function createOrderInDatabase(params: CreateOrderParams) {
     customerCep,
     paymentMethod,
     notes,
-    shippingCost = 0,
     items,
   } = params;
 
   if (!customerName || customerName.length < 3) throw new Error("Nome do cliente invalido.");
   if (!customerPhone || customerPhone.length < 10) throw new Error("Telefone do cliente invalido.");
+  if (!customerAddress || customerAddress.length < 6) throw new Error("Endereco de entrega invalido.");
+  if (!customerCity || customerCity.length < 2) throw new Error("Cidade de entrega invalida.");
+  if (!paymentMethod || !ALLOWED_PAYMENT_METHODS.has(paymentMethod)) {
+    throw new Error("Forma de pagamento invalida.");
+  }
   if (!items.length) throw new Error("Nenhum item no carrinho.");
 
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -97,7 +177,18 @@ async function createOrderInDatabase(params: CreateOrderParams) {
     (sum, item) => sum + (Number(item.product.employee_price) || 0) * item.quantity,
     0
   );
-  const finalTotal = itemsTotal + Number(shippingCost || 0);
+  const packageCount = items.reduce((sum, item) => {
+    return deriveIsPackage(item.product) ? sum + item.quantity : sum;
+  }, 0);
+
+  if (!meetsMinimumOrder({ packageCount, orderValue: itemsTotal })) {
+    throw new Error(
+      `Pedido minimo: ${MIN_PACKAGES} pacotes ou R$ ${MIN_ORDER_VALUE.toFixed(2)} em produtos.`
+    );
+  }
+
+  const normalizedShippingCost = resolveShippingCost(customerCity, itemsTotal);
+  const finalTotal = itemsTotal + normalizedShippingCost;
   const orderNumber = generateOrderNumber();
 
   const baseOrderPayload = {
@@ -116,7 +207,7 @@ async function createOrderInDatabase(params: CreateOrderParams) {
     metadata: {
       customer_name: customerName,
       items_total: itemsTotal,
-      shipping_cost: Number(shippingCost || 0),
+      shipping_cost: normalizedShippingCost,
     },
   };
 
@@ -124,8 +215,8 @@ async function createOrderInDatabase(params: CreateOrderParams) {
   const nextSchemaPayload = {
     ...baseOrderPayload,
     customer_name: customerName,
-    shipping_cost: Number(shippingCost || 0),
-    shipping_cents: Math.round(Number(shippingCost || 0) * 100),
+    shipping_cost: normalizedShippingCost,
+    shipping_cents: Math.round(normalizedShippingCost * 100),
   };
   const legacySchemaPayload = {
     ...baseOrderPayload,
@@ -203,8 +294,8 @@ async function resolveOrderItems(
   const supabase = getSupabaseAdminClient();
   const uniqueIds = Array.from(new Set(items.map((item) => String(item.product.id ?? "")).filter(Boolean)));
   const { data, error } = await supabase
-    .from("products")
-    .select("id, old_id, name, employee_price, in_stock")
+      .from("products")
+    .select("id, old_id, name, employee_price, weight, is_package, package_info, in_stock")
     .in("id", uniqueIds);
 
   if (error) throw error;
@@ -212,12 +303,15 @@ async function resolveOrderItems(
   const productMap = new Map<string, ProductSnapshot>();
   for (const row of data ?? []) {
     productMap.set(String(row.id), {
-      id: String(row.id),
-      old_id: row.old_id ?? null,
-      name: String(row.name ?? ""),
-      employee_price: Number(row.employee_price ?? 0),
-      in_stock: row.in_stock !== false,
-    });
+        id: String(row.id),
+        old_id: row.old_id ?? null,
+        name: String(row.name ?? ""),
+        employee_price: Number(row.employee_price ?? 0),
+        weight: Number(row.weight ?? 0),
+        is_package: row.is_package ?? null,
+        package_info: String(row.package_info ?? ""),
+        in_stock: row.in_stock !== false,
+      });
   }
 
   return items.map((item) => {

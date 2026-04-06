@@ -9,7 +9,7 @@ import ProductCard from "../components/ProductCard";
 import CartToggle from "../components/CartToggle";
 import Cart from "../components/Cart";
 import HelperChat from "../components/HelperChat";
-import { useCart } from "@/contexts/CartContext";
+import { useCart } from "@/contexts/useCart";
 import { normalizeText as normalizeTextUtil } from "@/utils/stringUtils";
 import FeaturedProductsCarousel from "@/components/FeaturedProductsCarousel";
 import { loadCrossSellMap, loadPublicCombos, type DeliveryComboResolved } from "@/lib/deliveryOffers";

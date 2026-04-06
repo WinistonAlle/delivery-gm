@@ -1,42 +1,11 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Product, CartItem } from "../types/products";
 import { FREE_SHIPPING_THRESHOLD } from "../data/shipping";
-import { MIN_ORDER_VALUE, MIN_PACKAGES } from "@/data/products";
 import { deriveIsPackage, deriveWeightKg } from "@/utils/productMetrics";
 import { trackCustomerEventOnce } from "@/lib/customerInsights";
 import { CUSTOMER_SESSION_EVENT, getCustomerSession } from "@/lib/customerAuth";
-
-interface CartContextType {
-  cartItems: CartItem[];
-  addToCart: (product: Product, quantity?: number) => void;
-  decreaseQuantity: (productId: string) => void;
-  removeFromCart: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
-  clearCart: () => void;
-  isCartOpen: boolean;
-  toggleCart: () => void;
-  openCart: () => void;
-  closeCart: () => void;
-  cartTotal: number;
-  itemsCount: number;
-  freeShippingRemaining: number;
-  totalWeight: number;
-  packageCount: number;
-  meetsMinimumOrder: boolean;
-  addMultipleToCart: (products: { product: Product; quantity: number }[]) => void;
-  animateCartIcon: number;
-  showFreeShippingAnimation: boolean;
-}
-
-const CartContext = createContext<CartContextType | undefined>(undefined);
-
-export const useCart = (): CartContextType => {
-  const context = useContext(CartContext);
-  if (!context) {
-    throw new Error("useCart must be used within a CartProvider");
-  }
-  return context;
-};
+import { meetsMinimumOrder as satisfiesMinimumOrder } from "../../shared/orderRules";
+import { CartContext, type CartContextType } from "@/contexts/cart-store";
 
 // Gera uma assinatura do cliente atual pra separar os carrinhos.
 function getCustomerSignature(): string {
@@ -311,8 +280,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
     return isPkg ? count + item.quantity : count;
   }, 0);
 
-  const meetsMinimumOrder =
-    packageCount >= MIN_PACKAGES || cartTotal >= MIN_ORDER_VALUE;
+  const meetsMinimumOrder = satisfiesMinimumOrder({
+    packageCount,
+    orderValue: cartTotal,
+  });
 
   const value: CartContextType = {
     cartItems,

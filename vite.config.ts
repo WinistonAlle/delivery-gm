@@ -82,4 +82,44 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules/jspdf") || id.includes("jspdf-autotable")) {
+            return "pdf-vendor";
+          }
+
+          if (id.includes("node_modules/recharts")) {
+            return "charts-vendor";
+          }
+
+          if (
+            id.includes("node_modules/react") ||
+            id.includes("node_modules/react-dom") ||
+            id.includes("node_modules/react-router-dom")
+          ) {
+            return "react-vendor";
+          }
+
+          if (
+            id.includes("node_modules/@supabase") ||
+            id.includes("node_modules/@tanstack/react-query")
+          ) {
+            return "data-vendor";
+          }
+
+          if (
+            id.includes("node_modules/framer-motion") ||
+            id.includes("node_modules/embla-carousel") ||
+            id.includes("node_modules/lucide-react")
+          ) {
+            return "ui-vendor";
+          }
+
+          return undefined;
+        },
+      },
+    },
+  },
 }));

@@ -11,7 +11,7 @@ import ProductImageCarousel from "./ProductImageCarousel";
 import { Package, Scale, Plus, Minus, Check, XCircle } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { useCart } from "@/contexts/CartContext";
+import { useCart } from "@/contexts/useCart";
 import { toast } from "./ui/sonner";
 
 interface ProductDetailProps {

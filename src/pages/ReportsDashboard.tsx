@@ -1398,7 +1398,7 @@ const ReportsPage: React.FC = () => {
                             ))}
                           </Pie>
                           <RechartsTooltip
-                            formatter={(value: any) =>
+                            formatter={(value: number | string) =>
                               formatCurrency(Number(value || 0))
                             }
                           />

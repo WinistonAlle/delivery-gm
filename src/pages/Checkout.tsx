@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
-import { useCart } from "@/contexts/CartContext";
+import { useCart } from "@/contexts/useCart";
 import { createOrder } from "@/services/orders";
 import type { Product } from "@/types/products";
 import logo from "../images/logoc.png";

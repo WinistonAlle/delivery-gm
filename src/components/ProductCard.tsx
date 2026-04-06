@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Product } from "../types/products";
-import { useCart } from "../contexts/CartContext";
+import { useCart } from "../contexts/useCart";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardFooter } from "./ui/card";
 import { Plus, Minus, Package, Check, XCircle, Heart } from "lucide-react";

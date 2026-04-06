@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useCart } from "@/contexts/CartContext";
+import { useCart } from "@/contexts/useCart";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -25,7 +25,10 @@ import {
   markCartDraft,
 } from "@/lib/deliveryEnhancements";
 import { trackCustomerEvent } from "@/lib/customerInsights";
-import { getCustomerSession } from "@/lib/customerAuth";
+import {
+  CUSTOMER_SESSION_EVENT,
+  getCustomerSession,
+} from "@/lib/customerAuth";
 
 const Cart: React.FC = () => {
   const navigate = useNavigate();
@@ -45,14 +48,30 @@ const Cart: React.FC = () => {
   } = useCart();
 
   const [attemptedNext, setAttemptedNext] = useState(false);
+  const [hasCustomerSession, setHasCustomerSession] = useState(() => {
+    const session = getCustomerSession();
+    return !!(session?.id || session?.phone || session?.cpf);
+  });
 
   const safeCartTotal = Number.isFinite(cartTotal) ? cartTotal : 0;
   const missingForFreeShipping = Math.max(0, FREE_SHIPPING_THRESHOLD - safeCartTotal);
   const missingForMinimumValue = Math.max(0, MIN_ORDER_VALUE - safeCartTotal);
-  const hasCustomerSession = useMemo(() => {
-    const session = getCustomerSession();
-    return !!(session?.id || session?.phone || session?.cpf);
-  }, [isCartOpen]);
+
+  useEffect(() => {
+    const syncSession = () => {
+      const session = getCustomerSession();
+      setHasCustomerSession(!!(session?.id || session?.phone || session?.cpf));
+    };
+
+    syncSession();
+    window.addEventListener(CUSTOMER_SESSION_EVENT, syncSession);
+    window.addEventListener("storage", syncSession);
+
+    return () => {
+      window.removeEventListener(CUSTOMER_SESSION_EVENT, syncSession);
+      window.removeEventListener("storage", syncSession);
+    };
+  }, []);
 
   useEffect(() => {
     markCartDraft(cartItems.length > 0);

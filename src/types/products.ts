@@ -69,5 +69,6 @@ export interface KitItem {
 }
 
 export interface ShippingRate {
+  city: string;
   cost: number;
 }

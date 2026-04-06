@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { ShoppingCart, Package, Weight } from "lucide-react";
-import { useCart } from "@/contexts/CartContext";
+import { useCart } from "@/contexts/useCart";
 import { Button } from "@/components/ui/button";
 import { MIN_ORDER_VALUE, MIN_PACKAGES } from "@/data/products";
 
