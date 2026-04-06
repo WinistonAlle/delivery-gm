@@ -329,9 +329,6 @@ const Checkout: React.FC = () => {
       return;
     }
 
-    const whatsappWindow =
-      typeof window !== "undefined" ? window.open("", "_blank", "noopener,noreferrer") : null;
-
     setIsSubmitting(true);
 
     try {
@@ -454,17 +451,12 @@ const Checkout: React.FC = () => {
       const msg = encodeURIComponent(messageLines.join("\n"));
       const whatsappUrl = `https://wa.me/${STORE_WHATSAPP}?text=${msg}`;
 
-      if (whatsappWindow) {
-        whatsappWindow.location.href = whatsappUrl;
-      } else if (typeof window !== "undefined") {
+      if (typeof window !== "undefined") {
         window.location.href = whatsappUrl;
       }
 
       navigate("/meus-pedidos", { replace: true });
     } catch (err: unknown) {
-      if (whatsappWindow && !whatsappWindow.closed) {
-        whatsappWindow.close();
-      }
       toast.error("Erro ao finalizar pedido", {
         description: err instanceof Error ? err.message : "Tente novamente em alguns instantes.",
       });
