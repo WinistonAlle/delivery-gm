@@ -1611,17 +1611,15 @@ const Index: React.FC = () => {
             </button>
           )}
 
-          {!isAdmin && (
-            <button
-              onClick={() => goTo("/meus-pedidos")}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-gray-800"
-            >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
-                <ClipboardList className="h-4 w-4 text-red-600" />
-              </span>
-              <span>Pedidos</span>
-            </button>
-          )}
+          <button
+            onClick={() => goTo("/meus-pedidos")}
+            className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-gray-800"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
+              <ClipboardList className="h-4 w-4 text-red-600" />
+            </span>
+            <span>Pedidos</span>
+          </button>
 
           {isAdmin && (
             <button

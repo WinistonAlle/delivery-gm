@@ -298,8 +298,11 @@ const Login: React.FC = () => {
   const prefilledPhone = String(
     (location.state as { prefilledPhone?: unknown } | null)?.prefilledPhone ?? ""
   );
+  const prefilledCpf = String(
+    (location.state as { prefilledCpf?: unknown } | null)?.prefilledCpf ?? ""
+  );
   const [phone, setPhone] = useState(prefilledPhone);
-  const [cpf, setCpf] = useState("");
+  const [cpf, setCpf] = useState(prefilledCpf);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -359,10 +362,25 @@ const Login: React.FC = () => {
       });
       navigate(redirectTo, { replace: true });
     } catch (err) {
-      setError(
+      const message =
         err instanceof Error
           ? err.message
-          : "Não foi possível validar seus dados."
+          : "Não foi possível validar seus dados.";
+
+      if (message.includes("Cadastro não encontrado")) {
+        navigate("/cadastro", {
+          replace: true,
+          state: {
+            prefilledPhone: normalizePhone(phone),
+            prefilledCpf: normalizeCpf(cpf),
+            redirectTo,
+          },
+        });
+        return;
+      }
+
+      setError(
+        message
       );
     } finally {
       setSubmitting(false);
@@ -452,7 +470,11 @@ const Login: React.FC = () => {
               type="button"
               onClick={() =>
                 navigate("/cadastro", {
-                  state: { prefilledPhone: normalizePhone(phone), redirectTo },
+                  state: {
+                    prefilledPhone: normalizePhone(phone),
+                    prefilledCpf: normalizeCpf(cpf),
+                    redirectTo,
+                  },
                 })
               }
               disabled={submitting}

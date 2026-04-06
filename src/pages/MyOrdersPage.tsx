@@ -26,7 +26,6 @@ import {
 import { Button } from "@/components/ui/button";
 import CartToggle from "@/components/CartToggle";
 import Cart from "@/components/Cart";
-import { statusLabel } from "@/lib/deliveryEnhancements";
 import {
   getCustomerSession,
   logoutCustomerSession,
@@ -150,29 +149,6 @@ const BottomNav: React.FC = () => {
     </nav>
   );
 };
-
-/* --------------------------------------------------------
-   HELPERS VISUAIS
--------------------------------------------------------- */
-function getStatusClasses(status: string) {
-  const s = status?.toLowerCase?.() ?? "";
-
-  if (s.includes("pend")) return "bg-amber-100 text-amber-800 border-amber-200";
-  if (s.includes("final") || s.includes("concl"))
-    return "bg-emerald-100 text-emerald-800 border-emerald-200";
-  if (s.includes("cancel")) return "bg-red-100 text-red-800 border-red-200";
-
-  return "bg-gray-100 text-gray-700 border-gray-200";
-}
-
-function statusProgress(status: string) {
-  const s = (status || "").toLowerCase();
-  if (s === "cancelado") return 0;
-  if (s === "entregue") return 100;
-  if (s === "saiu_para_entrega" || s === "pronto_para_retirada") return 75;
-  if (s === "em_preparo" || s === "em_separacao") return 45;
-  return 20;
-}
 
 const formatCurrency = (value: number) =>
   (value || 0).toLocaleString("pt-BR", {
@@ -487,30 +463,26 @@ const MyOrdersPage: React.FC = () => {
           </button>
 
           {!isAdmin && (
-            <>
-              {/* 3) Favoritos */}
-              <button
-                onClick={() => goTo("/favoritos")}
-                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-gray-800"
-              >
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
-                  <Heart className="h-4 w-4 text-red-600" />
-                </span>
-                <span>Favoritos</span>
-              </button>
-
-              {/* 4) Pedidos (ativo) */}
-              <button
-                onClick={() => goTo("/meus-pedidos")}
-                className="flex items-center gap-3 px-3 py-2 rounded-lg bg-red-50 text-red-700 font-medium"
-              >
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-600">
-                  <ClipboardList className="h-4 w-4 text-white" />
-                </span>
-                <span>Pedidos</span>
-              </button>
-            </>
+            <button
+              onClick={() => goTo("/favoritos")}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-gray-800"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
+                <Heart className="h-4 w-4 text-red-600" />
+              </span>
+              <span>Favoritos</span>
+            </button>
           )}
+
+          <button
+            onClick={() => goTo("/meus-pedidos")}
+            className="flex items-center gap-3 px-3 py-2 rounded-lg bg-red-50 text-red-700 font-medium"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-600">
+              <ClipboardList className="h-4 w-4 text-white" />
+            </span>
+            <span>Pedidos</span>
+          </button>
 
           {/* 5) Relatórios (Admin) */}
           {isAdmin && (
@@ -620,7 +592,7 @@ const MyOrdersPage: React.FC = () => {
         )}
 
         {!loading && !orders.length && (
-          <div className="mt-6 rounded-2xl border border-dashed border-gray-300 bg-white p-6 textcenter">
+          <div className="mt-6 rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center">
             <p className="font-medium text-gray-800 mb-1">
               Você ainda não realizou nenhum pedido.
             </p>
@@ -637,8 +609,6 @@ const MyOrdersPage: React.FC = () => {
           <div className="space-y-3">
             {orders.map((order) => {
               const isOpen = openOrderId === order.id;
-
-              const orderNumber = order.order_number ?? `#${order.id}`;
               const totalItems = order.total_items ?? 0;
               const totalValueRaw = order.total_value ?? 0;
 
@@ -647,46 +617,27 @@ const MyOrdersPage: React.FC = () => {
                   key={order.id}
                   className="border border-gray-200 bg-white rounded-xl p-3 md:p-4 flex flex-col gap-3 shadow-sm"
                 >
+                  <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3">
+                    <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-red-500">
+                      Data e hora do pedido
+                    </div>
+                    <div className="mt-1 text-base font-bold text-slate-900 md:text-lg">
+                      {new Date(order.created_at).toLocaleString("pt-BR")}
+                    </div>
+                  </div>
+
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
                     <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-500 uppercase tracking-wide">
-                          Pedido
-                        </span>
-                        <span className="text-sm font-semibold text-gray-900">
-                          {orderNumber}
+                      <div className="text-sm text-gray-600">
+                        <span className="font-medium">{totalItems}</span> itens ·{" "}
+                        <span className="font-medium">
+                          {formatCurrency(totalValueRaw)}
                         </span>
                       </div>
-                      <div className="text-xs text-gray-500 mt-0.5">
-                        {new Date(order.created_at).toLocaleString("pt-BR")}
-                      </div>
                     </div>
-
-                    <span
-                      className={
-                        "inline-flex items-center justify-center rounded-full border px-3 py-1 text-[11px] font-medium " +
-                        getStatusClasses(order.status)
-                      }
-                    >
-                      {statusLabel(order.status)}
-                    </span>
                   </div>
 
-                  <div className="w-full bg-gray-100 rounded-full h-2">
-                    <div
-                      className="bg-red-600 h-2 rounded-full transition-all"
-                      style={{ width: `${statusProgress(order.status)}%` }}
-                    />
-                  </div>
-
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
-                    <div className="text-sm text-gray-600">
-                      <span className="font-medium">{totalItems}</span> itens ·{" "}
-                      <span className="font-medium">
-                        {formatCurrency(totalValueRaw)}
-                      </span>
-                    </div>
-
+                  <div className="flex flex-col md:flex-row md:items-center justify-end gap-2">
                     <div className="flex gap-2 justify-end">
                       <Button
                         variant="outline"

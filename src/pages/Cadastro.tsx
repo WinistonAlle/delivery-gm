@@ -1,8 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
-import { useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { useBeforeUnload, useLocation, useNavigate } from "react-router-dom";
+import { AlertTriangle, ArrowLeft, ChevronRight } from "lucide-react";
 import { Bg, Card } from "../components/ui/app-surface";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import logo from "../images/logop.jpg";
 import {
   normalizeCpf,
@@ -11,6 +20,7 @@ import {
   signupCustomer,
 } from "@/lib/customerAuth";
 import { trackCustomerEvent } from "@/lib/customerInsights";
+import { SHIPPING_RATES } from "@/data/shipping";
 import { createFullAddress, fetchAddressFromCEP, formatCEP, formatCPF } from "@/utils/formatUtils";
 
 const Screen = styled(Bg)`
@@ -159,15 +169,26 @@ const TwoColumns = styled.div`
 const CityRow = styled.div`
   display: grid;
   gap: 14px;
+  align-items: start;
 
   @media (min-width: 640px) {
-    grid-template-columns: minmax(0, 1fr) 88px;
+    grid-template-columns: minmax(0, 1fr) 96px;
   }
 `;
 
 const Field = styled.div`
   display: grid;
   gap: 10px;
+  min-width: 0;
+`;
+
+const UfField = styled(Field)`
+  width: 100%;
+
+  @media (min-width: 640px) {
+    max-width: 96px;
+    justify-self: end;
+  }
 `;
 
 const Label = styled.label`
@@ -191,6 +212,7 @@ const InputShell = styled.div`
 
 const inputBase = `
   width: 100%;
+  box-sizing: border-box;
   border: none;
   outline: none;
   background: #f5f1f0;
@@ -309,6 +331,12 @@ const maskPhone = (value: string) => {
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 };
 
+const sanitizeName = (value: string) =>
+  value
+    .replace(/[^A-Za-zÀ-ÿ\s]/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/^\s/, "");
+
 const Cadastro: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -319,9 +347,13 @@ const Cadastro: React.FC = () => {
     location.state && typeof (location.state as { prefilledPhone?: unknown }).prefilledPhone === "string"
       ? normalizePhone((location.state as { prefilledPhone?: string }).prefilledPhone ?? "")
       : "";
+  const prefilledCpf =
+    location.state && typeof (location.state as { prefilledCpf?: unknown }).prefilledCpf === "string"
+      ? normalizeCpf((location.state as { prefilledCpf?: string }).prefilledCpf ?? "")
+      : "";
   const [name, setName] = useState("");
   const [phone, setPhone] = useState(prefilledPhone);
-  const [cpf, setCpf] = useState("");
+  const [cpf, setCpf] = useState(prefilledCpf);
   const [cep, setCep] = useState("");
   const [street, setStreet] = useState("");
   const [number, setNumber] = useState("");
@@ -329,6 +361,7 @@ const Cadastro: React.FC = () => {
   const [district, setDistrict] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
+  const [deliveryRegion, setDeliveryRegion] = useState("");
   const [howFoundUs, setHowFoundUs] = useState("");
   const [howFoundUsDetails, setHowFoundUsDetails] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -336,12 +369,46 @@ const Cadastro: React.FC = () => {
   const [error, setError] = useState("");
   const numberInputRef = useRef<HTMLInputElement | null>(null);
   const lastFetchedCepRef = useRef("");
+  const pendingLeaveActionRef = useRef<(() => void) | null>(null);
+  const [exitDialogOpen, setExitDialogOpen] = useState(false);
 
   const requiresDetails = howFoundUs === "Outro";
   const fullAddress = useMemo(
     () => createFullAddress(street.trim(), number.trim(), complement.trim(), district.trim(), city.trim(), state.trim()),
     [street, number, complement, district, city, state]
   );
+  const isFormDirty = useMemo(() => {
+    return [
+      name,
+      phone,
+      cpf,
+      cep,
+      street,
+      number,
+      complement,
+      district,
+      city,
+      state,
+      deliveryRegion,
+      howFoundUs,
+      howFoundUsDetails,
+    ].some((value) => String(value).trim().length > 0);
+  }, [
+    name,
+    phone,
+    cpf,
+    cep,
+    street,
+    number,
+    complement,
+    district,
+    city,
+    state,
+    deliveryRegion,
+    howFoundUs,
+    howFoundUsDetails,
+  ]);
+  const shouldConfirmExit = isFormDirty && !submitting;
 
   const canSubmit = useMemo(() => {
     return (
@@ -352,12 +419,92 @@ const Cadastro: React.FC = () => {
       street.trim().length >= 3 &&
       number.trim().length >= 1 &&
       district.trim().length >= 2 &&
+      deliveryRegion.trim().length >= 2 &&
       city.trim().length >= 2 &&
       state.trim().length === 2 &&
       howFoundUs.trim().length > 0 &&
       (!requiresDetails || howFoundUsDetails.trim().length >= 3)
     );
-  }, [name, phone, cpf, street, number, district, city, state, howFoundUs, howFoundUsDetails, requiresDetails]);
+  }, [name, phone, cpf, street, number, district, deliveryRegion, city, state, howFoundUs, howFoundUsDetails, requiresDetails]);
+
+  useBeforeUnload(
+    useCallback((event) => {
+      if (!shouldConfirmExit) return;
+      event.preventDefault();
+      event.returnValue = "";
+    }, [shouldConfirmExit]),
+    { capture: true }
+  );
+
+  const requestLeaveConfirmation = useCallback(
+    (action: () => void) => {
+      if (!shouldConfirmExit) {
+        action();
+        return;
+      }
+
+      pendingLeaveActionRef.current = action;
+      setExitDialogOpen(true);
+    },
+    [shouldConfirmExit]
+  );
+
+  const handleCancelLeave = useCallback(() => {
+    pendingLeaveActionRef.current = null;
+    setExitDialogOpen(false);
+    if (typeof window !== "undefined") {
+      window.history.pushState(null, "", window.location.href);
+    }
+  }, []);
+
+  const handleConfirmLeave = useCallback(() => {
+    const action = pendingLeaveActionRef.current;
+    pendingLeaveActionRef.current = null;
+    setExitDialogOpen(false);
+    action?.();
+  }, []);
+
+  const handleExitDialogOpenChange = useCallback(
+    (open: boolean) => {
+      if (!open) {
+        handleCancelLeave();
+        return;
+      }
+
+      setExitDialogOpen(true);
+    },
+    [handleCancelLeave]
+  );
+
+  useEffect(() => {
+    if (!shouldConfirmExit) return;
+
+    const handlePopState = () => {
+      requestLeaveConfirmation(() => {
+        window.removeEventListener("popstate", handlePopState);
+        navigate(-1);
+      });
+    };
+
+    window.history.pushState(null, "", window.location.href);
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [navigate, requestLeaveConfirmation, shouldConfirmExit]);
+
+  const handleLeavePage = useCallback(
+    (
+      target: string,
+      state?: { redirectTo: string; prefilledPhone: string; prefilledCpf?: string }
+    ) => {
+      requestLeaveConfirmation(() => {
+        navigate(target, state ? { state } : undefined);
+      });
+    },
+    [navigate, requestLeaveConfirmation]
+  );
 
   useEffect(() => {
     const prev = {
@@ -379,7 +526,7 @@ const Cadastro: React.FC = () => {
     setError("");
 
     if (!canSubmit) {
-      setError("Preencha nome, telefone, CPF, endereço completo e como conheceu a gente.");
+      setError("Preencha nome, telefone, CPF, endereço completo, região de entrega e como conheceu a gente.");
       return;
     }
 
@@ -392,7 +539,7 @@ const Cadastro: React.FC = () => {
         document_cpf: cpf,
         cep,
         address: fullAddress,
-        city,
+        city: deliveryRegion,
         how_found_us: howFoundUs,
         how_found_us_details: requiresDetails ? howFoundUsDetails : "",
       });
@@ -403,6 +550,7 @@ const Cadastro: React.FC = () => {
         phone: customer.phone,
         documentCpf: customer.document_cpf,
         metadata: {
+          deliveryRegion,
           howFoundUs,
           howFoundUsDetails: requiresDetails ? howFoundUsDetails.trim() : "",
         },
@@ -465,7 +613,13 @@ const Cadastro: React.FC = () => {
       <BackButton
         type="button"
         aria-label="Voltar"
-        onClick={() => navigate("/login", { state: { redirectTo, prefilledPhone: normalizePhone(phone) } })}
+        onClick={() =>
+          handleLeavePage("/login", {
+            redirectTo,
+            prefilledPhone: normalizePhone(phone),
+            prefilledCpf: normalizeCpf(cpf),
+          })
+        }
       >
         <ArrowLeft size={20} />
       </BackButton>
@@ -497,7 +651,7 @@ const Cadastro: React.FC = () => {
                     <TextInput
                       id="name"
                       value={name}
-                      onChange={(e) => setName(e.target.value.replace(/\d/g, ""))}
+                      onChange={(e) => setName(sanitizeName(e.target.value))}
                       placeholder="Seu nome"
                       autoComplete="name"
                       disabled={submitting}
@@ -596,6 +750,26 @@ const Cadastro: React.FC = () => {
                 </Field>
 
                 <Field>
+                  <Label htmlFor="deliveryRegion">Região de entrega</Label>
+                  <InputShell>
+                    <SelectInput
+                      id="deliveryRegion"
+                      value={deliveryRegion}
+                      onChange={(e) => setDeliveryRegion(e.target.value)}
+                      disabled={submitting}
+                    >
+                      <option value="">Selecione a região</option>
+                      {SHIPPING_RATES.map((rate) => (
+                        <option key={rate.city} value={rate.city}>
+                          {rate.city}
+                        </option>
+                      ))}
+                    </SelectInput>
+                  </InputShell>
+                  <HelperText>Essa região será usada para calcular o frete no checkout.</HelperText>
+                </Field>
+
+                <Field>
                   <Label htmlFor="street">Rua / logradouro</Label>
                   <InputShell>
                     <TextInput
@@ -661,14 +835,15 @@ const Cadastro: React.FC = () => {
                         id="city"
                         value={city}
                         onChange={(e) => setCity(e.target.value)}
-                        placeholder="Cidade"
+                        placeholder="Cidade do endereço"
                         autoComplete="address-level2"
                         disabled={submitting}
                       />
                     </InputShell>
+                    <HelperText>Cidade informativa do endereço. O frete usa a região selecionada acima.</HelperText>
                   </Field>
 
-                  <Field>
+                  <UfField>
                     <Label htmlFor="state">UF</Label>
                     <InputShell>
                       <TextInput
@@ -680,7 +855,8 @@ const Cadastro: React.FC = () => {
                         disabled={submitting}
                       />
                     </InputShell>
-                  </Field>
+                    <HelperText>&nbsp;</HelperText>
+                  </UfField>
                 </CityRow>
 
                 <Field>
@@ -702,19 +878,63 @@ const Cadastro: React.FC = () => {
           {error ? <ErrorMsg>{error}</ErrorMsg> : null}
 
           <ButtonRow>
-            <PrimaryButton type="submit" disabled={submitting}>
-              {submitting ? "Cadastrando..." : "Cadastrar"}
-            </PrimaryButton>
             <SecondaryButton
               type="button"
-              onClick={() => navigate("/login", { state: { redirectTo, prefilledPhone: normalizePhone(phone) } })}
+              onClick={() =>
+                handleLeavePage("/login", {
+                  redirectTo,
+                  prefilledPhone: normalizePhone(phone),
+                  prefilledCpf: normalizeCpf(cpf),
+                })
+              }
               disabled={submitting}
             >
               Já tenho conta
             </SecondaryButton>
+            <PrimaryButton type="submit" disabled={submitting}>
+              {submitting ? "Cadastrando..." : "Cadastrar"}
+            </PrimaryButton>
           </ButtonRow>
         </Form>
       </StyledCard>
+
+      <AlertDialog open={exitDialogOpen} onOpenChange={handleExitDialogOpenChange}>
+        <AlertDialogContent className="overflow-hidden border border-white/50 bg-[linear-gradient(180deg,rgba(255,255,255,0.82)_0%,rgba(255,247,245,0.76)_100%)] p-0 shadow-[0_30px_80px_rgba(85,24,24,0.28)] backdrop-blur-2xl sm:max-w-md sm:rounded-[32px]">
+          <div className="relative">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.85),transparent_48%),linear-gradient(180deg,rgba(255,255,255,0.24),transparent)]" />
+            <div className="relative p-6 sm:p-7">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] border border-white/70 bg-white/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_18px_36px_rgba(125,23,23,0.12)] backdrop-blur-xl">
+                <AlertTriangle className="h-7 w-7 text-red-500" />
+              </div>
+
+              <div className="mt-5 text-center">
+                <AlertDialogTitle className="text-[1.45rem] font-black tracking-[-0.02em] text-slate-950">
+                  Deseja sair do cadastro?
+                </AlertDialogTitle>
+                <AlertDialogDescription className="mt-2 text-[15px] leading-6 text-slate-600">
+                  Os dados preenchidos até agora podem ser perdidos se você sair desta tela.
+                </AlertDialogDescription>
+              </div>
+
+              <AlertDialogFooter className="mt-6 flex-col gap-3 sm:flex-row sm:justify-center sm:space-x-0">
+                <AlertDialogCancel
+                  onClick={handleCancelLeave}
+                  className="mt-0 h-12 rounded-2xl border-white/70 bg-white/55 px-5 text-sm font-semibold text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_14px_28px_rgba(15,23,42,0.08)] backdrop-blur-xl hover:bg-white/70"
+                >
+                  Continuar aqui
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleConfirmLeave}
+                  className="h-12 rounded-2xl bg-[linear-gradient(135deg,#c93232,#8b1d1d)] px-5 text-sm font-bold text-white shadow-[0_18px_36px_rgba(185,40,40,0.28)] hover:opacity-95"
+                >
+                  Sair mesmo
+                  <ChevronRight className="ml-1 h-4 w-4" />
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </div>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </Screen>
   );
 };

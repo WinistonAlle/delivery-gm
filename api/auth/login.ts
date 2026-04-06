@@ -27,7 +27,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const session = await getCustomerProfileByPhone(phone);
-    if (!session || session.document_cpf !== cpf) {
+    if (!session) {
+      return res.status(404).json({ error: "Cadastro não encontrado para este telefone." });
+    }
+
+    if (session.document_cpf !== cpf) {
       return res.status(401).json({ error: "Telefone ou CPF inválidos." });
     }
 

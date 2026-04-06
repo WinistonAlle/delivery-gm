@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -30,6 +30,7 @@ import {
   saveCustomerSession,
 } from "@/lib/customerAuth";
 import { trackCustomerEvent, trackCustomerEventOnce } from "@/lib/customerInsights";
+import { createFullAddress, fetchAddressFromCEP, formatCEP } from "@/utils/formatUtils";
 
 function safeGetSession() {
   return getCustomerSession() as CustomerSession | null;
@@ -109,6 +110,7 @@ const Checkout: React.FC = () => {
   const [customerName, setCustomerName] = useState(session?.full_name ?? session?.name ?? "");
   const [customerPhone, setCustomerPhone] = useState(session?.phone ?? session?.cpf ?? "");
   const [deliveryAddress, setDeliveryAddress] = useState(session?.address ?? "");
+  const [deliveryCep, setDeliveryCep] = useState(customerCep);
   const [selectedCity, setSelectedCity] = useState(customerCity);
   const [selectedSavedAddressId, setSelectedSavedAddressId] = useState(
     session?.saved_addresses?.find((item) => item.is_primary)?.id ??
@@ -116,13 +118,21 @@ const Checkout: React.FC = () => {
       ""
   );
   const [showNewAddressForm, setShowNewAddressForm] = useState(false);
-  const [newAddress, setNewAddress] = useState("");
-  const [newAddressCity, setNewAddressCity] = useState("");
+  const [newAddressCep, setNewAddressCep] = useState("");
+  const [newAddressStreet, setNewAddressStreet] = useState("");
+  const [newAddressNumber, setNewAddressNumber] = useState("");
+  const [newAddressComplement, setNewAddressComplement] = useState("");
+  const [newAddressDistrict, setNewAddressDistrict] = useState("");
+  const [newAddressLocalCity, setNewAddressLocalCity] = useState("");
+  const [newAddressState, setNewAddressState] = useState("");
+  const [newAddressRegion, setNewAddressRegion] = useState("");
   const [isSavingAddress, setIsSavingAddress] = useState(false);
+  const [isLoadingNewAddressCep, setIsLoadingNewAddressCep] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("");
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [checkoutSuggestions, setCheckoutSuggestions] = useState<Product[]>([]);
+  const lastFetchedNewAddressCepRef = useRef("");
   const shippingCost = useMemo(() => {
     if (!selectedCity) return 0;
     const city = SHIPPING_RATES.find((rate) => rate.city === selectedCity);
@@ -131,6 +141,25 @@ const Checkout: React.FC = () => {
   const isFreeShipping = cartTotal >= FREE_SHIPPING_THRESHOLD;
   const finalShipping = selectedCity ? (isFreeShipping ? 0 : shippingCost) : 0;
   const finalTotal = cartTotal + finalShipping;
+  const newAddressSummary = useMemo(
+    () =>
+      createFullAddress(
+        newAddressStreet.trim(),
+        newAddressNumber.trim(),
+        newAddressComplement.trim(),
+        newAddressDistrict.trim(),
+        newAddressLocalCity.trim(),
+        newAddressState.trim()
+      ),
+    [
+      newAddressStreet,
+      newAddressNumber,
+      newAddressComplement,
+      newAddressDistrict,
+      newAddressLocalCity,
+      newAddressState,
+    ]
+  );
 
   const canSubmit =
     customerName.trim().length >= 3 &&
@@ -188,6 +217,7 @@ const Checkout: React.FC = () => {
 
     setSelectedSavedAddressId(selectedAddress.id);
     setDeliveryAddress(selectedAddress.address);
+    setDeliveryCep(selectedAddress.cep);
     setSelectedCity(selectedAddress.city);
   }, [savedAddresses, selectedSavedAddressId]);
 
@@ -233,6 +263,64 @@ const Checkout: React.FC = () => {
     };
   }, [cartItems]);
 
+  const resetNewAddressForm = useCallback(() => {
+    setNewAddressCep("");
+    setNewAddressStreet("");
+    setNewAddressNumber("");
+    setNewAddressComplement("");
+    setNewAddressDistrict("");
+    setNewAddressLocalCity("");
+    setNewAddressState("");
+    setNewAddressRegion("");
+    lastFetchedNewAddressCepRef.current = "";
+  }, []);
+
+  const handleCloseNewAddressModal = useCallback(() => {
+    setShowNewAddressForm(false);
+    resetNewAddressForm();
+  }, [resetNewAddressForm]);
+
+  const fetchNewAddressCepAndFill = useCallback(async (rawCep: string) => {
+    const normalizedCep = onlyDigits(rawCep);
+    if (normalizedCep.length !== 8 || isLoadingNewAddressCep) return;
+
+    setIsLoadingNewAddressCep(true);
+    try {
+      const data = await fetchAddressFromCEP(normalizedCep);
+      if (data?.erro) {
+        toast.error("CEP não encontrado", {
+          description: "Confira o CEP informado para continuar.",
+        });
+        return;
+      }
+
+      lastFetchedNewAddressCepRef.current = normalizedCep;
+      setNewAddressStreet(data.logradouro || "");
+      setNewAddressDistrict(data.bairro || "");
+      setNewAddressLocalCity(data.localidade || "");
+      setNewAddressState((data.uf || "").toUpperCase());
+    } catch {
+      toast.error("Erro ao consultar CEP", {
+        description: "Não foi possível buscar os dados do endereço agora.",
+      });
+    } finally {
+      setIsLoadingNewAddressCep(false);
+    }
+  }, [isLoadingNewAddressCep]);
+
+  useEffect(() => {
+    const normalizedCep = onlyDigits(newAddressCep);
+    if (normalizedCep.length !== 8) {
+      if (lastFetchedNewAddressCepRef.current !== normalizedCep) {
+        lastFetchedNewAddressCepRef.current = "";
+      }
+      return;
+    }
+
+    if (lastFetchedNewAddressCepRef.current === normalizedCep) return;
+    void fetchNewAddressCepAndFill(normalizedCep);
+  }, [fetchNewAddressCepAndFill, newAddressCep]);
+
   const handleConfirm = async () => {
     if (!canSubmit) {
       toast.error("Dados incompletos", {
@@ -258,7 +346,7 @@ const Checkout: React.FC = () => {
         customerDocumentCpf,
         customerAddress: deliveryAddress.trim(),
         customerCity: selectedCity,
-        customerCep,
+        customerCep: onlyDigits(deliveryCep),
         paymentMethod,
         notes: notes.trim(),
         shippingCost: finalShipping,
@@ -276,7 +364,7 @@ const Checkout: React.FC = () => {
         cpf: cleanPhone,
         phone: cleanPhone,
         document_cpf: customerDocumentCpf,
-        cep: customerCep,
+        cep: onlyDigits(deliveryCep),
         city: selectedCity,
         address: deliveryAddress.trim(),
         addresses: Array.from(
@@ -293,7 +381,7 @@ const Checkout: React.FC = () => {
                   id: "checkout-address",
                   address: deliveryAddress.trim(),
                   city: selectedCity,
-                  cep: customerCep,
+                  cep: onlyDigits(deliveryCep),
                   label: "",
                   is_primary: true,
                 },
@@ -353,7 +441,7 @@ const Checkout: React.FC = () => {
         `Nome: ${customerName.trim()}`,
         `CPF: ${customerDocumentCpf || "Não informado"}`,
         `Endereço: ${deliveryAddress.trim()}`,
-        `CEP: ${customerCep || "Não informado"}`,
+        `CEP: ${formatCEP(deliveryCep) || "Não informado"}`,
         `Como nos conheceu: ${howFoundLabel}`,
         "",
         `*Total:* ${formatCurrency(finalTotal)}`,
@@ -386,41 +474,52 @@ const Checkout: React.FC = () => {
   };
 
   const handleSaveAdditionalAddress = async () => {
-    if (newAddress.trim().length < 6 || newAddressCity.trim().length < 2) {
-      toast.error("Endereco incompleto", {
-        description: "Preencha o novo endereco e a cidade para salvar.",
+    if (
+      newAddressStreet.trim().length < 3 ||
+      newAddressNumber.trim().length < 1 ||
+      newAddressDistrict.trim().length < 2 ||
+      newAddressLocalCity.trim().length < 2 ||
+      newAddressState.trim().length !== 2 ||
+      newAddressRegion.trim().length < 2 ||
+      onlyDigits(newAddressCep).length !== 8
+    ) {
+      toast.error("Endereço incompleto", {
+        description: "Preencha o endereço completo, CEP e região de entrega para salvar.",
       });
       return;
     }
 
     setIsSavingAddress(true);
     try {
+      const fullNewAddress = newAddressSummary.trim();
       const updatedSession = await createAdditionalCustomerAddress({
-        address: newAddress.trim(),
-        city: newAddressCity.trim(),
+        address: fullNewAddress,
+        city: newAddressRegion.trim(),
+        cep: onlyDigits(newAddressCep),
         setPrimary: false,
       });
 
       const createdAddress =
         updatedSession.saved_addresses.find(
           (item) =>
-            item.address.trim() === newAddress.trim() && item.city.trim() === newAddressCity.trim()
+            item.address.trim() === fullNewAddress &&
+            item.city.trim() === newAddressRegion.trim() &&
+            item.cep === onlyDigits(newAddressCep)
         ) ?? updatedSession.saved_addresses[0];
 
       saveCustomerSession(updatedSession);
       setSession(updatedSession);
       setSelectedSavedAddressId(createdAddress?.id ?? "");
-      setDeliveryAddress(createdAddress?.address ?? newAddress.trim());
-      setSelectedCity(createdAddress?.city ?? newAddressCity.trim());
-      setShowNewAddressForm(false);
-      setNewAddress("");
-      setNewAddressCity("");
+      setDeliveryAddress(createdAddress?.address ?? fullNewAddress);
+      setDeliveryCep(createdAddress?.cep ?? onlyDigits(newAddressCep));
+      setSelectedCity(createdAddress?.city ?? newAddressRegion.trim());
+      handleCloseNewAddressModal();
 
-      toast.success("Endereco salvo", {
-        description: "Novo endereco cadastrado com sucesso.",
+      toast.success("Endereço salvo", {
+        description: "Novo endereço cadastrado com sucesso.",
       });
     } catch (error) {
-      toast.error("Erro ao salvar endereco", {
+      toast.error("Erro ao salvar endereço", {
         description: error instanceof Error ? error.message : "Tente novamente em alguns instantes.",
       });
     } finally {
@@ -491,13 +590,13 @@ const Checkout: React.FC = () => {
                 </div>
                 <div>
                   <h2 className="text-xl font-black text-slate-950">Entrega</h2>
-                  <p className="text-sm text-slate-500">Confira o endereco cadastrado e a cidade vinculada ao seu cadastro para calcular o frete.</p>
+                  <p className="text-sm text-slate-500">Confira o endereço cadastrado e a cidade vinculada ao seu cadastro para calcular o frete.</p>
                 </div>
               </div>
 
               {savedAddresses.length > 0 ? (
                 <div className="mb-4">
-                  <span className="mb-2 block text-sm font-semibold text-slate-700">Enderecos salvos</span>
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">Endereços salvos</span>
                   <div className="grid gap-3">
                     {savedAddresses.map((item) => {
                       const isSelected = item.id === selectedSavedAddressId;
@@ -517,13 +616,16 @@ const Checkout: React.FC = () => {
                           }`}
                         >
                           <div className="flex items-start justify-between gap-3">
-                            <div>
+                          <div>
                               <p className="text-sm font-bold text-slate-900">
-                                {item.label || (item.is_primary ? "Endereco principal" : "Outro endereco")}
+                                {item.label || (item.is_primary ? "Endereço principal" : "Outro endereço")}
                               </p>
                               <p className="mt-1 text-sm text-slate-600">{item.address}</p>
                               <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
-                                {item.city || "Cidade nao informada"}
+                                {item.city || "Cidade não informada"}
+                              </p>
+                              <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                                CEP {formatCEP(item.cep) || "não informado"}
                               </p>
                             </div>
                             {isSelected ? (
@@ -544,81 +646,47 @@ const Checkout: React.FC = () => {
                   type="button"
                   variant="outline"
                   className="rounded-2xl border-slate-200"
-                  onClick={() => setShowNewAddressForm((current) => !current)}
+                  onClick={() => setShowNewAddressForm(true)}
                   disabled={isSubmitting || isSavingAddress}
                 >
-                  {showNewAddressForm ? "Cancelar novo endereco" : "Cadastrar outro endereco"}
+                  Cadastrar outro endereço
                 </Button>
               </div>
 
-              {showNewAddressForm ? (
-                <div className="mb-5 grid gap-4 rounded-[28px] border border-slate-200 bg-slate-50/80 p-4 md:grid-cols-[minmax(0,1fr)_260px]">
-                  <label className="block">
-                    <span className="mb-2 block text-sm font-semibold text-slate-700">Novo endereco</span>
-                    <textarea
-                      className="min-h-[112px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[15px] text-slate-900 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
-                      value={newAddress}
-                      onChange={(e) => setNewAddress(e.target.value)}
-                      disabled={isSubmitting || isSavingAddress}
-                      placeholder="Rua, numero, bairro e referencia"
-                    />
-                  </label>
-
-                  <div className="space-y-4">
-                    <label className="block">
-                      <span className="mb-2 block text-sm font-semibold text-slate-700">Cidade</span>
-                      <select
-                        className="h-[56px] w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] font-medium text-slate-900 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
-                        value={newAddressCity}
-                        onChange={(e) => setNewAddressCity(e.target.value)}
-                        disabled={isSubmitting || isSavingAddress}
-                      >
-                        <option value="">Selecione a cidade</option>
-                        {SHIPPING_RATES.map((rate) => (
-                          <option key={rate.city} value={rate.city}>
-                            {rate.city}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-
-                    <Button
-                      type="button"
-                      className="h-[52px] w-full rounded-2xl bg-red-600 text-base font-bold hover:bg-red-700"
-                      onClick={handleSaveAdditionalAddress}
-                      disabled={isSubmitting || isSavingAddress}
-                    >
-                      {isSavingAddress ? "Salvando endereco..." : "Salvar endereco"}
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
-
               <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_260px]">
                 <label className="block">
-                  <span className="mb-2 block text-sm font-semibold text-slate-700">Endereco de entrega</span>
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">Endereço de entrega</span>
                   <div className="min-h-[112px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[15px] text-slate-900">
-                    {deliveryAddress || "Nenhum endereco selecionado"}
+                    {deliveryAddress || "Nenhum endereço selecionado"}
                   </div>
                 </label>
 
-                <label className="block">
-                  <span className="mb-2 block text-sm font-semibold text-slate-700">Cidade</span>
-                  <div className="flex min-h-[56px] items-center rounded-2xl border border-slate-200 bg-slate-50 px-4 text-[15px] font-medium text-slate-900">
-                    {selectedCity || "Cidade nao informada no cadastro"}
-                  </div>
+                <div className="space-y-3">
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold text-slate-700">Cidade</span>
+                    <div className="flex min-h-[56px] items-center rounded-2xl border border-slate-200 bg-slate-50 px-4 text-[15px] font-medium text-slate-900">
+                      {selectedCity || "Cidade não informada no cadastro"}
+                    </div>
+                  </label>
 
-                  <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold text-slate-700">CEP</span>
+                    <div className="flex min-h-[56px] items-center rounded-2xl border border-slate-200 bg-slate-50 px-4 text-[15px] font-medium text-slate-900">
+                      {formatCEP(deliveryCep) || "CEP não informado"}
+                    </div>
+                  </label>
+
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                     {selectedCity ? (
                       <span>
                         Frete para <strong className="text-slate-900">{selectedCity}</strong>:{" "}
-                        <strong className="text-slate-900">{finalShipping > 0 ? formatCurrency(finalShipping) : "Gratis"}</strong>
+                        <strong className="text-slate-900">{finalShipping > 0 ? formatCurrency(finalShipping) : "Grátis"}</strong>
                       </span>
                     ) : (
-                      <span>Seu cadastro precisa ter uma cidade preenchida para liberar a confirmacao do pedido.</span>
+                      <span>Seu cadastro precisa ter uma cidade preenchida para liberar a confirmação do pedido.</span>
                     )}
                   </div>
-                </label>
+                </div>
               </div>
             </motion.section>
 
@@ -634,8 +702,17 @@ const Checkout: React.FC = () => {
                 </div>
                 <div>
                   <h2 className="text-xl font-black text-slate-950">Pagamento e observações</h2>
+                  <p className="text-sm text-slate-500">
+                    Selecione uma forma de pagamento para liberar a confirmação do pedido.
+                  </p>
                 </div>
               </div>
+
+              {!paymentMethod ? (
+                <div className="mb-4 rounded-[24px] border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+                  Escolha o método de pagamento antes de confirmar o pedido.
+                </div>
+              ) : null}
 
               <div className="grid gap-3 md:grid-cols-3">
                 {paymentOptions.map((option) => {
@@ -650,7 +727,9 @@ const Checkout: React.FC = () => {
                       className={`rounded-[28px] border px-4 py-4 text-left transition ${
                         active
                           ? "border-red-500 bg-red-600 text-white shadow-[0_18px_36px_rgba(220,38,38,0.28)]"
-                          : "border-slate-200 bg-white hover:-translate-y-0.5 hover:border-red-200 hover:bg-red-50"
+                          : paymentMethod
+                            ? "border-slate-200 bg-white hover:-translate-y-0.5 hover:border-red-200 hover:bg-red-50"
+                            : "border-red-200 bg-white hover:-translate-y-0.5 hover:border-red-300 hover:bg-red-50"
                       }`}
                     >
                       <div className={`flex h-11 w-11 items-center justify-center rounded-2xl ${active ? "bg-white/20" : "bg-slate-100 text-slate-700"}`}>
@@ -726,7 +805,7 @@ const Checkout: React.FC = () => {
                   </div>
                   <div className="flex items-center justify-between text-sm text-white/70">
                     <span>Frete</span>
-                    <span className="font-semibold text-white">{finalShipping > 0 ? formatCurrency(finalShipping) : "Gratis"}</span>
+                    <span className="font-semibold text-white">{finalShipping > 0 ? formatCurrency(finalShipping) : "Grátis"}</span>
                   </div>
                   <div className="h-px bg-white/10" />
                   <div className="flex items-center justify-between">
@@ -786,7 +865,11 @@ const Checkout: React.FC = () => {
                     onClick={handleConfirm}
                     disabled={isSubmitting || !canSubmit}
                   >
-                    {isSubmitting ? "Preparando WhatsApp..." : "Confirmar pedido"}
+                    {isSubmitting
+                      ? "Preparando WhatsApp..."
+                      : !paymentMethod
+                        ? "Selecione o pagamento"
+                        : "Confirmar pedido"}
                     <ChevronRight className="ml-2 h-5 w-5" />
                   </Button>
                 </div>
@@ -843,6 +926,174 @@ const Checkout: React.FC = () => {
           </motion.aside>
         </div>
       </div>
+
+      {showNewAddressForm ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 py-6 backdrop-blur-sm">
+          <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-[32px] border border-white/70 bg-white p-5 shadow-[0_30px_100px_rgba(15,23,42,0.3)] md:p-6">
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-2xl font-black text-slate-950">Novo endereço</h3>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-2xl border-slate-200"
+                onClick={handleCloseNewAddressModal}
+                disabled={isSavingAddress}
+              >
+                Fechar
+              </Button>
+            </div>
+
+            <div className="grid gap-5">
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">CEP</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={9}
+                    className="h-[56px] w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] font-medium text-slate-900 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
+                    value={formatCEP(newAddressCep)}
+                    onChange={(e) => setNewAddressCep(e.target.value)}
+                    disabled={isSubmitting || isSavingAddress}
+                    placeholder="00000-000"
+                  />
+                  {isLoadingNewAddressCep ? (
+                    <span className="mt-2 block text-xs text-slate-500">Buscando endereço pelo CEP...</span>
+                  ) : null}
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">Região de entrega</span>
+                  <select
+                    className="h-[56px] w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] font-medium text-slate-900 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
+                    value={newAddressRegion}
+                    onChange={(e) => setNewAddressRegion(e.target.value)}
+                    disabled={isSubmitting || isSavingAddress}
+                  >
+                    <option value="">Selecione a região</option>
+                    {SHIPPING_RATES.map((rate) => (
+                      <option key={rate.city} value={rate.city}>
+                        {rate.city}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold text-slate-700">Rua / logradouro</span>
+                <input
+                  type="text"
+                  className="h-[56px] w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] text-slate-900 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
+                  value={newAddressStreet}
+                  onChange={(e) => setNewAddressStreet(e.target.value)}
+                  disabled={isSubmitting || isSavingAddress}
+                  placeholder="Rua / logradouro"
+                />
+              </label>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">Número</span>
+                  <input
+                    type="text"
+                    className="h-[56px] w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] text-slate-900 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
+                    value={newAddressNumber}
+                    onChange={(e) => setNewAddressNumber(e.target.value)}
+                    disabled={isSubmitting || isSavingAddress}
+                    placeholder="Número"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">Complemento</span>
+                  <input
+                    type="text"
+                    className="h-[56px] w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] text-slate-900 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
+                    value={newAddressComplement}
+                    onChange={(e) => setNewAddressComplement(e.target.value)}
+                    disabled={isSubmitting || isSavingAddress}
+                    placeholder="Complemento"
+                  />
+                </label>
+              </div>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold text-slate-700">Bairro</span>
+                <input
+                  type="text"
+                  className="h-[56px] w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] text-slate-900 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
+                  value={newAddressDistrict}
+                  onChange={(e) => setNewAddressDistrict(e.target.value)}
+                  disabled={isSubmitting || isSavingAddress}
+                  placeholder="Bairro"
+                />
+              </label>
+
+              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_120px]">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">Cidade</span>
+                  <input
+                    type="text"
+                    className="h-[56px] w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] text-slate-900 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
+                    value={newAddressLocalCity}
+                    onChange={(e) => setNewAddressLocalCity(e.target.value)}
+                    disabled={isSubmitting || isSavingAddress}
+                    placeholder="Cidade do endereço"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">UF</span>
+                  <input
+                    type="text"
+                    maxLength={2}
+                    className="h-[56px] w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] text-slate-900 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
+                    value={newAddressState}
+                    onChange={(e) =>
+                      setNewAddressState(e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2))
+                    }
+                    disabled={isSubmitting || isSavingAddress}
+                    placeholder="UF"
+                  />
+                </label>
+              </div>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold text-slate-700">Resumo do endereço</span>
+                <textarea
+                  className="min-h-[112px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-[15px] text-slate-900 outline-none"
+                  value={newAddressSummary}
+                  readOnly
+                  placeholder="O endereço completo aparece aqui."
+                />
+              </label>
+
+              <div className="flex flex-col-reverse gap-3 pt-2 md:flex-row md:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-2xl border-slate-200"
+                  onClick={handleCloseNewAddressModal}
+                  disabled={isSavingAddress}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  className="rounded-2xl bg-red-600 text-base font-bold hover:bg-red-700"
+                  onClick={handleSaveAdditionalAddress}
+                  disabled={isSubmitting || isSavingAddress}
+                >
+                  {isSavingAddress ? "Salvando endereço..." : "Salvar endereço"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

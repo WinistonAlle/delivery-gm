@@ -905,38 +905,34 @@ const Destaques: React.FC = () => {
           </button>
 
           {!isAdmin && (
-            <>
-              {/* 3) Favoritos */}
-              <button
-                onClick={() => goTo("/favoritos")}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 ${
-                  activeTab("/favoritos")
-                    ? "bg-red-50 text-red-700 font-semibold"
-                    : "text-gray-800"
-                }`}
-              >
-                <span className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
-                  <Heart className="h-4 w-4 text-red-600" />
-                </span>
-                Favoritos
-              </button>
-
-              {/* 4) Pedidos */}
-              <button
-                onClick={() => goTo("/meus-pedidos")}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 ${
-                  activeTab("/meus-pedidos")
-                    ? "bg-red-50 text-red-700 font-semibold"
-                    : "text-gray-800"
-                }`}
-              >
-                <span className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
-                  <ClipboardList className="h-4 w-4 text-red-600" />
-                </span>
-                Pedidos
-              </button>
-            </>
+            <button
+              onClick={() => goTo("/favoritos")}
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 ${
+                activeTab("/favoritos")
+                  ? "bg-red-50 text-red-700 font-semibold"
+                  : "text-gray-800"
+              }`}
+            >
+              <span className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
+                <Heart className="h-4 w-4 text-red-600" />
+              </span>
+              Favoritos
+            </button>
           )}
+
+          <button
+            onClick={() => goTo("/meus-pedidos")}
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 ${
+              activeTab("/meus-pedidos")
+                ? "bg-red-50 text-red-700 font-semibold"
+                : "text-gray-800"
+            }`}
+          >
+            <span className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
+              <ClipboardList className="h-4 w-4 text-red-600" />
+            </span>
+            Pedidos
+          </button>
 
           {/* 5) Relatórios */}
           {isAdmin && (
