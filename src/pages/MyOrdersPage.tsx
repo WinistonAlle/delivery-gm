@@ -20,6 +20,7 @@ import {
   Facebook,
   Instagram,
   Youtube,
+  CirclePlay,
   Star,
   Palette,
 } from "lucide-react";
@@ -473,6 +474,16 @@ const MyOrdersPage: React.FC = () => {
               <span>Favoritos</span>
             </button>
           )}
+
+          <button
+            onClick={() => goTo("/modos-de-preparo")}
+            className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 text-gray-800"
+          >
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
+              <CirclePlay className="h-4 w-4 text-red-600" />
+            </span>
+            <span>Modos de preparo</span>
+          </button>
 
           <button
             onClick={() => goTo("/meus-pedidos")}

@@ -28,6 +28,7 @@ import {
   Facebook,
   Instagram,
   Youtube,
+  CirclePlay,
   X,
   CheckCircle2,
   Loader2,
@@ -925,6 +926,20 @@ const Destaques: React.FC = () => {
               Favoritos
             </button>
           )}
+
+          <button
+            onClick={() => goTo("/modos-de-preparo")}
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-red-50 ${
+              activeTab("/modos-de-preparo")
+                ? "bg-red-50 text-red-700 font-semibold"
+                : "text-gray-800"
+            }`}
+          >
+            <span className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
+              <CirclePlay className="h-4 w-4 text-red-600" />
+            </span>
+            Modos de preparo
+          </button>
 
           <button
             onClick={() => goTo("/meus-pedidos")}

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bot, MessageCircle, Send, Sparkles, X } from "lucide-react";
+import { Bot, MapPin, MessageCircle, Package2, Send, ShoppingCart, Sparkles, X } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   MIN_ORDER_VALUE,
@@ -10,7 +10,15 @@ import {
 } from "@/data/products";
 import { FREE_SHIPPING_THRESHOLD, SHIPPING_RATES } from "@/data/shipping";
 import { normalizeText } from "@/utils/stringUtils";
-import type { Product } from "@/types/products";
+import type { CartItem, Product } from "@/types/products";
+import { useCart } from "@/contexts/useCart";
+import {
+  CUSTOMER_SESSION_EVENT,
+  getCustomerSession,
+  type CustomerSession,
+} from "@/lib/customerAuth";
+import { getShippingCostForCity } from "../../shared/orderRules";
+import { PREPARATION_VIDEOS, type PreparationVideo } from "@/data/preparationVideos";
 
 type ChatMessage = {
   id: string;
@@ -18,11 +26,23 @@ type ChatMessage = {
   content: string;
 };
 
+type AssistantContext = {
+  session: CustomerSession | null;
+  cartItems: CartItem[];
+  itemsCount: number;
+  cartTotal: number;
+  packageCount: number;
+  meetsMinimumOrder: boolean;
+  freeShippingRemaining: number;
+  shippingCost: number | null;
+  shippingCity: string | null;
+};
+
 const QUICK_QUESTIONS = [
   "Quais pães de queijo vocês têm?",
   "Qual pão de queijo é mais vendido?",
   "Quantos salgados para 50 pessoas?",
-  "Vocês entregam em Taguatinga?",
+  "Qual é o frete para minha região?",
   "Qual é o pedido mínimo?",
   "Me indique produtos para festa",
 ];
@@ -222,6 +242,89 @@ function buildSavorySuggestions(question: string) {
   return "Para festa, um mix equilibrado entre fritos e assados costuma funcionar melhor.";
 }
 
+function findPreparationVideo(question: string) {
+  const normalizedQuestion = normalizeQuestion(question);
+  const wantsTutorial = questionHasAny(question, [
+    "video",
+    "vídeo",
+    "tutorial",
+    "short",
+    "shorts",
+    "modo de preparo",
+    "modos de preparo",
+    "como preparar",
+    "como fritar",
+    "como assar",
+  ]);
+
+  if (!wantsTutorial && !questionHasAny(question, ["preparo", "assar", "fritar"])) {
+    return null;
+  }
+
+  const scored = PREPARATION_VIDEOS.map((video) => {
+    let score = 0;
+
+    for (const keyword of video.keywords) {
+      if (hasApproxPhrase(question, keyword)) score += 8;
+      else if (normalizedQuestion.includes(normalizeQuestion(keyword))) score += 5;
+    }
+
+    if (questionHasAny(question, [video.category])) score += 2;
+    return { video, score };
+  })
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  return scored[0]?.video ?? null;
+}
+
+function buildPreparationVideoAnswer(question: string) {
+  const video = findPreparationVideo(question);
+
+  if (video) {
+    return `Tenho um vídeo para isso: ${video.title}. ${video.videoUrl}`;
+  }
+
+  if (
+    questionHasAny(question, [
+      "video",
+      "vídeo",
+      "tutorial",
+      "short",
+      "shorts",
+      "modo de preparo",
+      "modos de preparo",
+    ])
+  ) {
+    return "Os tutoriais estão na página Modos de preparo, no menu. Se você me disser o produto, eu também posso te mandar o vídeo certo.";
+  }
+
+  return "";
+}
+
+function renderMessageContent(content: string) {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = content.split(urlRegex).filter(Boolean);
+
+  return parts.map((part, index) => {
+    if (/^https?:\/\//.test(part)) {
+      return (
+        <a
+          key={`${part}-${index}`}
+          href={part}
+          target="_blank"
+          rel="noreferrer"
+          className="font-semibold text-red-600 underline underline-offset-4"
+        >
+          {part}
+        </a>
+      );
+    }
+
+    return <React.Fragment key={`${part}-${index}`}>{part}</React.Fragment>;
+  });
+}
+
 function buildPartyAnswer(question: string) {
   const peopleCount = extractNumber(question);
   const isCheeseBread = questionHasAny(question, ["pao de queijo", "pao queijo"]);
@@ -256,6 +359,9 @@ function buildPartyAnswer(question: string) {
 }
 
 function buildOvenAnswer(question: string) {
+  const tutorialAnswer = buildPreparationVideoAnswer(question);
+  if (tutorialAnswer) return tutorialAnswer;
+
   const isCheeseBread = questionHasAny(question, ["pao de queijo", "pao queijo"]);
   const hasAirFryer = questionHasAny(question, ["airfryer", "air fryer"]);
   const isFrying = questionHasAny(question, ["fritar", "fritura", "oleo"]);
@@ -279,18 +385,104 @@ function buildOvenAnswer(question: string) {
   return "Como média geral, pães e salgados assados costumam ficar entre 20 e 40 minutos em forno preaquecido, variando com tamanho, recheio e temperatura.";
 }
 
-function buildDeliveryAnswer(question: string) {
-  const city = findShippingCity(question);
-
-  if (city) {
-    return `Sim, atendemos ${city.city}. No carrinho, o frete dessa região está configurado em ${formatCurrency(city.cost)}.`;
-  }
-
-  return `Você pode montar o pedido e seguir para o carrinho para consultar entrega e frete. O frete grátis é liberado a partir de ${formatCurrency(FREE_SHIPPING_THRESHOLD)}.`;
+function formatShortName(session: CustomerSession | null) {
+  const raw = session?.full_name || session?.name || "";
+  const firstName = raw.trim().split(/\s+/)[0];
+  return firstName || null;
 }
 
-function buildMinimumOrderAnswer() {
-  return `Hoje o carrinho trabalha com pedido mínimo de ${MIN_PACKAGES} pacotes ou ${formatCurrency(MIN_ORDER_VALUE)}. Conforme você adiciona os itens, o próprio carrinho mostra o que ainda falta para atingir o mínimo.`;
+function getSessionCity(session: CustomerSession | null) {
+  const city = String(session?.city ?? "").trim();
+  return city || null;
+}
+
+function getCartCategories(cartItems: CartItem[]) {
+  return Array.from(new Set(cartItems.map((item) => item.product.category).filter(Boolean)));
+}
+
+function getComplementarySuggestions(cartItems: CartItem[], limit = 4) {
+  const cartProductIds = new Set(cartItems.map((item) => String(item.product.id)));
+  const categories = getCartCategories(cartItems);
+
+  const preferredCategories = new Set<string>();
+
+  if (categories.includes("Pão de Queijo")) {
+    preferredCategories.add("Salgados Assados");
+    preferredCategories.add("Pães e Massas Doces");
+  }
+
+  if (categories.includes("Salgados P/ Fritar")) {
+    preferredCategories.add("Salgados Assados");
+    preferredCategories.add("Pão de Queijo");
+  }
+
+  if (categories.includes("Salgados Assados")) {
+    preferredCategories.add("Pão de Queijo");
+    preferredCategories.add("Pães e Massas Doces");
+  }
+
+  if (preferredCategories.size === 0) {
+    preferredCategories.add("Pão de Queijo");
+    preferredCategories.add("Salgados Assados");
+    preferredCategories.add("Salgados P/ Fritar");
+  }
+
+  return PRODUCTS.filter((product) => {
+    if (product.inStock === false) return false;
+    if (cartProductIds.has(String(product.id))) return false;
+    return preferredCategories.has(product.category);
+  })
+    .sort(
+      (a, b) =>
+        Number(b.featured ?? false) - Number(a.featured ?? false) ||
+        Number(a.employee_price ?? a.price ?? 0) - Number(b.employee_price ?? b.price ?? 0)
+    )
+    .slice(0, limit);
+}
+
+function buildCartSnapshotAnswer(context: AssistantContext) {
+  if (!context.itemsCount) {
+    return "Seu carrinho ainda está vazio. Se quiser, eu posso te indicar itens para começar ou te dizer o que mais sai no catálogo.";
+  }
+
+  const minimumHint = context.meetsMinimumOrder
+    ? "Seu pedido já bate o mínimo."
+    : `Seu pedido ainda não bate o mínimo de ${MIN_PACKAGES} pacotes ou ${formatCurrency(MIN_ORDER_VALUE)}.`;
+
+  const shippingHint =
+    context.shippingCity && context.shippingCost !== null
+      ? context.shippingCost === 0
+        ? `Para ${context.shippingCity}, o frete já está grátis.`
+        : `Para ${context.shippingCity}, o frete atual está em ${formatCurrency(context.shippingCost)}.`
+      : context.freeShippingRemaining > 0
+        ? `Faltam ${formatCurrency(context.freeShippingRemaining)} para liberar frete grátis.`
+        : "Seu carrinho já liberou frete grátis.";
+
+  return `Hoje seu carrinho está com ${context.itemsCount} item(ns), ${context.packageCount} pacote(s) e total de ${formatCurrency(context.cartTotal)}. ${minimumHint} ${shippingHint}`;
+}
+
+function buildMinimumOrderAnswer(context: AssistantContext) {
+  if (!context.itemsCount) {
+    return `Hoje o carrinho trabalha com pedido mínimo de ${MIN_PACKAGES} pacotes ou ${formatCurrency(MIN_ORDER_VALUE)}. Quando você adicionar itens, eu consigo te dizer exatamente o que ainda falta para bater o mínimo.`;
+  }
+
+  if (context.meetsMinimumOrder) {
+    return `Seu carrinho já atingiu o mínimo. No momento você está com ${context.packageCount} pacote(s) e ${formatCurrency(context.cartTotal)} em itens, então já pode seguir para o checkout sem depender de completar mais nada.`;
+  }
+
+  const missingPackages = Math.max(0, MIN_PACKAGES - context.packageCount);
+  const missingValue = Math.max(0, MIN_ORDER_VALUE - context.cartTotal);
+  const parts: string[] = [];
+
+  if (missingPackages > 0) {
+    parts.push(`${missingPackages} pacote(s)`);
+  }
+
+  if (missingValue > 0) {
+    parts.push(`${formatCurrency(missingValue)}`);
+  }
+
+  return `Seu carrinho está com ${context.packageCount} pacote(s) e ${formatCurrency(context.cartTotal)} em itens. Para atingir o mínimo, ainda faltam ${parts.join(" ou ")}. Se quiser, eu posso te sugerir itens para completar o pedido.`;
 }
 
 function buildStorageAnswer(question: string) {
@@ -378,7 +570,26 @@ function buildBestSellerAnswer(question: string) {
   return "Entre os itens de maior saída, pão de queijo e salgados de festa costumam ser escolhas fortes.";
 }
 
-function buildRecommendationAnswer(question: string) {
+function buildRecommendationAnswer(question: string, context: AssistantContext) {
+  if (
+    context.itemsCount > 0 &&
+    questionHasAny(question, [
+      "meu carrinho",
+      "completar pedido",
+      "combina com meu carrinho",
+      "mais um item",
+      "fechar pedido",
+    ])
+  ) {
+    const suggestions = getComplementarySuggestions(context.cartItems, 4);
+
+    if (suggestions.length) {
+      return `Pelo que já está no seu carrinho, eu completaria com ${suggestions
+        .map((product) => `${product.name} (${getProductPrice(product)})`)
+        .join("; ")}.`;
+    }
+  }
+
   if (questionHasAny(question, ["cafe", "cafe da tarde", "lanche"])) {
     const recommendations = [
       ...getCategoryProducts("Pão de Queijo", 2),
@@ -411,19 +622,34 @@ function buildRecommendationAnswer(question: string) {
   return "Posso te indicar opções para festa, café da tarde, revenda ou pão de queijo. Se quiser, me diga a ocasião.";
 }
 
-function buildGreetingAnswer() {
-  return "Oi! Agora eu consigo ajudar com dúvidas do catálogo, preço de produtos, sugestões para festa, preparo, frete, pedido mínimo e cidades atendidas.";
+function buildGreetingAnswer(context: AssistantContext) {
+  const firstName = formatShortName(context.session);
+  const greetingLead = firstName ? `Oi, ${firstName}!` : "Oi!";
+
+  if (context.itemsCount > 0) {
+    return `${greetingLead} Já vi que você está com ${context.itemsCount} item(ns) no carrinho. Posso te ajudar a completar o pedido, conferir frete para ${context.shippingCity ?? "sua região"} ou dizer se o mínimo já foi atingido.`;
+  }
+
+  if (context.shippingCity) {
+    return `${greetingLead} Posso te ajudar com catálogo, preço, preparo, frete para ${context.shippingCity} e sugestões para montar o pedido.`;
+  }
+
+  return `${greetingLead} Posso te ajudar com dúvidas do catálogo, preço de produtos, sugestões para festa, preparo, frete, pedido mínimo e cidades atendidas.`;
 }
 
 function buildHoursAnswer() {
   return "Os horários de atendimento e entrega podem variar. O melhor caminho é seguir para o pedido ou confirmar diretamente pelo canal de atendimento da loja.";
 }
 
-function buildPaymentAnswer() {
+function buildPaymentAnswer(context: AssistantContext) {
+  if (context.itemsCount > 0) {
+    return "As formas de pagamento aparecem na finalização do pedido. Como seu carrinho já está montado, o próximo passo é abrir o carrinho e seguir para o checkout para escolher a forma de pagamento.";
+  }
+
   return "As formas de pagamento aparecem na finalização do pedido. Se quiser, monte o carrinho que eu te oriento no restante do fluxo.";
 }
 
-function buildFallbackAnswer(question: string) {
+function buildFallbackAnswer(question: string, context: AssistantContext) {
   const category = inferCategory(question);
   const matches = findProductMatches(question, 3);
 
@@ -437,12 +663,106 @@ function buildFallbackAnswer(question: string) {
     return `Posso te ajudar melhor dentro da categoria ${category}. Por exemplo: "qual o preço desse item?", "quais vocês indicam?" ou "tem entrega para minha região?".`;
   }
 
+  if (context.itemsCount > 0) {
+    return "Eu consigo te ajudar com o seu carrinho atual, preço, sugestão de produtos, quantidade para festa, preparo, frete, pedido mínimo e frete grátis. Tente algo como: 'meu carrinho já bate o mínimo?', 'quanto falta para o frete grátis?' ou 'o que combina com meu carrinho?'.";
+  }
+
   return "Eu consigo ajudar com catálogo, preço, sugestão de produtos, quantidade para festa, preparo, frete, cidades atendidas, pedido mínimo e frete grátis. Tente algo como: 'quais pães de queijo vocês têm?', 'qual o preço do pão de queijo GG?' ou 'quantos salgados para 80 pessoas?'.";
 }
 
-function buildFaqAnswer(question: string) {
+function buildDeliveryAnswer(question: string, context: AssistantContext) {
+  const explicitCity = findShippingCity(question);
+  const cityName =
+    explicitCity?.city ??
+    (questionHasAny(question, ["minha regiao", "minha cidade", "meu frete", "minha entrega"])
+      ? context.shippingCity
+      : null);
+
+  if (cityName) {
+    const cost =
+      explicitCity?.cost ?? (context.shippingCity === cityName ? context.shippingCost : getShippingCostForCity(cityName, context.cartTotal));
+
+    if (cost === null) {
+      return `Eu vi a cidade ${cityName}, mas não encontrei uma tarifa configurada para ela no frete atual.`;
+    }
+
+    if (cost === 0) {
+      return `Sim, atendemos ${cityName}. Com o valor atual do seu pedido, o frete para essa região já está grátis.`;
+    }
+
+    const freeShippingHint =
+      context.freeShippingRemaining > 0
+        ? `Se quiser liberar frete grátis, faltam ${formatCurrency(context.freeShippingRemaining)} em itens.`
+        : "";
+
+    return `Sim, atendemos ${cityName}. No cenário atual, o frete dessa região fica em ${formatCurrency(cost)}. ${freeShippingHint}`.trim();
+  }
+
+  return `Você pode montar o pedido e seguir para o carrinho para consultar entrega e frete. O frete grátis é liberado a partir de ${formatCurrency(FREE_SHIPPING_THRESHOLD)}.`;
+}
+
+function buildCartAwareAnswer(question: string, context: AssistantContext) {
+  if (
+    questionHasAny(question, [
+      "meu carrinho",
+      "como esta meu carrinho",
+      "resumo do carrinho",
+      "pedido atual",
+    ])
+  ) {
+    return buildCartSnapshotAnswer(context);
+  }
+
+  if (
+    questionHasAny(question, [
+      "quanto falta para o frete gratis",
+      "falta pro frete gratis",
+      "frete gratis",
+      "meu frete",
+    ])
+  ) {
+    return buildDeliveryAnswer(question, context);
+  }
+
+  if (
+    questionHasAny(question, [
+      "bate o minimo",
+      "pedido minimo",
+      "minimo do pedido",
+      "quanto falta",
+      "o que falta",
+    ])
+  ) {
+    return buildMinimumOrderAnswer(context);
+  }
+
+  if (
+    questionHasAny(question, [
+      "o que combina com meu carrinho",
+      "mais um item",
+      "completar pedido",
+      "fechar pedido",
+    ])
+  ) {
+    return buildRecommendationAnswer(question, context);
+  }
+
+  return "";
+}
+
+function buildFaqAnswer(question: string, context: AssistantContext) {
   if (questionHasAny(question, ["oi", "ola", "bom dia", "boa tarde", "boa noite"])) {
-    return buildGreetingAnswer();
+    return buildGreetingAnswer(context);
+  }
+
+  const tutorialAnswer = buildPreparationVideoAnswer(question);
+  if (tutorialAnswer) {
+    return tutorialAnswer;
+  }
+
+  const cartAwareAnswer = buildCartAwareAnswer(question, context);
+  if (cartAwareAnswer) {
+    return cartAwareAnswer;
   }
 
   if (
@@ -456,7 +776,7 @@ function buildFaqAnswer(question: string) {
       "melhor para cafe",
     ])
   ) {
-    return buildRecommendationAnswer(question);
+    return buildRecommendationAnswer(question, context);
   }
 
   if (
@@ -496,11 +816,11 @@ function buildFaqAnswer(question: string) {
       "regiao",
     ])
   ) {
-    return buildDeliveryAnswer(question);
+    return buildDeliveryAnswer(question, context);
   }
 
   if (questionHasAny(question, ["pedido minimo", "minimo", "quantidade minima"])) {
-    return buildMinimumOrderAnswer();
+    return buildMinimumOrderAnswer(context);
   }
 
   if (
@@ -543,7 +863,7 @@ function buildFaqAnswer(question: string) {
   }
 
   if (questionHasAny(question, ["pagamento", "pix", "cartao"])) {
-    return buildPaymentAnswer();
+    return buildPaymentAnswer(context);
   }
 
   if (questionHasAny(question, ["frete gratis", "gratis"])) {
@@ -553,26 +873,124 @@ function buildFaqAnswer(question: string) {
   const catalogAnswer = buildCatalogAnswer(question);
   if (catalogAnswer) return catalogAnswer;
 
-  return buildFallbackAnswer(question);
+  return buildFallbackAnswer(question, context);
 }
 
 const HelperChat: React.FC = () => {
+  const {
+    cartItems,
+    itemsCount,
+    cartTotal,
+    packageCount,
+    meetsMinimumOrder,
+    freeShippingRemaining,
+    openCart,
+  } = useCart();
   const [isOpen, setIsOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [session, setSession] = useState<CustomerSession | null>(() => getCustomerSession());
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
       role: "bot",
       content:
-        "Oi! Eu consigo responder dúvidas do catálogo, encontrar produtos, sugerir itens para festa e informar preço, preparo, frete e pedido mínimo.",
+        "Oi! Eu consigo responder dúvidas do catálogo, encontrar produtos, sugerir itens para festa e também analisar seu carrinho, frete e pedido mínimo.",
     },
   ]);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const replyTimeoutRef = useRef<number | null>(null);
 
   const canSend = draft.trim().length > 0;
-  const quickQuestions = useMemo(() => QUICK_QUESTIONS, []);
+  const shippingCity = getSessionCity(session);
+  const shippingCost = shippingCity ? getShippingCostForCity(shippingCity, cartTotal) : null;
+
+  const assistantContext = useMemo<AssistantContext>(
+    () => ({
+      session,
+      cartItems,
+      itemsCount,
+      cartTotal,
+      packageCount,
+      meetsMinimumOrder,
+      freeShippingRemaining,
+      shippingCost,
+      shippingCity,
+    }),
+    [
+      session,
+      cartItems,
+      itemsCount,
+      cartTotal,
+      packageCount,
+      meetsMinimumOrder,
+      freeShippingRemaining,
+      shippingCost,
+      shippingCity,
+    ]
+  );
+
+  const quickQuestions = useMemo(() => {
+    const baseQuestions = [...QUICK_QUESTIONS];
+
+    if (assistantContext.shippingCity) {
+      baseQuestions[3] = `Qual é o frete para ${assistantContext.shippingCity}?`;
+    }
+
+    if (assistantContext.itemsCount > 0) {
+      return [
+        "Meu carrinho já bate o mínimo?",
+        "Quanto falta para o frete grátis?",
+        "O que combina com meu carrinho?",
+        "Qual é o frete para minha região?",
+        "Me indique itens para completar o pedido",
+        "Qual é o pedido mínimo?",
+      ];
+    }
+
+    return baseQuestions;
+  }, [assistantContext.itemsCount, assistantContext.shippingCity]);
+
+  const helperSubtitle = useMemo(() => {
+    if (assistantContext.itemsCount > 0) {
+      return "Respostas com base no seu carrinho, frete e catálogo.";
+    }
+
+    if (assistantContext.shippingCity) {
+      return `Catálogo, frete e dúvidas para ${assistantContext.shippingCity}.`;
+    }
+
+    return "Respostas com base no catálogo, frete e dúvidas frequentes.";
+  }, [assistantContext.itemsCount, assistantContext.shippingCity]);
+
+  const statusChips = useMemo(() => {
+    const chips: string[] = [];
+    const firstName = formatShortName(assistantContext.session);
+
+    if (firstName) chips.push(firstName);
+    if (assistantContext.shippingCity) chips.push(assistantContext.shippingCity);
+    if (assistantContext.itemsCount > 0) chips.push(`${assistantContext.itemsCount} itens`);
+
+    if (assistantContext.itemsCount > 0) {
+      if (assistantContext.shippingCost === 0) {
+        chips.push("Frete grátis");
+      } else if (assistantContext.freeShippingRemaining > 0) {
+        chips.push(`Faltam ${formatCurrency(assistantContext.freeShippingRemaining)}`);
+      }
+    }
+
+    return chips.slice(0, 4);
+  }, [assistantContext]);
+
+  useEffect(() => {
+    const syncSession = () => setSession(getCustomerSession());
+    window.addEventListener(CUSTOMER_SESSION_EVENT, syncSession);
+    window.addEventListener("storage", syncSession);
+    return () => {
+      window.removeEventListener(CUSTOMER_SESSION_EVENT, syncSession);
+      window.removeEventListener("storage", syncSession);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -602,7 +1020,7 @@ const HelperChat: React.FC = () => {
     const cleanQuestion = question.trim();
     if (!cleanQuestion) return;
 
-    const answer = buildFaqAnswer(cleanQuestion);
+    const answer = buildFaqAnswer(cleanQuestion, assistantContext);
     const timestamp = Date.now();
 
     if (replyTimeoutRef.current !== null) {
@@ -655,8 +1073,20 @@ const HelperChat: React.FC = () => {
                   <p className="font-black">Assistente inteligente</p>
                 </div>
                 <p className="mt-1 text-xs text-slate-300">
-                  Respostas com base no catálogo, frete e dúvidas frequentes.
+                  {helperSubtitle}
                 </p>
+                {statusChips.length > 0 ? (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {statusChips.map((chip) => (
+                      <span
+                        key={chip}
+                        className="rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/90"
+                      >
+                        {chip}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
               </div>
 
               <button
@@ -686,7 +1116,7 @@ const HelperChat: React.FC = () => {
                             : "bg-slate-900 text-white"
                         }`}
                       >
-                        {message.content}
+                        {renderMessageContent(message.content)}
                       </div>
                     </div>
                   );
@@ -707,6 +1137,40 @@ const HelperChat: React.FC = () => {
             </ScrollArea>
 
             <div className="border-t border-slate-200 bg-white/90 px-4 py-3">
+              {assistantContext.itemsCount > 0 ? (
+                <div className="mb-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsOpen(false);
+                      openCart();
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700"
+                  >
+                    <ShoppingCart className="h-3.5 w-3.5" />
+                    Ver carrinho
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => pushQuestion("Meu carrinho já bate o mínimo?")}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700"
+                  >
+                    <Package2 className="h-3.5 w-3.5" />
+                    Analisar pedido
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => pushQuestion("Qual é o frete para minha região?")}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700"
+                  >
+                    <MapPin className="h-3.5 w-3.5" />
+                    Ver frete
+                  </button>
+                </div>
+              ) : null}
+
               <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
                 {quickQuestions.map((item) => (
                   <button

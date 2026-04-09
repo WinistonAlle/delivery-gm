@@ -30,6 +30,7 @@ const AdminThemes = lazy(() => import("./pages/AdminThemes"));
 const ReportsDashboard = lazy(() => import("./pages/ReportsDashboard"));
 const DeliveryOps = lazy(() => import("./pages/DeliveryOps"));
 const AdminOrders = lazy(() => import("./pages/AdminOrders"));
+const PreparationGuides = lazy(() => import("./pages/PreparationGuides"));
 
 const queryClient = new QueryClient();
 
@@ -282,6 +283,15 @@ function App() {
                   element={
                     <RequireAuth>
                       <MyOrdersPage />
+                    </RequireAuth>
+                  }
+                />
+
+                <Route
+                  path="/modos-de-preparo"
+                  element={
+                    <RequireAuth>
+                      <PreparationGuides />
                     </RequireAuth>
                   }
                 />
