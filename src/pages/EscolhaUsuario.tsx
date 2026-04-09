@@ -117,6 +117,7 @@ const Subtitle = styled.p`
 
 const EscolhaUsuario: React.FC = () => {
   const navigate = useNavigate();
+  type BodyStyleWithInset = CSSStyleDeclaration & { inset?: string };
 
   useEffect(() => {
     // Trava scroll/bounce só nessa página
@@ -124,7 +125,7 @@ const EscolhaUsuario: React.FC = () => {
       htmlOverflow: document.documentElement.style.overflow,
       bodyOverflow: document.body.style.overflow,
       bodyPosition: document.body.style.position,
-      bodyInset: (document.body.style as any).inset,
+      bodyInset: (document.body.style as BodyStyleWithInset).inset,
       bodyWidth: document.body.style.width,
       htmlBg: document.documentElement.style.background,
       bodyBg: document.body.style.background,
@@ -133,7 +134,7 @@ const EscolhaUsuario: React.FC = () => {
     document.documentElement.style.overflow = "hidden";
     document.body.style.overflow = "hidden";
     document.body.style.position = "fixed";
-    (document.body.style as any).inset = "0";
+    (document.body.style as BodyStyleWithInset).inset = "0";
     document.body.style.width = "100%";
 
     // Evita “faixa branca” do html/body em mobile/pwa
@@ -144,7 +145,7 @@ const EscolhaUsuario: React.FC = () => {
       document.documentElement.style.overflow = prev.htmlOverflow;
       document.body.style.overflow = prev.bodyOverflow;
       document.body.style.position = prev.bodyPosition;
-      (document.body.style as any).inset = prev.bodyInset;
+      (document.body.style as BodyStyleWithInset).inset = prev.bodyInset;
       document.body.style.width = prev.bodyWidth;
       document.documentElement.style.background = prev.htmlBg;
       document.body.style.background = prev.bodyBg;

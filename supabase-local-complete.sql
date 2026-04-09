@@ -302,10 +302,6 @@ create table if not exists public.orders (
   ready_at timestamptz null,
   picked_up_at timestamptz null,
   delivered_at timestamptz null,
-  saibweb_status text not null default 'PENDING',
-  saibweb_error text null,
-  saibweb_synced_at timestamptz null,
-  saibweb_external_id text null,
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -328,16 +324,12 @@ create table if not exists public.orders (
       'em_separacao',
       'pronto_para_retirada'
     )
-  ),
-  constraint orders_saibweb_status_valid check (
-    saibweb_status in ('PENDING', 'PROCESSING', 'SYNCED', 'ERROR')
   )
 );
 
 create index if not exists orders_created_at_idx on public.orders (created_at desc);
 create index if not exists orders_customer_phone_idx on public.orders (customer_phone);
 create index if not exists orders_status_idx on public.orders (status, created_at desc);
-create index if not exists orders_saibweb_status_idx on public.orders (saibweb_status, created_at asc);
 
 drop trigger if exists trg_orders_set_updated_at on public.orders;
 create trigger trg_orders_set_updated_at

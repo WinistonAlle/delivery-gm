@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "@/components/ui/sonner";
+import { toast } from "@/components/ui/sonner-toast";
 import type { Product } from "@/types/products";
 import PageLoader from "@/components/PageLoader";
 import {
@@ -178,9 +178,9 @@ export default function AdminOffers() {
       });
       setStorageMode(result.mode ?? "supabase");
       toast.success("Configurações salvas no Supabase");
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error("Erro ao salvar ofertas", {
-        description: err?.message ?? "Tente novamente em instantes.",
+        description: err instanceof Error ? err.message : "Tente novamente em instantes.",
       });
     } finally {
       setSaving(false);

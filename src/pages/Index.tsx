@@ -39,7 +39,11 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { getLocalTheme, type AppThemeKey } from "@/lib/appTheme";
-import { getCustomerSession, logoutCustomerSession } from "@/lib/customerAuth";
+import {
+  getCustomerSession,
+  logoutCustomerSession,
+  type CustomerSession,
+} from "@/lib/customerAuth";
 import {
   Dialog,
   DialogContent,
@@ -84,7 +88,7 @@ const NEW_YEAR_FIREWORKS = [
    HELPERS
 -------------------------------------------------------- */
 function safeGetEmployee() {
-  return getCustomerSession() ?? {};
+  return getCustomerSession();
 }
 
 function useDebounce<T>(value: T, delay = 300) {
@@ -136,6 +140,13 @@ type SmartCombo = {
   badge?: string;
   items: { product: Product; quantity: number }[];
   total: number;
+};
+
+type ProductRow = Record<string, unknown>;
+
+type FeaturedProductRow = {
+  position: number;
+  product_id: string;
 };
 
 const THEME_HEADER_COLORS: Record<
@@ -647,7 +658,8 @@ const Index: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | "all">(
     () => {
       if (typeof window === "undefined") return "all";
-      return (localStorage.getItem(CATEGORY_CACHE_KEY) as any) || "all";
+      const cachedCategory = localStorage.getItem(CATEGORY_CACHE_KEY);
+      return cachedCategory || "all";
     }
   );
 
@@ -684,7 +696,7 @@ const Index: React.FC = () => {
   const [noticesLoading, setNoticesLoading] = useState(true);
 
   const hasLoadedFromCache = useRef(false);
-  const employee: any = safeGetEmployee();
+  const employee: CustomerSession | null = safeGetEmployee();
   const isLoggedIn = !!(employee?.id || employee?.phone || employee?.cpf);
   const displayName = employee?.full_name ?? employee?.name ?? "Cliente";
 
@@ -692,6 +704,14 @@ const Index: React.FC = () => {
     employee?.is_admin ||
     employee?.role === "admin" ||
     employee?.tipo === "ADMIN";
+
+  const persistLocalSetting = useCallback((key: string, value: string) => {
+    try {
+      localStorage.setItem(key, value);
+    } catch (error) {
+      console.debug(`Nao foi possivel persistir ${key}:`, error);
+    }
+  }, []);
 
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
 
@@ -733,16 +753,12 @@ const Index: React.FC = () => {
   };
 
   useEffect(() => {
-    try {
-      localStorage.setItem(SEARCH_CACHE_KEY, searchTerm);
-    } catch {}
-  }, [searchTerm]);
+    persistLocalSetting(SEARCH_CACHE_KEY, searchTerm);
+  }, [persistLocalSetting, searchTerm]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(CATEGORY_CACHE_KEY, selectedCategory);
-    } catch {}
-  }, [selectedCategory]);
+    persistLocalSetting(CATEGORY_CACHE_KEY, selectedCategory);
+  }, [persistLocalSetting, selectedCategory]);
 
   useEffect(() => {
     const syncTheme = () => setActiveTheme(getLocalTheme());
@@ -763,7 +779,7 @@ const Index: React.FC = () => {
     };
   }, []);
 
-  function mapRowToProduct(row: any): Product {
+  function mapRowToProduct(row: ProductRow): Product {
     const employeePrice = Number(row.employee_price ?? row.price ?? 0);
 
     const categoryName =
@@ -827,7 +843,7 @@ const Index: React.FC = () => {
         }
 
         if (isMounted && data) {
-          const mapped: Product[] = (data as any[]).map(mapRowToProduct);
+          const mapped: Product[] = (data as ProductRow[]).map(mapRowToProduct);
 
           setProducts(mapped);
 
@@ -837,8 +853,10 @@ const Index: React.FC = () => {
             console.error("Erro ao salvar cache de produtos:", err);
           }
         }
-      } catch (err: any) {
-        if (isMounted) setLoadError(String(err?.message ?? err));
+      } catch (err: unknown) {
+        if (isMounted) {
+          setLoadError(err instanceof Error ? err.message : String(err));
+        }
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -848,7 +866,6 @@ const Index: React.FC = () => {
     return () => {
       isMounted = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* ---------------- Destaques: modo (auto/manual) ---------------- */
@@ -903,7 +920,7 @@ const Index: React.FC = () => {
           if (!mounted) return;
 
           if (!err1 && rows && rows.length > 0) {
-            const ordered = (rows as any[])
+            const ordered = (rows as FeaturedProductRow[])
               .filter((r) => r?.product_id)
               .map((r) => ({ position: r.position, product_id: r.product_id }));
 
@@ -917,8 +934,8 @@ const Index: React.FC = () => {
             if (!mounted) return;
 
             if (!err2 && prods && prods.length > 0) {
-              const byId = new Map<string, any>();
-              (prods as any[]).forEach((p) => byId.set(String(p.id), p));
+              const byId = new Map<string, ProductRow>();
+              (prods as ProductRow[]).forEach((p) => byId.set(String(p.id), p));
 
               const mappedManual = ordered
                 .map((r) => byId.get(String(r.product_id)))
@@ -950,7 +967,7 @@ const Index: React.FC = () => {
             if (local) return local;
 
             return {
-              id: r.product_id as any,
+              id: r.product_id,
               old_id: null,
               name: r.product_name,
               price: 0,
@@ -1004,7 +1021,7 @@ const Index: React.FC = () => {
 
         if (isMounted && data) {
           setNotices(
-            (data as any[]).map((n: any) => ({
+            (data as Notice[]).map((n) => ({
               id: n.id,
               title: n.title,
               body: n.body,
@@ -1042,12 +1059,12 @@ const Index: React.FC = () => {
     const set = new Set<string>();
     products.forEach((p) => p.category && set.add(p.category));
 
-    let list = Array.from(set);
+    const list = Array.from(set);
     if (!list.length) return ORDERED_CATEGORIES;
 
     list.sort((a, b) => {
-      const ia = ORDERED_CATEGORIES.indexOf(a as any);
-      const ib = ORDERED_CATEGORIES.indexOf(b as any);
+      const ia = ORDERED_CATEGORIES.indexOf(a as (typeof ORDERED_CATEGORIES)[number]);
+      const ib = ORDERED_CATEGORIES.indexOf(b as (typeof ORDERED_CATEGORIES)[number]);
       if (ia === -1 && ib === -1) return a.localeCompare(b);
       if (ia === -1) return 1;
       if (ib === -1) return -1;
@@ -2091,7 +2108,6 @@ const Index: React.FC = () => {
                 selectedCategory={selectedCategory}
                 setSelectedCategory={handleSelectCategory}
                 categories={categories}
-                // @ts-ignore
               />
 
               <button

@@ -1,5 +1,5 @@
 // src/pages/AdminOrders.tsx
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCustomerSession } from "@/lib/customerAuth";
 
@@ -369,7 +369,7 @@ export default function AdminOrders() {
     return map;
   }
 
-  async function loadOrders() {
+  const loadOrders = useCallback(async () => {
     setLoading(true);
     setErr(null);
     try {
@@ -386,7 +386,7 @@ export default function AdminOrders() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [cpfFilter, orderFilter, statusFilter]);
 
   async function reloadSelectedOrder(orderId: string) {
     try {
@@ -613,7 +613,7 @@ export default function AdminOrders() {
 
   useEffect(() => {
     loadOrders();
-  }, []);
+  }, [loadOrders]);
 
   useEffect(() => {
     if (selected) {

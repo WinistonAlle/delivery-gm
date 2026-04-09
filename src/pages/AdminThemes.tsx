@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { toast } from "@/components/ui/sonner";
+import { toast } from "@/components/ui/sonner-toast";
 import { APP_THEMES, type AppThemeKey, applyTheme, getLocalTheme, saveTheme } from "@/lib/appTheme";
 import PageLoader from "@/components/PageLoader";
 
@@ -82,9 +82,9 @@ export default function AdminThemes() {
       toast.success(
         result === "supabase" ? "Tema salvo no Supabase" : "Tema salvo apenas localmente"
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error("Não foi possível salvar o tema", {
-        description: error?.message ?? "Tente novamente em instantes.",
+        description: error instanceof Error ? error.message : "Tente novamente em instantes.",
       });
     } finally {
       setSaving(false);

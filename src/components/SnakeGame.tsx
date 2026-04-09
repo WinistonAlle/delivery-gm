@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowDown,
   ArrowLeft,
@@ -67,10 +67,10 @@ const SnakeGame: React.FC = () => {
     setIsRunning(true);
   };
 
-  const changeDirection = (nextDirection: Direction) => {
+  const changeDirection = useCallback((nextDirection: Direction) => {
     if (OPPOSITE_DIRECTION[direction] === nextDirection) return;
     setQueuedDirection(nextDirection);
-  };
+  }, [direction]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -128,7 +128,7 @@ const SnakeGame: React.FC = () => {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [direction, gameOver]);
+  }, [changeDirection, gameOver]);
 
   useEffect(() => {
     if (!isRunning || gameOver) return;
@@ -147,7 +147,9 @@ const SnakeGame: React.FC = () => {
 
         setDirection(nextDirection);
 
-        const hitSelf = currentSnake.some(
+        const willEat = nextHead.x === food.x && nextHead.y === food.y;
+        const bodyToCheck = willEat ? currentSnake : currentSnake.slice(0, -1);
+        const hitSelf = bodyToCheck.some(
           (segment) => segment.x === nextHead.x && segment.y === nextHead.y
         );
 
@@ -157,7 +159,6 @@ const SnakeGame: React.FC = () => {
           return currentSnake;
         }
 
-        const willEat = nextHead.x === food.x && nextHead.y === food.y;
         const nextSnake = willEat
           ? [nextHead, ...currentSnake]
           : [nextHead, ...currentSnake.slice(0, -1)];

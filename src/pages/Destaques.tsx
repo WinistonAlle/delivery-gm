@@ -1,12 +1,17 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-import { getCustomerSession, logoutCustomerSession } from "@/lib/customerAuth";
+import {
+  getCustomerSession,
+  logoutCustomerSession,
+  type CustomerSession,
+} from "@/lib/customerAuth";
 import FeaturedProductsCarousel from "@/components/FeaturedProductsCarousel";
 import ProductCard from "@/components/ProductCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import PageLoader from "@/components/PageLoader";
+import type { Product } from "@/types/products";
 
 import logoGostinho from "@/images/logoc.png";
 
@@ -36,7 +41,7 @@ import {
    HELPERS
 -------------------------------------------------------- */
 function safeGetEmployee() {
-  return getCustomerSession() ?? {};
+  return getCustomerSession();
 }
 
 function normalizeForSearch(text: string) {
@@ -87,6 +92,8 @@ type FeaturedPosRow = {
   product_id: string;
   active: boolean;
 };
+
+type ProductRow = Record<string, unknown>;
 
 async function readJson<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
@@ -308,7 +315,7 @@ const Destaques: React.FC = () => {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const employee: any = safeGetEmployee();
+  const employee: CustomerSession | null = safeGetEmployee();
   const isAdmin =
     employee?.is_admin ||
     employee?.role === "admin" ||
@@ -438,7 +445,7 @@ const Destaques: React.FC = () => {
       return;
     }
 
-    const mapped: ProductLite[] = ((data as any[]) ?? []).map((row: any) => {
+    const mapped: ProductLite[] = ((data as ProductRow[]) ?? []).map((row) => {
       const categoryName =
         CATEGORY_NAME_BY_ID[row.category_id as number] ??
         row.category ??
@@ -502,8 +509,8 @@ const Destaques: React.FC = () => {
         return;
       }
 
-      const mapById = new Map<string, any>();
-      (prods as any[] | null | undefined)?.forEach((p) =>
+      const mapById = new Map<string, ProductRow>();
+      (prods as ProductRow[] | null | undefined)?.forEach((p) =>
         mapById.set(String(p.id), p)
       );
 
@@ -645,9 +652,9 @@ const Destaques: React.FC = () => {
 
       setModeSaved(true);
       setTimeout(() => setModeSaved(false), 2000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       setValidationMsg(
-        error?.message
+        error instanceof Error
           ? `Não foi possível salvar o modo: ${error.message}`
           : "Não foi possível salvar o modo."
       );
@@ -695,10 +702,10 @@ const Destaques: React.FC = () => {
       setTimeout(() => setManualSaved(false), 2000);
 
       await loadManualSaved();
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("Erro saveManual:", e);
       setValidationMsg(
-        e?.message
+        e instanceof Error
           ? `Não foi possível salvar: ${e.message}`
           : "Não foi possível salvar as escolhas."
       );
@@ -715,14 +722,13 @@ const Destaques: React.FC = () => {
       loadProducts();
       loadManualSaved();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
   const previewItems = useMemo(() => {
     if (!manualSelected.length) return [];
 
     return manualSelected.map((p) => {
-      const productForCard: any = {
+      const productForCard: Product = {
         id: p.id,
         name: p.name,
         price: Number(p.employee_price ?? p.price ?? 0),

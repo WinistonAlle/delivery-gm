@@ -12,7 +12,7 @@ import {
   Truck,
   UserRound,
 } from "lucide-react";
-import { toast } from "@/components/ui/sonner";
+import { toast } from "@/components/ui/sonner-toast";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/useCart";
 import { createOrder } from "@/services/orders";

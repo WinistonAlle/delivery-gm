@@ -48,6 +48,87 @@ export type CrossSellRule = {
   is_active: boolean;
 };
 
+type ProductCategory = Product["category"];
+
+type ProductRow = Record<string, unknown> & {
+  id?: string | null;
+  old_id?: number | string | null;
+  name?: string | null;
+  price?: number | string | null;
+  employee_price?: number | string | null;
+  images?: string[] | null;
+  image?: string | null;
+  image_path?: string | null;
+  category_id?: number | string | null;
+  category?: string | null;
+  category_name?: string | null;
+  description?: string | null;
+  packageInfo?: string | null;
+  package_info?: string | null;
+  weight?: number | string | null;
+  isPackage?: boolean | null;
+  is_package?: boolean | null;
+  featured?: boolean | null;
+  isFeatured?: boolean | null;
+  inStock?: boolean | null;
+  in_stock?: boolean | null;
+  isLaunch?: boolean | null;
+  is_launch?: boolean | null;
+  extraInfo?: Product["extraInfo"];
+};
+
+type ComboRow = Record<string, unknown> & {
+  id?: string | number | null;
+  title?: string | null;
+  description?: string | null;
+  badge?: string | null;
+  is_active?: boolean | null;
+  sort_order?: number | string | null;
+};
+
+type ComboItemRow = Record<string, unknown> & {
+  id?: string | number | null;
+  combo_id?: string | number | null;
+  product_id?: string | number | null;
+  quantity?: number | string | null;
+};
+
+type RecommendationRow = Record<string, unknown> & {
+  id?: string | number | null;
+  placement?: string | null;
+  product_id?: string | number | null;
+  priority?: number | string | null;
+  is_active?: boolean | null;
+};
+
+type CrossSellRow = Record<string, unknown> & {
+  id?: string | number | null;
+  source_product_id?: string | number | null;
+  target_product_id?: string | number | null;
+  priority?: number | string | null;
+  is_active?: boolean | null;
+};
+
+type IdRow = Record<string, unknown> & {
+  id?: string | number | null;
+};
+
+const CATEGORY_VALUES: ProductCategory[] = [
+  "Salgados P/ Fritar",
+  "Salgados Assados",
+  "Pães e Massas Doces",
+  "Pão de Queijo",
+  "Biscoito de Queijo",
+  "Kits e Combos",
+  "Salgados Grandes",
+  "Alho em creme",
+  "Outros",
+];
+
+function isProductCategory(value: string): value is ProductCategory {
+  return CATEGORY_VALUES.includes(value as ProductCategory);
+}
+
 const readJson = <T>(key: string, fallback: T): T => {
   try {
     const raw = localStorage.getItem(key);
@@ -66,23 +147,24 @@ const writeJson = <T>(key: string, value: T) => {
   }
 };
 
-function mapRowToProduct(row: any): Product {
+function mapRowToProduct(row: ProductRow): Product {
   const employeePrice = Number(row.employee_price ?? row.price ?? 0);
   const categoryName =
     CATEGORY_NAME_BY_ID[Number(row.category_id ?? 0)] ??
     row.category ??
     row.category_name ??
     "Outros";
+  const normalizedCategory = isProductCategory(categoryName) ? categoryName : "Outros";
 
   return {
-    id: row.id,
-    old_id: row.old_id ?? null,
+    id: String(row.id ?? ""),
+    old_id: row.old_id == null ? null : Number(row.old_id),
     name: row.name ?? "",
     price: employeePrice,
     employee_price: employeePrice,
     images: row.images ?? (row.image ? [row.image] : []),
     image_path: row.image_path ?? null,
-    category: categoryName as any,
+    category: normalizedCategory,
     description: row.description ?? "",
     packageInfo: row.packageInfo ?? row.package_info ?? "",
     weight: Number(row.weight ?? 0),
@@ -124,7 +206,7 @@ function resolveCombos(
 export async function fetchCatalogProducts(): Promise<Product[]> {
   const { data, error } = await supabase.from("products").select("*").order("name", { ascending: true });
   if (error) throw error;
-  return (data ?? []).map(mapRowToProduct);
+  return ((data ?? []) as ProductRow[]).map(mapRowToProduct);
 }
 
 export async function loadPublicCombos(products: Product[]): Promise<DeliveryComboResolved[]> {
@@ -138,7 +220,8 @@ export async function loadPublicCombos(products: Product[]): Promise<DeliveryCom
       .order("sort_order", { ascending: true });
     if (cErr) throw cErr;
 
-    const comboIds = (combosData ?? []).map((c: any) => String(c.id));
+    const comboRows = (combosData ?? []) as ComboRow[];
+    const comboIds = comboRows.map((combo) => String(combo.id));
     if (!comboIds.length) return [];
 
     const { data: itemsData, error: iErr } = await supabase
@@ -147,17 +230,21 @@ export async function loadPublicCombos(products: Product[]): Promise<DeliveryCom
       .in("combo_id", comboIds)
       .order("id", { ascending: true });
     if (iErr) throw iErr;
+    const itemRows = (itemsData ?? []) as ComboItemRow[];
 
     return resolveCombos(
-      (combosData ?? []).map((c: any) => ({
-        ...c,
-        is_active: !!c.is_active,
-        sort_order: Number(c.sort_order ?? 0),
+      comboRows.map((combo) => ({
+        id: String(combo.id),
+        title: combo.title ?? "",
+        description: combo.description ?? "",
+        badge: combo.badge ?? "",
+        is_active: !!combo.is_active,
+        sort_order: Number(combo.sort_order ?? 0),
       })),
-      (itemsData ?? []).map((i: any) => ({
-        combo_id: String(i.combo_id),
-        product_id: String(i.product_id),
-        quantity: Number(i.quantity ?? 1),
+      itemRows.map((item) => ({
+        combo_id: String(item.combo_id),
+        product_id: String(item.product_id),
+        quantity: Number(item.quantity ?? 1),
       })),
       productsById
     );
@@ -198,8 +285,8 @@ export async function loadPlacementRecommendations(
       .order("priority", { ascending: true });
     if (error) throw error;
 
-    return (data ?? [])
-      .map((row: any) => productsById.get(String(row.product_id)))
+    return ((data ?? []) as RecommendationRow[])
+      .map((row) => productsById.get(String(row.product_id)))
       .filter(Boolean) as Product[];
   } catch {
     const key = placement === "cart" ? LS_CART_REC_KEY : LS_CHECKOUT_REC_KEY;
@@ -220,7 +307,7 @@ export async function loadCrossSellMap(products: Product[]): Promise<Record<stri
       .order("priority", { ascending: true });
     if (error) throw error;
 
-    (data ?? []).forEach((row: any) => {
+    ((data ?? []) as CrossSellRow[]).forEach((row) => {
       const sourceId = String(row.source_product_id);
       const target = productsById.get(String(row.target_product_id));
       if (!target) return;
@@ -276,32 +363,37 @@ export async function loadAdminOfferConfig() {
       );
     }
 
-    const combos: DeliveryComboConfig[] = (combosData.data ?? []).map((combo: any) => ({
+    const comboRows = (combosData.data ?? []) as ComboRow[];
+    const itemRows = (itemsData.data ?? []) as ComboItemRow[];
+    const recommendationRows = (recData.data ?? []) as RecommendationRow[];
+    const crossSellRows = (crossSellData.data ?? []) as CrossSellRow[];
+
+    const combos: DeliveryComboConfig[] = comboRows.map((combo) => ({
       id: String(combo.id),
       title: combo.title ?? "",
       description: combo.description ?? "",
       badge: combo.badge ?? "",
       is_active: !!combo.is_active,
       sort_order: Number(combo.sort_order ?? 0),
-      items: (itemsData.data ?? [])
-        .filter((item: any) => String(item.combo_id) === String(combo.id))
-        .map((item: any) => ({
+      items: itemRows
+        .filter((item) => String(item.combo_id) === String(combo.id))
+        .map((item) => ({
           product_id: String(item.product_id),
           quantity: Number(item.quantity ?? 1),
         })),
     }));
 
-    const cartRecommendationIds = (recData.data ?? [])
-      .filter((row: any) => row.placement === "cart" && row.is_active)
-      .sort((a: any, b: any) => Number(a.priority ?? 0) - Number(b.priority ?? 0))
-      .map((row: any) => String(row.product_id));
+    const cartRecommendationIds = recommendationRows
+      .filter((row) => row.placement === "cart" && row.is_active)
+      .sort((a, b) => Number(a.priority ?? 0) - Number(b.priority ?? 0))
+      .map((row) => String(row.product_id));
 
-    const checkoutRecommendationIds = (recData.data ?? [])
-      .filter((row: any) => row.placement === "checkout" && row.is_active)
-      .sort((a: any, b: any) => Number(a.priority ?? 0) - Number(b.priority ?? 0))
-      .map((row: any) => String(row.product_id));
+    const checkoutRecommendationIds = recommendationRows
+      .filter((row) => row.placement === "checkout" && row.is_active)
+      .sort((a, b) => Number(a.priority ?? 0) - Number(b.priority ?? 0))
+      .map((row) => String(row.product_id));
 
-    const crossSellRules: CrossSellRule[] = (crossSellData.data ?? []).map((row: any) => ({
+    const crossSellRules: CrossSellRule[] = crossSellRows.map((row) => ({
       id: String(row.id),
       source_product_id: String(row.source_product_id),
       target_product_id: String(row.target_product_id),
@@ -374,7 +466,7 @@ export async function saveAdminOfferConfig(input: {
       .select("id");
     if (existingErr) throw existingErr;
 
-    const existingIds = new Set((existingCombos ?? []).map((row: any) => String(row.id)));
+    const existingIds = new Set(((existingCombos ?? []) as IdRow[]).map((row) => String(row.id)));
     const incomingIds = new Set(combos.map((combo) => String(combo.id)));
 
     const deleteIds = Array.from(existingIds).filter((id) => !incomingIds.has(id));
@@ -457,4 +549,3 @@ export async function saveAdminOfferConfig(input: {
     return { mode: "local" as const };
   }
 }
-

@@ -7,7 +7,7 @@ import { Plus, Minus, Package, Check, XCircle, Heart } from "lucide-react";
 import { Input } from "./ui/input";
 import ProductImageCarousel from "./ProductImageCarousel";
 import ProductDetail from "./ProductDetail";
-import { toast } from "./ui/sonner";
+import { toast } from "./ui/sonner-toast";
 import { getCustomerSession } from "@/lib/customerAuth";
 
 interface ProductCardProps {
@@ -71,7 +71,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   }, [quantity]);
 
   // ✅ IMPORTANTE: evita o Carousel/Drag “roubar” os cliques dos botões
-  const stop = (e: any) => {
+  const stop = (e: React.SyntheticEvent) => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
   };
@@ -181,9 +181,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
         setIsFavorite(true);
         toast.success("Adicionado aos favoritos", { description: product.name });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error("Não foi possível atualizar favoritos", {
-        description: err?.message ?? "Tente novamente.",
+        description: err instanceof Error ? err.message : "Tente novamente.",
       });
     } finally {
       setFavLoading(false);

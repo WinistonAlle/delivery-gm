@@ -28,6 +28,11 @@ export default function FeaturedProductsCarousel({
   className = "",
   title = "Destaques",
 }: Props) {
+  type PointerCaptureElement = HTMLDivElement & {
+    setPointerCapture?: (pointerId: number) => void;
+    releasePointerCapture?: (pointerId: number) => void;
+  };
+
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
 
@@ -116,9 +121,8 @@ export default function FeaturedProductsCarousel({
     dragStartOffsetRef.current = offsetRef.current;
 
     // capturar pointer (melhor no mobile)
-    try {
-      (e.currentTarget as any).setPointerCapture?.(e.pointerId);
-    } catch {}
+    const target = e.currentTarget as PointerCaptureElement;
+    target.setPointerCapture?.(e.pointerId);
   }
 
   function onPointerMove(e: React.PointerEvent) {
@@ -133,9 +137,8 @@ export default function FeaturedProductsCarousel({
     setIsDragging(false);
     dragStartXRef.current = null;
 
-    try {
-      (e.currentTarget as any).releasePointerCapture?.(e.pointerId);
-    } catch {}
+    const target = e.currentTarget as PointerCaptureElement;
+    target.releasePointerCapture?.(e.pointerId);
   }
 
   if (!items?.length) return null;

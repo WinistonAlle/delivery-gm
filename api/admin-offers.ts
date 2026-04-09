@@ -23,6 +23,42 @@ type AdminOfferConfigPayload = {
   theme?: string;
 };
 
+type ComboRow = Record<string, unknown> & {
+  id?: string | number | null;
+  title?: string | null;
+  description?: string | null;
+  badge?: string | null;
+  is_active?: boolean | null;
+  sort_order?: number | string | null;
+};
+
+type ComboItemRow = Record<string, unknown> & {
+  id?: string | number | null;
+  combo_id?: string | number | null;
+  product_id?: string | number | null;
+  quantity?: number | string | null;
+};
+
+type RecommendationRow = Record<string, unknown> & {
+  id?: string | number | null;
+  placement?: string | null;
+  product_id?: string | number | null;
+  priority?: number | string | null;
+  is_active?: boolean | null;
+};
+
+type CrossSellRow = Record<string, unknown> & {
+  id?: string | number | null;
+  source_product_id?: string | number | null;
+  target_product_id?: string | number | null;
+  priority?: number | string | null;
+  is_active?: boolean | null;
+};
+
+type IdRow = Record<string, unknown> & {
+  id?: string | number | null;
+};
+
 function asString(value: unknown) {
   return String(value ?? "").trim();
 }
@@ -87,32 +123,37 @@ async function listConfig() {
     );
   }
 
-  const combos = (combosRes.data ?? []).map((combo: any) => ({
+  const comboRows = (combosRes.data ?? []) as ComboRow[];
+  const itemRows = (itemsRes.data ?? []) as ComboItemRow[];
+  const recommendationRows = (recRes.data ?? []) as RecommendationRow[];
+  const crossSellRows = (crossRes.data ?? []) as CrossSellRow[];
+
+  const combos = comboRows.map((combo) => ({
     id: String(combo.id),
     title: combo.title ?? "",
     description: combo.description ?? "",
     badge: combo.badge ?? "",
     is_active: !!combo.is_active,
     sort_order: Number(combo.sort_order ?? 0),
-    items: (itemsRes.data ?? [])
-      .filter((item: any) => String(item.combo_id) === String(combo.id))
-      .map((item: any) => ({
+    items: itemRows
+      .filter((item) => String(item.combo_id) === String(combo.id))
+      .map((item) => ({
         product_id: String(item.product_id),
         quantity: Number(item.quantity ?? 1),
       })),
   }));
 
-  const cartRecommendationIds = (recRes.data ?? [])
-    .filter((row: any) => row.placement === "cart" && row.is_active)
-    .sort((a: any, b: any) => Number(a.priority ?? 0) - Number(b.priority ?? 0))
-    .map((row: any) => String(row.product_id));
+  const cartRecommendationIds = recommendationRows
+    .filter((row) => row.placement === "cart" && row.is_active)
+    .sort((a, b) => Number(a.priority ?? 0) - Number(b.priority ?? 0))
+    .map((row) => String(row.product_id));
 
-  const checkoutRecommendationIds = (recRes.data ?? [])
-    .filter((row: any) => row.placement === "checkout" && row.is_active)
-    .sort((a: any, b: any) => Number(a.priority ?? 0) - Number(b.priority ?? 0))
-    .map((row: any) => String(row.product_id));
+  const checkoutRecommendationIds = recommendationRows
+    .filter((row) => row.placement === "checkout" && row.is_active)
+    .sort((a, b) => Number(a.priority ?? 0) - Number(b.priority ?? 0))
+    .map((row) => String(row.product_id));
 
-  const crossSellRules = (crossRes.data ?? []).map((row: any) => ({
+  const crossSellRules = crossSellRows.map((row) => ({
     id: String(row.id),
     source_product_id: String(row.source_product_id),
     target_product_id: String(row.target_product_id),
@@ -186,7 +227,7 @@ async function saveConfig(body: AdminOfferConfigPayload) {
     .select("id");
   if (existingCrossSellErr) throw existingCrossSellErr;
 
-  const existingIds = new Set((existingCombos ?? []).map((row: any) => String(row.id)));
+  const existingIds = new Set(((existingCombos ?? []) as IdRow[]).map((row) => String(row.id)));
   const incomingIds = new Set(combos.map((combo) => combo.id));
   const deleteIds = Array.from(existingIds).filter((id) => !incomingIds.has(id));
 
@@ -218,7 +259,7 @@ async function saveConfig(body: AdminOfferConfigPayload) {
       if (itemsErr) throw itemsErr;
     }
   } else {
-    const existingItemIds = (existingComboItems ?? []).map((row: any) => String(row.id)).filter(Boolean);
+    const existingItemIds = ((existingComboItems ?? []) as IdRow[]).map((row) => String(row.id)).filter(Boolean);
     if (existingItemIds.length) {
       const { error: clearItemsErr } = await supabase
         .from("delivery_combo_items")
@@ -282,9 +323,9 @@ async function saveConfig(body: AdminOfferConfigPayload) {
   const desiredComboKeys = new Set(
     combos.flatMap((combo) => combo.items.map((item) => `${combo.id}:${item.product_id}`))
   );
-  const staleComboItemIds = (existingComboItems ?? [])
-    .filter((row: any) => !desiredComboKeys.has(`${row.combo_id}:${row.product_id}`))
-    .map((row: any) => String(row.id))
+  const staleComboItemIds = ((existingComboItems ?? []) as ComboItemRow[])
+    .filter((row) => !desiredComboKeys.has(`${row.combo_id}:${row.product_id}`))
+    .map((row) => String(row.id))
     .filter(Boolean);
   if (staleComboItemIds.length) {
     const { error: staleItemsErr } = await supabase
@@ -302,8 +343,8 @@ async function saveConfig(body: AdminOfferConfigPayload) {
     if (deleteCombosErr) throw deleteCombosErr;
   }
 
-  const existingRecommendationIds = (existingRecommendations ?? [])
-    .map((row: any) => String(row.id))
+  const existingRecommendationIds = ((existingRecommendations ?? []) as IdRow[])
+    .map((row) => String(row.id))
     .filter(Boolean);
   if (existingRecommendationIds.length) {
     const { error: clearRecErr } = await supabase
@@ -313,8 +354,8 @@ async function saveConfig(body: AdminOfferConfigPayload) {
     if (clearRecErr) throw clearRecErr;
   }
 
-  const existingCrossSellIds = (existingCrossSell ?? [])
-    .map((row: any) => String(row.id))
+  const existingCrossSellIds = ((existingCrossSell ?? []) as IdRow[])
+    .map((row) => String(row.id))
     .filter(Boolean);
   if (existingCrossSellIds.length) {
     const { error: clearCrossErr } = await supabase

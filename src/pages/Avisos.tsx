@@ -35,11 +35,15 @@ import {
 
 // ✅ LOGO (mesmo do Index)
 import logoGostinho from "@/images/logoc.png";
-import { getCustomerSession, logoutCustomerSession } from "@/lib/customerAuth";
+import {
+  getCustomerSession,
+  logoutCustomerSession,
+  type CustomerSession,
+} from "@/lib/customerAuth";
 
 // Mesmo helper do Index
 function safeGetEmployee() {
-  return getCustomerSession() ?? {};
+  return getCustomerSession();
 }
 
 type Notice = {
@@ -260,7 +264,7 @@ const Avisos: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const employee: any = safeGetEmployee();
+  const employee: CustomerSession | null = safeGetEmployee();
 
   const isAdmin =
     employee?.is_admin ||
@@ -306,8 +310,8 @@ const Avisos: React.FC = () => {
       }
 
       setNotices((data as Notice[]) ?? []);
-    } catch (err: any) {
-      setLoadError(String(err?.message ?? err));
+    } catch (err: unknown) {
+      setLoadError(err instanceof Error ? err.message : String(err));
       setNotices([]);
     } finally {
       setLoading(false);
@@ -373,8 +377,8 @@ const Avisos: React.FC = () => {
 
     const fileExt = selectedImageFile.name.split(".").pop();
     const baseId =
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? (crypto as any).randomUUID()
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
         : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     const fileName = `${baseId}.${fileExt}`;

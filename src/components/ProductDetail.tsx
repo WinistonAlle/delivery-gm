@@ -12,7 +12,7 @@ import { Package, Scale, Plus, Minus, Check, XCircle } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { useCart } from "@/contexts/useCart";
-import { toast } from "./ui/sonner";
+import { toast } from "./ui/sonner-toast";
 
 interface ProductDetailProps {
   product: Product;
@@ -20,42 +20,49 @@ interface ProductDetailProps {
   onClose: () => void;
 }
 
+type ProductView = Product & {
+  package_info?: string;
+  is_package?: boolean;
+  in_stock?: boolean;
+};
+
 const ProductDetail: React.FC<ProductDetailProps> = ({
   product,
   isOpen,
   onClose,
 }) => {
   const { addToCart, decreaseQuantity, updateQuantity, cartItems } = useCart();
+  const productView = product as ProductView;
 
   // ---- campos flexíveis vindos do Supabase ----
-  const images: string[] = Array.isArray((product as any).images)
-    ? ((product as any).images as string[])
+  const images: string[] = Array.isArray(productView.images)
+    ? productView.images
     : [];
 
   const packageInfo: string =
-    (product as any).packageInfo ??
-    (product as any).package_info ??
+    productView.packageInfo ??
+    productView.package_info ??
     "";
 
   const rawWeight =
-    typeof (product as any).weight === "number"
-      ? (product as any).weight
-      : Number((product as any).weight ?? 0) || null;
+    typeof productView.weight === "number"
+      ? productView.weight
+      : Number(productView.weight ?? 0) || null;
 
   const isPackage =
-    (product as any).isPackage ?? (product as any).is_package ?? false;
+    productView.isPackage ?? productView.is_package ?? false;
 
   const isInStock =
-    (product as any).inStock ??
-    (product as any).in_stock ??
+    productView.inStock ??
+    productView.in_stock ??
     true;
 
   const employeePrice =
-    (product as any).employee_price ??
-    (product as any).price ??
+    productView.employee_price ??
+    productView.price ??
     0;
 
-  const extraInfo = (product as any).extraInfo ?? {};
+  const extraInfo = productView.extraInfo ?? {};
 
   // Item atual no carrinho
   const currentItem = cartItems.find((item) => item.product.id === product.id);

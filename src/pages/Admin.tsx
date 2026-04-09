@@ -50,7 +50,63 @@ const CATEGORY_LABELS: Record<string, string> = {
   "8": "Outros",
 };
 
-type Editable = Product & {
+type AdminProduct = Omit<Product, "category" | "extraInfo"> & {
+  category: string;
+  image_path?: string | null;
+  weight: number;
+  extraInfo?: Product["extraInfo"] | null;
+};
+
+type ProductRow = Record<string, unknown> & {
+  id?: string | null;
+  old_id?: unknown;
+  name?: string | null;
+  price?: unknown;
+  employee_price?: unknown;
+  images?: unknown;
+  image?: unknown;
+  image_path?: string | null;
+  category_id?: unknown;
+  category?: unknown;
+  category_name?: unknown;
+  categoryId?: unknown;
+  description?: string | null;
+  packageInfo?: string | null;
+  package_info?: string | null;
+  weight?: unknown;
+  isPackage?: boolean | null;
+  is_package?: boolean | null;
+  featured?: boolean | null;
+  isFeatured?: boolean | null;
+  inStock?: boolean | null;
+  in_stock?: boolean | null;
+  isLaunch?: boolean | null;
+  is_launch?: boolean | null;
+  extraInfo?: Product["extraInfo"] | null;
+  extra_info?: Product["extraInfo"] | null;
+};
+
+type ProductPayload = {
+  id: string;
+  old_id: number | null;
+  name: string;
+  employee_price: number;
+  unit: string;
+  category_id: number | null;
+  image_path: string | null;
+  description: string;
+  package_info: string;
+  is_package: boolean;
+  featured: boolean;
+  is_launch: boolean;
+};
+
+type WeightRow = {
+  product_id?: string | number | null;
+  weight?: unknown;
+};
+
+type Editable = AdminProduct & {
   images?: string[];
 
   // ✅ mantém o texto enquanto digita (pra aceitar 3,5 / 3.5)
@@ -58,7 +114,7 @@ type Editable = Product & {
   employee_price_input?: string;
 };
 
-function parseBRNumber(v: any, fallback = 0): number {
+function parseBRNumber(v: unknown, fallback = 0): number {
   if (v === null || v === undefined) return fallback;
   if (typeof v === "number") return Number.isFinite(v) ? v : fallback;
 
@@ -70,30 +126,30 @@ function parseBRNumber(v: any, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
-function safeNumberOrNull(v: any): number | null {
+function safeNumberOrNull(v: unknown): number | null {
   if (v === null || v === undefined || v === "") return null;
   const n = parseBRNumber(v, NaN);
   return Number.isFinite(n) ? n : null;
 }
 
-function safeNumber(v: any, fallback = 0): number {
+function safeNumber(v: unknown, fallback = 0): number {
   return parseBRNumber(v, fallback);
 }
 
-function normalizeImages(row: any): string[] {
-  if (Array.isArray(row?.images)) return row.images.filter(Boolean);
-  if (typeof row?.images === "string" && row.images.trim())
+function normalizeImages(row: ProductRow): string[] {
+  if (Array.isArray(row.images)) return row.images.filter((value): value is string => typeof value === "string" && Boolean(value));
+  if (typeof row.images === "string" && row.images.trim())
     return row.images
       .split(",")
       .map((s: string) => s.trim())
       .filter(Boolean);
 
-  if (row?.image && typeof row.image === "string") return [row.image];
-  if (row?.image_path && typeof row.image_path === "string") return [row.image_path];
+  if (row.image && typeof row.image === "string") return [row.image];
+  if (row.image_path && typeof row.image_path === "string") return [row.image_path];
   return [];
 }
 
-function mapRowToProduct(row: any): Product {
+function mapRowToProduct(row: ProductRow): AdminProduct {
   const employeePrice = safeNumber(row.employee_price ?? row.price, 0);
 
   const categoryId =
@@ -104,7 +160,7 @@ function mapRowToProduct(row: any): Product {
   const images = normalizeImages(row);
 
   return {
-    id: row.id,
+    id: String(row.id ?? ""),
     old_id: oldId,
     name: row.name ?? "",
     price: employeePrice,
@@ -112,7 +168,7 @@ function mapRowToProduct(row: any): Product {
     images,
     image_path: row.image_path ?? (images[0] ?? null),
 
-    category: categoryId != null ? String(categoryId) : ("8" as any),
+    category: categoryId != null ? String(categoryId) : "8",
 
     description: row.description ?? "",
     packageInfo: row.packageInfo ?? row.package_info ?? "",
@@ -126,7 +182,7 @@ function mapRowToProduct(row: any): Product {
 
     isLaunch: row.isLaunch ?? row.is_launch ?? false,
     extraInfo: row.extraInfo ?? row.extra_info ?? null,
-  } as Product;
+  };
 }
 
 /**
@@ -138,16 +194,16 @@ function mapRowToProduct(row: any): Product {
  */
 function mapEditingToDbPayload(editing: Editable) {
   const employeePrice = parseBRNumber(
-    editing.employee_price_input ?? (editing as any).employee_price,
+    editing.employee_price_input ?? editing.employee_price,
     0
   );
 
   const firstImage =
     editing.images && editing.images.length > 0 ? editing.images[0].trim() : null;
 
-  const payload: any = {
+  const payload: ProductPayload = {
     id: editing.id,
-    old_id: safeNumberOrNull((editing as any).old_id),
+    old_id: safeNumberOrNull(editing.old_id),
 
     name: editing.name?.trim() ?? "",
     employee_price: employeePrice,
@@ -156,25 +212,25 @@ function mapEditingToDbPayload(editing: Editable) {
     category_id: editing.category ? Number(editing.category) : null,
 
     // ✅ coluna certa
-    image_path: (editing as any).image_path ?? firstImage,
+    image_path: editing.image_path ?? firstImage,
 
-    description: (editing as any).description ?? "",
-    package_info: (editing as any).packageInfo ?? "",
-    is_package: !!(editing as any).isPackage,
-    featured: !!(editing as any).featured,
-    is_launch: !!(editing as any).isLaunch,
+    description: editing.description ?? "",
+    package_info: editing.packageInfo ?? "",
+    is_package: !!editing.isPackage,
+    featured: !!editing.featured,
+    is_launch: !!editing.isLaunch,
   };
 
   return payload;
 }
 
-function mapPayloadBackToProduct(editing: Editable, payload: any): Product {
+function mapPayloadBackToProduct(editing: Editable, payload: ProductPayload): AdminProduct {
   const employeePrice = safeNumber(payload.employee_price, 0);
   const images = (editing.images ?? []).filter(Boolean);
 
   // peso final convertido (pra exibir corretamente)
   const weightFinal = parseBRNumber(
-    editing.weight_input ?? (editing as any).weight,
+    editing.weight_input ?? editing.weight,
     0
   );
 
@@ -186,7 +242,7 @@ function mapPayloadBackToProduct(editing: Editable, payload: any): Product {
     employee_price: employeePrice,
     images,
     image_path: payload.image_path ?? null,
-    category: (editing.category ?? "8") as any,
+    category: editing.category ?? "8",
     description: editing.description ?? "",
     packageInfo: editing.packageInfo ?? "",
     weight: weightFinal,
@@ -198,11 +254,11 @@ function mapPayloadBackToProduct(editing: Editable, payload: any): Product {
 
     isLaunch: !!editing.isLaunch,
     extraInfo: editing.extraInfo ?? null,
-  } as Product;
+  };
 }
 
 export default function Admin() {
-  const [items, setItems] = useState<Product[]>([]);
+  const [items, setItems] = useState<AdminProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -250,7 +306,7 @@ export default function Admin() {
 
         if (pErr) throw pErr;
 
-        const mapped = (productsData ?? []).map(mapRowToProduct) as Product[];
+        const mapped = ((productsData ?? []) as ProductRow[]).map(mapRowToProduct);
 
         // 2) Pesos (tabela weight) -> merge por product_id
         const ids = mapped.map((p) => p.id).filter(Boolean);
@@ -264,13 +320,13 @@ export default function Admin() {
             console.warn("Aviso: erro ao carregar pesos da tabela weight:", wErr);
           } else {
             const byId = new Map<string, number>();
-            (wData ?? []).forEach((r: any) => {
-              if (r?.product_id) byId.set(String(r.product_id), safeNumber(r.weight, 0));
+            ((wData ?? []) as WeightRow[]).forEach((row) => {
+              if (row.product_id) byId.set(String(row.product_id), safeNumber(row.weight, 0));
             });
 
             for (const p of mapped) {
               const w = byId.get(String(p.id));
-              if (w !== undefined) (p as any).weight = w;
+              if (w !== undefined) p.weight = w;
             }
           }
         }
@@ -337,7 +393,7 @@ export default function Admin() {
       employee_price_input: "",
       images: [],
       image_path: null,
-      category: "8" as any,
+      category: "8",
       description: "",
       packageInfo: "",
       weight: 0,
@@ -351,15 +407,15 @@ export default function Admin() {
     setOpenForm(true);
   };
 
-  const startEdit = (p: Product) => {
-    const weightNum = safeNumber((p as any).weight, 0);
-    const priceNum = safeNumber((p as any).employee_price, 0);
+  const startEdit = (p: AdminProduct) => {
+    const weightNum = safeNumber(p.weight, 0);
+    const priceNum = safeNumber(p.employee_price, 0);
 
     setEditing({
-      ...(p as Editable),
-      old_id: safeNumberOrNull((p as any).old_id),
+      ...p,
+      old_id: safeNumberOrNull(p.old_id),
       images: (p.images ?? []).filter(Boolean),
-      image_path: (p as any).image_path ?? (p.images?.[0] ?? null),
+      image_path: p.image_path ?? (p.images?.[0] ?? null),
 
       weight: weightNum,
       weight_input: String(weightNum).replace(".", ","),
@@ -407,9 +463,9 @@ export default function Admin() {
       if (!url) throw new Error("Não foi possível obter a URL pública.");
 
       return url;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Erro ao enviar imagem:", err);
-      setUploadError(err?.message || "Erro ao enviar imagem. Tente novamente.");
+      setUploadError(err instanceof Error ? err.message : "Erro ao enviar imagem. Tente novamente.");
       throw err;
     } finally {
       setUploadingImage(false);
@@ -493,7 +549,7 @@ export default function Admin() {
 
       // ✅ peso -> tabela weight
       const weightValue = parseBRNumber(
-        editing.weight_input ?? (editing as any).weight,
+        editing.weight_input ?? editing.weight,
         0
       );
 
@@ -522,11 +578,11 @@ export default function Admin() {
       });
 
       closeForm();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Erro ao salvar produto:", err);
       alert(
         "Erro ao salvar produto no banco.\n\n" +
-          (err?.message || err?.hint || "Erro desconhecido.")
+          (err instanceof Error ? err.message : "Erro desconhecido.")
       );
     } finally {
       setSaving(false);
@@ -636,10 +692,10 @@ export default function Admin() {
 
               const thumb =
                 (p.images?.length ? p.images[0] : null) ||
-                (p as any).image_path ||
+                p.image_path ||
                 FALLBACK_IMG;
 
-              const w = safeNumber((p as any).weight, 0);
+              const w = safeNumber(p.weight, 0);
 
               return (
                 <Card key={p.id} className="overflow-hidden">
@@ -724,7 +780,7 @@ export default function Admin() {
                   <div className="text-sm text-muted-foreground">
                     ID: {editing.old_id !== null ? editing.old_id : editing.id} • R${" "}
                     {parseBRNumber(
-                      editing.employee_price_input ?? (editing as any).employee_price,
+                      editing.employee_price_input ?? editing.employee_price,
                       0
                     ).toFixed(2)}
                   </div>
@@ -754,7 +810,7 @@ export default function Admin() {
               <Field label="Categoria">
                 <Select
                   value={String(editing.category ?? "8")}
-                  onValueChange={(v) => setEditing({ ...editing, category: v as any })}
+                  onValueChange={(v) => setEditing({ ...editing, category: v })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Categoria" />

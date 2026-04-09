@@ -7,11 +7,13 @@ import CartToggle from "@/components/CartToggle";
 import Cart from "@/components/Cart";
 import { Button } from "@/components/ui/button";
 import logoGostinho from "@/images/logoc.png";
-import { getCustomerSession } from "@/lib/customerAuth";
+import { getCustomerSession, type CustomerSession } from "@/lib/customerAuth";
 
 function safeGetSession() {
   return getCustomerSession();
 }
+
+type ProductRow = Record<string, unknown>;
 
 function getFavoriteStorageKey() {
   try {
@@ -36,7 +38,7 @@ function readFavoriteIds(): string[] {
   }
 }
 
-function mapRowToProduct(row: any): Product {
+function mapRowToProduct(row: ProductRow): Product {
   const value = Number(row.employee_price ?? row.price ?? 0);
   return {
     id: row.id,
@@ -64,7 +66,7 @@ const FavoritesPage: React.FC = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
 
-  const session: any = safeGetSession() ?? {};
+  const session: CustomerSession | null = safeGetSession();
   const displayName = session?.full_name ?? session?.name ?? "Cliente";
 
   useEffect(() => {
@@ -93,7 +95,7 @@ const FavoritesPage: React.FC = () => {
 
         if (error) throw error;
 
-        const byId = new Map((data ?? []).map((row: any) => [String(row.id), row]));
+        const byId = new Map((data as ProductRow[] | null | undefined)?.map((row) => [String(row.id), row]) ?? []);
         const ordered = ids
           .map((id) => byId.get(String(id)))
           .filter(Boolean)
@@ -101,9 +103,9 @@ const FavoritesPage: React.FC = () => {
 
         if (!alive) return;
         setProducts(ordered);
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!alive) return;
-        setLoadError(err?.message ?? "Erro ao carregar favoritos.");
+        setLoadError(err instanceof Error ? err.message : "Erro ao carregar favoritos.");
         setProducts([]);
       } finally {
         if (alive) setLoading(false);
