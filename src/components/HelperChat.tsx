@@ -18,6 +18,7 @@ import {
   type CustomerSession,
 } from "@/lib/customerAuth";
 import { getShippingCostForCity } from "../../shared/orderRules";
+import { getDisplayProductPrice } from "../../shared/productPricing";
 import { PREPARATION_VIDEOS, type PreparationVideo } from "@/data/preparationVideos";
 
 type ChatMessage = {
@@ -152,7 +153,7 @@ function roundUpPackages(quantity: number, packageSize = 50) {
 }
 
 function getProductPrice(product: Product) {
-  const value = Number(product.employee_price ?? product.price ?? 0);
+  const value = getDisplayProductPrice(product);
   return formatCurrency(value);
 }
 
@@ -168,8 +169,7 @@ function getCategoryProducts(category: string, limit = 4) {
     .sort(
       (a, b) =>
         Number(b.featured ?? false) - Number(a.featured ?? false) ||
-        Number(a.employee_price ?? a.price ?? 0) -
-          Number(b.employee_price ?? b.price ?? 0)
+        getDisplayProductPrice(a) - getDisplayProductPrice(b)
     )
     .slice(0, limit);
 }
@@ -454,7 +454,7 @@ function getComplementarySuggestions(cartItems: CartItem[], limit = 4) {
     .sort(
       (a, b) =>
         Number(b.featured ?? false) - Number(a.featured ?? false) ||
-        Number(a.employee_price ?? a.price ?? 0) - Number(b.employee_price ?? b.price ?? 0)
+        getDisplayProductPrice(a) - getDisplayProductPrice(b)
     )
     .slice(0, limit);
 }

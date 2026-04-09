@@ -26,11 +26,10 @@ export interface Product {
 
   name: string;
 
-  // 🔴 Preço antigo (varejo) – pode ficar aqui por compatibilidade,
-  // mas no Catálogo de Funcionários não vamos mais usar.
+  // 🔴 Preço antigo (varejo) – pode ficar aqui por compatibilidade.
   price: number;
 
-  // 💰 Preço exclusivo para funcionários (vem do Supabase)
+  // 💰 Preço base usado pelo catálogo (vem do Supabase)
   employee_price: number;
 
   // 🖼️ Lista de imagens (para o carousel)

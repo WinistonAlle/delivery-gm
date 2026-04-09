@@ -11,6 +11,7 @@ import {
   meetsMinimumOrder,
   normalizeMatch,
 } from "../shared/orderRules";
+import { getDisplayProductPrice } from "../shared/productPricing";
 
 type ProductSnapshot = {
   id: string;
@@ -88,33 +89,34 @@ function normalizePayload(body: unknown): CreateOrderParams {
   };
 }
 
-function parseKgFromText(text: string) {
-  const normalized = normalizeMatch(text).replace(",", ".");
-  if (!normalized) return null;
-
-  const kgMatch = normalized.match(/(\d+(?:\.\d+)?)\s*kg\b/);
-  if (kgMatch) {
-    const parsed = Number(kgMatch[1]);
-    if (Number.isFinite(parsed) && parsed > 0) return parsed;
-  }
-
-  const gramMatch = normalized.match(/(\d+(?:\.\d+)?)\s*g\b/);
-  if (gramMatch) {
-    const grams = Number(gramMatch[1]);
-    if (Number.isFinite(grams) && grams > 0) return grams / 1000;
-  }
-
-  return null;
-}
-
 function deriveWeightKg(product: ProductSnapshot) {
   const direct = Number(product.weight ?? 0);
   if (Number.isFinite(direct) && direct > 0) return direct;
 
-  const fromPackageInfo = parseKgFromText(String(product.package_info ?? ""));
+  const normalizedPackageInfo = normalizeMatch(String(product.package_info ?? "")).replace(",", ".");
+  const normalizedName = normalizeMatch(product.name).replace(",", ".");
+  const parseKgFromText = (text: string) => {
+    if (!text) return null;
+
+    const kgMatch = text.match(/(\d+(?:\.\d+)?)\s*kg\b/);
+    if (kgMatch) {
+      const parsed = Number(kgMatch[1]);
+      if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    }
+
+    const gramMatch = text.match(/(\d+(?:\.\d+)?)\s*g\b/);
+    if (gramMatch) {
+      const grams = Number(gramMatch[1]);
+      if (Number.isFinite(grams) && grams > 0) return grams / 1000;
+    }
+
+    return null;
+  };
+
+  const fromPackageInfo = parseKgFromText(normalizedPackageInfo);
   if (fromPackageInfo) return fromPackageInfo;
 
-  const fromName = parseKgFromText(product.name);
+  const fromName = parseKgFromText(normalizedName);
   if (fromName) return fromName;
 
   return 0;
@@ -174,7 +176,7 @@ async function createOrderInDatabase(params: CreateOrderParams) {
 
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
   const itemsTotal = items.reduce(
-    (sum, item) => sum + (Number(item.product.employee_price) || 0) * item.quantity,
+    (sum, item) => sum + getDisplayProductPrice(item.product) * item.quantity,
     0
   );
   const packageCount = items.reduce((sum, item) => {
@@ -267,7 +269,7 @@ async function createOrderInDatabase(params: CreateOrderParams) {
     product_id: item.product.id,
     product_old_id: item.product.old_id ?? null,
     product_name: item.product.name,
-    unit_price: Number(item.product.employee_price) || 0,
+    unit_price: getDisplayProductPrice(item.product),
     quantity: item.quantity,
   }));
 

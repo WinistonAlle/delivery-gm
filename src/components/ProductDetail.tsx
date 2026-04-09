@@ -13,6 +13,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { useCart } from "@/contexts/useCart";
 import { toast } from "./ui/sonner-toast";
+import { getDisplayProductPrice } from "../../shared/productPricing";
 
 interface ProductDetailProps {
   product: Product;
@@ -57,10 +58,7 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
     productView.in_stock ??
     true;
 
-  const employeePrice =
-    productView.employee_price ??
-    productView.price ??
-    0;
+  const employeePrice = getDisplayProductPrice(productView);
 
   const extraInfo = productView.extraInfo ?? {};
 

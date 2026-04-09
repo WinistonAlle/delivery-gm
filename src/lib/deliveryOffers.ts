@@ -1,5 +1,6 @@
 import type { Product } from "@/types/products";
 import { supabase } from "@/lib/supabase";
+import { getDisplayProductPrice } from "../../shared/productPricing";
 
 const CATEGORY_NAME_BY_ID: Record<number, string> = {
   1: "Pão de Queijo",
@@ -193,7 +194,7 @@ function resolveCombos(
 
       const total = items.reduce(
         (sum, item) =>
-          sum + Number(item.product.employee_price ?? item.product.price ?? 0) * item.quantity,
+          sum + getDisplayProductPrice(item.product) * item.quantity,
         0
       );
 
@@ -261,7 +262,7 @@ export async function loadPublicCombos(products: Product[]): Promise<DeliveryCom
           .filter((item) => !!item.product) as { product: Product; quantity: number }[];
         const total = items.reduce(
           (sum, item) =>
-            sum + Number(item.product.employee_price ?? item.product.price ?? 0) * item.quantity,
+            sum + getDisplayProductPrice(item.product) * item.quantity,
           0
         );
         return { ...combo, items, total };

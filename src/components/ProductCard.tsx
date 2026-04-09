@@ -9,6 +9,7 @@ import ProductImageCarousel from "./ProductImageCarousel";
 import ProductDetail from "./ProductDetail";
 import { toast } from "./ui/sonner-toast";
 import { getCustomerSession } from "@/lib/customerAuth";
+import { getDisplayProductPrice } from "../../shared/productPricing";
 
 interface ProductCardProps {
   product: Product;
@@ -58,7 +59,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   const { addToCart, decreaseQuantity, updateQuantity, cartItems } = useCart();
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
-  const employeePrice = Number(product.employee_price ?? 0);
+  const employeePrice = getDisplayProductPrice(product);
   const isAvailable = product.inStock !== false;
 
   const currentItem = cartItems.find((item) => item.product.id === product.id);
@@ -134,8 +135,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
       )
       .sort(
         (a, b) =>
-          Number(b.employee_price ?? b.price ?? 0) -
-          Number(a.employee_price ?? a.price ?? 0)
+          getDisplayProductPrice(b) - getDisplayProductPrice(a)
       )
       .slice(0, 2);
   }, [crossSellRecommendations, relatedProducts, product.id, product.category]);

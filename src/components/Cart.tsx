@@ -4,6 +4,7 @@ import { useCart } from "@/contexts/useCart";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { getDisplayProductPrice } from "../../shared/productPricing";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -193,7 +194,7 @@ const Cart: React.FC = () => {
                     cartItems.map((item) => {
                       const images = Array.isArray(item.product.images) ? item.product.images : [];
                       const thumb = images[0] || item.product.image_path || "/placeholder.svg";
-                      const price = Number(item.product.employee_price ?? item.product.price ?? 0);
+                      const price = getDisplayProductPrice(item.product);
                       const subtotal = price * item.quantity;
 
                       return (

@@ -93,12 +93,16 @@ type ProductPayload = {
   employee_price: number;
   unit: string;
   category_id: number | null;
+  images: string[];
   image_path: string | null;
   description: string;
   package_info: string;
+  weight: number;
   is_package: boolean;
   featured: boolean;
+  in_stock: boolean;
   is_launch: boolean;
+  extra_info: Product["extraInfo"] | Record<string, never>;
 };
 
 type WeightRow = {
@@ -177,7 +181,6 @@ function mapRowToProduct(row: ProductRow): AdminProduct {
     isPackage: row.isPackage ?? row.is_package ?? false,
     featured: row.featured ?? row.isFeatured ?? false,
 
-    // mantém no UI (mesmo que seu banco não tenha coluna)
     inStock: row.inStock ?? row.in_stock ?? true,
 
     isLaunch: row.isLaunch ?? row.is_launch ?? false,
@@ -185,21 +188,20 @@ function mapRowToProduct(row: ProductRow): AdminProduct {
   };
 }
 
-/**
- * ✅ Payload SOMENTE da tabela products
- * - NÃO inclui images (sua tabela não tem)
- * - NÃO inclui weight (vai pra tabela weight)
- * - NÃO inclui in_stock (seu banco não tem)
- * - NÃO inclui extra_info (se não existir)
- */
 function mapEditingToDbPayload(editing: Editable) {
   const employeePrice = parseBRNumber(
     editing.employee_price_input ?? editing.employee_price,
     0
   );
+  const weightValue = parseBRNumber(editing.weight_input ?? editing.weight, 0);
+  const normalizedImages = (editing.images ?? [])
+    .map((image) => image.trim())
+    .filter(Boolean);
 
   const firstImage =
-    editing.images && editing.images.length > 0 ? editing.images[0].trim() : null;
+    normalizedImages.length > 0
+      ? normalizedImages[0]
+      : (editing.image_path?.trim() ?? null);
 
   const payload: ProductPayload = {
     id: editing.id,
@@ -210,51 +212,87 @@ function mapEditingToDbPayload(editing: Editable) {
     unit: "un",
 
     category_id: editing.category ? Number(editing.category) : null,
+    images: normalizedImages,
 
-    // ✅ coluna certa
     image_path: editing.image_path ?? firstImage,
 
     description: editing.description ?? "",
     package_info: editing.packageInfo ?? "",
+    weight: weightValue,
     is_package: !!editing.isPackage,
     featured: !!editing.featured,
+    in_stock: editing.inStock !== false,
     is_launch: !!editing.isLaunch,
+    extra_info: editing.extraInfo ?? {},
   };
 
   return payload;
 }
 
-function mapPayloadBackToProduct(editing: Editable, payload: ProductPayload): AdminProduct {
-  const employeePrice = safeNumber(payload.employee_price, 0);
-  const images = (editing.images ?? []).filter(Boolean);
+function getAdminProductsApiUrl() {
+  if (typeof window === "undefined") return "/api/admin-products";
+  return new URL("/api/admin-products", window.location.origin).toString();
+}
 
-  // peso final convertido (pra exibir corretamente)
-  const weightFinal = parseBRNumber(
-    editing.weight_input ?? editing.weight,
-    0
-  );
-
+function getAdminApiHeaders() {
   return {
-    id: editing.id,
-    old_id: payload.old_id ?? null,
-    name: (payload.name ?? editing.name ?? "").trim(),
-    price: employeePrice,
-    employee_price: employeePrice,
-    images,
-    image_path: payload.image_path ?? null,
-    category: editing.category ?? "8",
-    description: editing.description ?? "",
-    packageInfo: editing.packageInfo ?? "",
-    weight: weightFinal,
-    isPackage: !!editing.isPackage,
-    featured: !!editing.featured,
-
-    // permanece no estado (mesmo sem coluna no banco)
-    inStock: editing.inStock !== false,
-
-    isLaunch: !!editing.isLaunch,
-    extraInfo: editing.extraInfo ?? null,
+    "Content-Type": "application/json",
   };
+}
+
+async function readApiPayload<T>(response: Response): Promise<T | null> {
+  try {
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchProductsDirectly(): Promise<AdminProduct[]> {
+  const { data: productsData, error: pErr } = await supabase
+    .from("products")
+    .select("*")
+    .order("name", { ascending: true });
+
+  if (pErr) throw pErr;
+
+  const mapped = ((productsData ?? []) as ProductRow[]).map(mapRowToProduct);
+  const ids = mapped.map((p) => p.id).filter(Boolean);
+
+  if (ids.length) {
+    const { data: wData, error: wErr } = await supabase
+      .from("weight")
+      .select("product_id, weight")
+      .in("product_id", ids);
+
+    if (!wErr) {
+      const byId = new Map<string, number>();
+      ((wData ?? []) as WeightRow[]).forEach((row) => {
+        if (row.product_id) byId.set(String(row.product_id), safeNumber(row.weight, 0));
+      });
+
+      for (const p of mapped) {
+        const w = byId.get(String(p.id));
+        if (w !== undefined) p.weight = w;
+      }
+    }
+  }
+
+  return mapped;
+}
+
+async function saveProductThroughApi(payload: ProductPayload) {
+  const response = await fetch(getAdminProductsApiUrl(), {
+    method: "POST",
+    credentials: "include",
+    headers: getAdminApiHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  const result = await readApiPayload<{ error?: string }>(response);
+  if (!response.ok) {
+    throw new Error(result?.error || "Erro ao salvar produto.");
+  }
 }
 
 export default function Admin() {
@@ -298,40 +336,7 @@ export default function Admin() {
     const fetchProducts = async () => {
       setLoading(true);
       try {
-        // 1) Produtos
-        const { data: productsData, error: pErr } = await supabase
-          .from("products")
-          .select("*")
-          .order("name", { ascending: true });
-
-        if (pErr) throw pErr;
-
-        const mapped = ((productsData ?? []) as ProductRow[]).map(mapRowToProduct);
-
-        // 2) Pesos (tabela weight) -> merge por product_id
-        const ids = mapped.map((p) => p.id).filter(Boolean);
-        if (ids.length) {
-          const { data: wData, error: wErr } = await supabase
-            .from("weight")
-            .select("product_id, weight")
-            .in("product_id", ids);
-
-          if (wErr) {
-            console.warn("Aviso: erro ao carregar pesos da tabela weight:", wErr);
-          } else {
-            const byId = new Map<string, number>();
-            ((wData ?? []) as WeightRow[]).forEach((row) => {
-              if (row.product_id) byId.set(String(row.product_id), safeNumber(row.weight, 0));
-            });
-
-            for (const p of mapped) {
-              const w = byId.get(String(p.id));
-              if (w !== undefined) p.weight = w;
-            }
-          }
-        }
-
-        setItems(mapped);
+        setItems(await fetchProductsDirectly());
       } catch (err) {
         console.error("Erro ao carregar produtos:", err);
         alert("Erro ao carregar produtos do banco.");
@@ -529,53 +534,11 @@ export default function Admin() {
       return;
     }
 
-    setSaving(true);
+      setSaving(true);
     try {
-      const existsInState = items.some((p) => p.id === editing.id);
-
-      // payload apenas do products (sem in_stock)
       const payload = mapEditingToDbPayload(editing);
-
-      if (existsInState) {
-        const { error } = await supabase
-          .from("products")
-          .update(payload)
-          .eq("id", editing.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("products").insert(payload);
-        if (error) throw error;
-      }
-
-      // ✅ peso -> tabela weight
-      const weightValue = parseBRNumber(
-        editing.weight_input ?? editing.weight,
-        0
-      );
-
-      const { error: wErr } = await supabase
-        .from("weight")
-        .upsert(
-          { product_id: editing.id, weight: weightValue },
-          { onConflict: "product_id" }
-        );
-
-      if (wErr) throw wErr;
-
-      // ✅ atualiza estado local
-      const saved = mapPayloadBackToProduct(editing, payload);
-
-      setItems((prev) => {
-        const idx = prev.findIndex((p) => p.id === saved.id);
-        if (idx >= 0) {
-          const next = [...prev];
-          next[idx] = saved;
-          return next;
-        }
-        const next = [saved, ...prev];
-        next.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
-        return next;
-      });
+      await saveProductThroughApi(payload);
+      setItems(await fetchProductsDirectly());
 
       closeForm();
     } catch (err: unknown) {
@@ -596,16 +559,27 @@ export default function Admin() {
     if (!toDelete) return;
 
     try {
-      await supabase.from("weight").delete().eq("product_id", toDelete.id);
+      const response = await fetch(getAdminProductsApiUrl(), {
+        method: "DELETE",
+        credentials: "include",
+        headers: getAdminApiHeaders(),
+        body: JSON.stringify({ id: toDelete.id }),
+      });
 
-      const { error } = await supabase.from("products").delete().eq("id", toDelete.id);
-      if (error) throw error;
+      const payload = await readApiPayload<{ error?: string }>(response);
+      if (!response.ok) {
+        throw new Error(payload?.error || "Erro ao excluir produto.");
+      }
 
-      setItems((prev) => prev.filter((p) => p.id !== toDelete.id));
+      const refreshed = await fetchProductsDirectly();
+      setItems(refreshed);
       setToDelete(null);
     } catch (err) {
       console.error("Erro ao excluir produto:", err);
-      alert("Erro ao excluir produto no banco.");
+      alert(
+        "Erro ao excluir produto no banco.\n\n" +
+          (err instanceof Error ? err.message : "Erro desconhecido.")
+      );
     }
   };
 
@@ -825,7 +799,7 @@ export default function Admin() {
                 </Select>
               </Field>
 
-              <Field label="Preço funcionário (R$)">
+              <Field label="Preço do produto (R$)">
                 <Input
                   type="text"
                   inputMode="decimal"

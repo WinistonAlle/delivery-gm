@@ -7,6 +7,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 import adminOrdersHandler from "./api/admin-orders";
 import adminOffersHandler from "./api/admin-offers";
+import adminProductsHandler from "./api/admin-products";
 import adminThemeHandler from "./api/admin-theme";
 import adminFeaturedHandler from "./api/admin-featured";
 import authLoginHandler from "./api/auth/login";
@@ -59,6 +60,7 @@ app.all("/api/auth/session", adaptHandler(authSessionHandler));
 app.all("/api/auth/signup", adaptHandler(authSignupHandler));
 app.all("/api/admin-orders", adaptHandler(adminOrdersHandler));
 app.all("/api/admin-offers", adaptHandler(adminOffersHandler));
+app.all("/api/admin-products", adaptHandler(adminProductsHandler));
 app.all("/api/admin-theme", adaptHandler(adminThemeHandler));
 app.all("/api/admin-featured", adaptHandler(adminFeaturedHandler));
 app.all("/api/customer-orders", adaptHandler(customerOrdersHandler));

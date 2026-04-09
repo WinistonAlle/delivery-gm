@@ -5,6 +5,7 @@ import { deriveIsPackage, deriveWeightKg } from "@/utils/productMetrics";
 import { trackCustomerEventOnce } from "@/lib/customerInsights";
 import { CUSTOMER_SESSION_EVENT, getCustomerSession } from "@/lib/customerAuth";
 import { meetsMinimumOrder as satisfiesMinimumOrder } from "../../shared/orderRules";
+import { getDisplayProductPrice } from "../../shared/productPricing";
 import { CartContext, type CartContextType } from "@/contexts/cart-store";
 
 // Gera uma assinatura do cliente atual pra separar os carrinhos.
@@ -116,7 +117,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // 💰 Total do carrinho
   const cartTotal = cartItems.reduce(
-    (total, item) => total + item.product.price * item.quantity,
+    (total, item) => total + getDisplayProductPrice(item.product) * item.quantity,
     0
   );
 

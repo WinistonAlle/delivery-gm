@@ -31,6 +31,7 @@ import {
 } from "@/lib/customerAuth";
 import { trackCustomerEvent, trackCustomerEventOnce } from "@/lib/customerInsights";
 import { createFullAddress, fetchAddressFromCEP, formatCEP } from "@/utils/formatUtils";
+import { getDisplayProductPrice } from "../../shared/productPricing";
 
 function safeGetSession() {
   return getCustomerSession() as CustomerSession | null;
@@ -414,7 +415,7 @@ const Checkout: React.FC = () => {
 
       const itemsSummary = cartItems
         .map((item) => {
-          const unitPrice = Number(item.product.employee_price ?? item.product.price ?? 0);
+          const unitPrice = getDisplayProductPrice(item.product);
           const totalWeight = Number(item.product.weight ?? 0) * item.quantity;
           const packageInfo = String(item.product.packageInfo ?? "").trim();
           const code = item.product.old_id ?? item.product.id;
@@ -766,7 +767,7 @@ const Checkout: React.FC = () => {
 
                 <div className="mt-5 space-y-3">
                   {cartItems.map((item, index) => {
-                    const unitPrice = Number(item.product.employee_price ?? 0);
+                    const unitPrice = getDisplayProductPrice(item.product);
                     const subtotal = unitPrice * item.quantity;
                     return (
                       <motion.div
@@ -907,7 +908,7 @@ const Checkout: React.FC = () => {
                         className="rounded-full border-red-200 text-red-600 hover:bg-red-50"
                         onClick={() => addToCart(product)}
                       >
-                        + {formatCurrency(Number(product.employee_price ?? product.price ?? 0))}
+                        + {formatCurrency(getDisplayProductPrice(product))}
                       </Button>
                     </motion.div>
                   ))}

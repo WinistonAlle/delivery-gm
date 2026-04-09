@@ -396,7 +396,8 @@ export async function syncCustomerSessionFromServer() {
     });
 
     if (!response.ok) {
-      return getCustomerSession();
+      clearCustomerSession();
+      return null;
     }
 
     const payload = await readJson<{ session?: CustomerSession | null }>(response);
@@ -404,7 +405,8 @@ export async function syncCustomerSessionFromServer() {
     hydrateCustomerSession(session);
     return session;
   } catch {
-    return getCustomerSession();
+    clearCustomerSession();
+    return null;
   }
 }
 

@@ -52,6 +52,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { getDisplayProductPrice } from "../../shared/productPricing";
 
 const CATEGORY_NAME_BY_ID: Record<number, string> = {
   1: "Pão de Queijo",
@@ -1295,8 +1296,7 @@ const Index: React.FC = () => {
         .filter((p) => p.category === category)
         .sort(
           (a, b) =>
-            Number(b.employee_price ?? b.price ?? 0) -
-            Number(a.employee_price ?? a.price ?? 0)
+            getDisplayProductPrice(b) - getDisplayProductPrice(a)
         );
 
     const comboMineiroItems = [
@@ -1323,7 +1323,7 @@ const Index: React.FC = () => {
       if (!items.length) return null;
       const total = items.reduce(
         (sum, item) =>
-          sum + Number(item.product.employee_price ?? item.product.price ?? 0) * item.quantity,
+          sum + getDisplayProductPrice(item.product) * item.quantity,
         0
       );
       return { id, title, description, items, total };
@@ -2226,7 +2226,7 @@ const Index: React.FC = () => {
 
           <div className="space-y-3">
             {(selectedCombo?.items ?? []).map((item) => {
-              const price = Number(item.product.employee_price ?? item.product.price ?? 0);
+              const price = getDisplayProductPrice(item.product);
               const subtotal = price * item.quantity;
               return (
                 <div
