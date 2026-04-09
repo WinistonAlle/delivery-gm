@@ -252,12 +252,22 @@ function findPreparationVideo(question: string) {
     "shorts",
     "modo de preparo",
     "modos de preparo",
+    "como fazer",
+    "como faz",
+    "como prepara",
+    "como preparar",
     "como preparar",
     "como fritar",
     "como assar",
+    "fazer",
+    "faz",
+    "preparar",
   ]);
 
-  if (!wantsTutorial && !questionHasAny(question, ["preparo", "assar", "fritar"])) {
+  if (
+    !wantsTutorial &&
+    !questionHasAny(question, ["preparo", "assar", "fritar", "fazer", "faz"])
+  ) {
     return null;
   }
 
@@ -267,12 +277,21 @@ function findPreparationVideo(question: string) {
     for (const keyword of video.keywords) {
       if (hasApproxPhrase(question, keyword)) score += 8;
       else if (normalizedQuestion.includes(normalizeQuestion(keyword))) score += 5;
+
+      const keywordTokens = tokenizeQuestion(keyword);
+      const questionTokens = tokenizeQuestion(question);
+      const tokenMatches = keywordTokens.filter((keywordToken) =>
+        questionTokens.some((questionToken) => isApproxWordMatch(questionToken, keywordToken))
+      ).length;
+
+      score += tokenMatches * 2;
     }
 
     if (questionHasAny(question, [video.category])) score += 2;
+    if (questionHasAny(question, [video.title])) score += 6;
     return { video, score };
   })
-    .filter((entry) => entry.score > 0)
+    .filter((entry) => entry.score >= 3)
     .sort((a, b) => b.score - a.score);
 
   return scored[0]?.video ?? null;
