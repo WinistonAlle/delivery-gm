@@ -9,6 +9,7 @@ import ProductCard from "../components/ProductCard";
 import CartToggle from "../components/CartToggle";
 import Cart from "../components/Cart";
 import HelperChat from "../components/HelperChat";
+import SnakeGame from "../components/SnakeGame";
 import { useCart } from "@/contexts/useCart";
 import { normalizeText as normalizeTextUtil } from "@/utils/stringUtils";
 import FeaturedProductsCarousel from "@/components/FeaturedProductsCarousel";
@@ -652,6 +653,9 @@ const Index: React.FC = () => {
 
   const [currentPage, setCurrentPage] = useState(1);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [snakeDialogOpen, setSnakeDialogOpen] = useState(false);
+  const [logoClickCount, setLogoClickCount] = useState(0);
+  const logoClickResetRef = useRef<number | null>(null);
 
   const [isMobile, setIsMobile] = useState(false);
   const [hideHeader, setHideHeader] = useState(false);
@@ -708,6 +712,26 @@ const Index: React.FC = () => {
     });
   };
 
+  const handleLogoSecretClick = () => {
+    if (logoClickResetRef.current) {
+      window.clearTimeout(logoClickResetRef.current);
+    }
+
+    setLogoClickCount((current) => {
+      const nextCount = current + 1;
+      if (nextCount >= 7) {
+        setSnakeDialogOpen(true);
+        return 0;
+      }
+      return nextCount;
+    });
+
+    logoClickResetRef.current = window.setTimeout(() => {
+      setLogoClickCount(0);
+      logoClickResetRef.current = null;
+    }, 5000);
+  };
+
   useEffect(() => {
     try {
       localStorage.setItem(SEARCH_CACHE_KEY, searchTerm);
@@ -728,6 +752,14 @@ const Index: React.FC = () => {
     return () => {
       window.removeEventListener("storage", syncTheme);
       window.removeEventListener("focus", syncTheme);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (logoClickResetRef.current) {
+        window.clearTimeout(logoClickResetRef.current);
+      }
     };
   }, []);
 
@@ -1455,9 +1487,10 @@ const Index: React.FC = () => {
           )}
           {/* ✅ LOGO NO LUGAR DO TEXTO */}
           <button
-            onClick={() => goTo("/catalogo")}
+            onClick={handleLogoSecretClick}
             className="text-left flex items-center"
-            aria-label="Ir para o catálogo"
+            aria-label="Logo da Gostinho Mineiro"
+            title={logoClickCount > 0 ? `${logoClickCount}/7` : "Logo da Gostinho Mineiro"}
           >
             <img
               src={logoGostinho}
@@ -2212,6 +2245,18 @@ const Index: React.FC = () => {
               Adicionar combo
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={snakeDialogOpen} onOpenChange={setSnakeDialogOpen}>
+        <DialogContent className="max-w-[95vw] border-0 bg-white/95 p-4 shadow-[0_30px_90px_rgba(15,23,42,0.22)] backdrop-blur-xl sm:max-w-3xl sm:p-6">
+          <DialogHeader className="space-y-2 text-left">
+            <DialogTitle className="text-2xl text-slate-900">Jogo da Cobinha</DialogTitle>
+            <DialogDescription className="text-slate-600">
+              Easter egg liberado com 7 cliques na logo da página principal.
+            </DialogDescription>
+          </DialogHeader>
+          <SnakeGame />
         </DialogContent>
       </Dialog>
     </div>
