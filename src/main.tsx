@@ -2,10 +2,16 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
-if (import.meta.env.DEV && "serviceWorker" in navigator) {
+if ("serviceWorker" in navigator) {
   void navigator.serviceWorker.getRegistrations().then((registrations) => {
     registrations.forEach((registration) => {
       void registration.unregister();
+    });
+  });
+
+  void caches.keys().then((keys) => {
+    keys.forEach((key) => {
+      void caches.delete(key);
     });
   });
 }
