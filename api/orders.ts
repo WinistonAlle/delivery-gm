@@ -18,6 +18,7 @@ type ProductSnapshot = {
   old_id?: number | null;
   name: string;
   employee_price: number;
+  sale_type?: "kg" | "pct" | null;
   weight?: number | null;
   is_package?: boolean | null;
   package_info?: string | null;
@@ -297,7 +298,7 @@ async function resolveOrderItems(
   const uniqueIds = Array.from(new Set(items.map((item) => String(item.product.id ?? "")).filter(Boolean)));
   const { data, error } = await supabase
       .from("products")
-    .select("id, old_id, name, employee_price, weight, is_package, package_info, in_stock")
+    .select("id, old_id, name, employee_price, sale_type, weight, is_package, package_info, in_stock")
     .in("id", uniqueIds);
 
   if (error) throw error;
@@ -309,6 +310,7 @@ async function resolveOrderItems(
         old_id: row.old_id ?? null,
         name: String(row.name ?? ""),
         employee_price: Number(row.employee_price ?? 0),
+        sale_type: row.sale_type === "pct" ? "pct" : "kg",
         weight: Number(row.weight ?? 0),
         is_package: row.is_package ?? null,
         package_info: String(row.package_info ?? ""),

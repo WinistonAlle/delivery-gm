@@ -1,6 +1,8 @@
 type PriceableProduct = {
   employee_price?: number | null;
   price?: number | null;
+  saleType?: "kg" | "pct" | null;
+  sale_type?: "kg" | "pct" | null;
   weight?: number | string | null;
   packageInfo?: string | null;
   package_info?: string | null;
@@ -50,8 +52,18 @@ export function getStoredProductPrice(product: PriceableProduct): number {
   return Number.isFinite(value) ? value : 0;
 }
 
+export function getProductSaleType(product: PriceableProduct): "kg" | "pct" {
+  return product.saleType === "pct" || product.sale_type === "pct" ? "pct" : "kg";
+}
+
 export function getDisplayProductPrice(product: PriceableProduct): number {
   const basePrice = getStoredProductPrice(product);
+  const saleType = getProductSaleType(product);
+
+  if (saleType === "pct") {
+    return roundCurrency(basePrice);
+  }
+
   const weight = getProductWeightKg(product);
 
   if (weight > 1) {

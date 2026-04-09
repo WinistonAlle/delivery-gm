@@ -174,6 +174,7 @@ function mapSupabaseProduct(row: Record<string, unknown>): Product {
     category: row.category ?? row.category_name ?? "Outros",
     description: row.description ?? "",
     packageInfo: row.packageInfo ?? row.package_info ?? "",
+    saleType: row.saleType === "pct" || row.sale_type === "pct" ? "pct" : "kg",
     weight: Number(row.weight ?? 0),
     isPackage: row.isPackage ?? row.is_package ?? false,
     featured: row.featured ?? row.isFeatured ?? false,

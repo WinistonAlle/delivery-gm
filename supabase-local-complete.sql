@@ -114,6 +114,7 @@ create table if not exists public.products (
   description text not null default '',
   price numeric(12,2) not null default 0,
   employee_price numeric(12,2) not null default 0,
+  sale_type text not null default 'kg',
   unit text not null default 'un',
   category_id integer null references public.product_categories(id),
   image_path text null,
@@ -128,6 +129,7 @@ create table if not exists public.products (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint products_name_not_blank check (btrim(name) <> ''),
+  constraint products_sale_type_valid check (sale_type in ('kg', 'pct')),
   constraint products_price_non_negative check (price >= 0),
   constraint products_employee_price_non_negative check (employee_price >= 0),
   constraint products_weight_non_negative check (weight >= 0)

@@ -66,6 +66,8 @@ type ProductRow = Record<string, unknown> & {
   description?: string | null;
   packageInfo?: string | null;
   package_info?: string | null;
+  saleType?: Product["saleType"] | null;
+  sale_type?: Product["saleType"] | null;
   weight?: number | string | null;
   isPackage?: boolean | null;
   is_package?: boolean | null;
@@ -168,6 +170,7 @@ function mapRowToProduct(row: ProductRow): Product {
     category: normalizedCategory,
     description: row.description ?? "",
     packageInfo: row.packageInfo ?? row.package_info ?? "",
+    saleType: row.saleType === "pct" || row.sale_type === "pct" ? "pct" : "kg",
     weight: Number(row.weight ?? 0),
     isPackage: row.isPackage ?? row.is_package ?? false,
     featured: row.featured ?? row.isFeatured ?? false,

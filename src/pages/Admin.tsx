@@ -50,6 +50,11 @@ const CATEGORY_LABELS: Record<string, string> = {
   "8": "Outros",
 };
 
+const SALE_TYPE_LABELS = {
+  kg: "Por kg",
+  pct: "Pacote",
+} as const;
+
 type AdminProduct = Omit<Product, "category" | "extraInfo"> & {
   category: string;
   image_path?: string | null;
@@ -73,6 +78,8 @@ type ProductRow = Record<string, unknown> & {
   description?: string | null;
   packageInfo?: string | null;
   package_info?: string | null;
+  saleType?: Product["saleType"] | null;
+  sale_type?: Product["saleType"] | null;
   weight?: unknown;
   isPackage?: boolean | null;
   is_package?: boolean | null;
@@ -91,6 +98,7 @@ type ProductPayload = {
   old_id: number | null;
   name: string;
   employee_price: number;
+  sale_type: Product["saleType"];
   unit: string;
   category_id: number | null;
   images: string[];
@@ -176,6 +184,7 @@ function mapRowToProduct(row: ProductRow): AdminProduct {
 
     description: row.description ?? "",
     packageInfo: row.packageInfo ?? row.package_info ?? "",
+    saleType: row.saleType === "pct" || row.sale_type === "pct" ? "pct" : "kg",
     weight: safeNumber(row.weight, 0),
 
     isPackage: row.isPackage ?? row.is_package ?? false,
@@ -209,6 +218,7 @@ function mapEditingToDbPayload(editing: Editable) {
 
     name: editing.name?.trim() ?? "",
     employee_price: employeePrice,
+    sale_type: editing.saleType === "pct" ? "pct" : "kg",
     unit: "un",
 
     category_id: editing.category ? Number(editing.category) : null,
@@ -401,6 +411,7 @@ export default function Admin() {
       category: "8",
       description: "",
       packageInfo: "",
+      saleType: "kg",
       weight: 0,
       weight_input: "",
       isPackage: false,
@@ -757,6 +768,8 @@ export default function Admin() {
                       editing.employee_price_input ?? editing.employee_price,
                       0
                     ).toFixed(2)}
+                    {" • "}
+                    {SALE_TYPE_LABELS[editing.saleType]}
                   </div>
                 </div>
               </div>
@@ -812,6 +825,23 @@ export default function Admin() {
                   }
                   placeholder="Ex.: 48,50"
                 />
+              </Field>
+
+              <Field label="Tipo de venda">
+                <Select
+                  value={editing.saleType}
+                  onValueChange={(value: Product["saleType"]) =>
+                    setEditing({ ...editing, saleType: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="kg">Por kg</SelectItem>
+                    <SelectItem value="pct">Pacote</SelectItem>
+                  </SelectContent>
+                </Select>
               </Field>
 
               <Field label="Descrição" full>
@@ -928,7 +958,7 @@ export default function Admin() {
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-2 sm:col-span-2">
                 <Flag
-                  label="Pacote"
+                  label="Conta no mínimo"
                   checked={!!editing.isPackage}
                   onCheckedChange={(v) => setEditing({ ...editing, isPackage: v })}
                 />

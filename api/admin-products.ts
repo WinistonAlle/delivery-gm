@@ -7,6 +7,7 @@ type AdminProductPayload = {
   old_id: number | null;
   name: string;
   employee_price: number;
+  sale_type: "kg" | "pct";
   unit: string;
   category_id: number | null;
   images: string[];
@@ -108,6 +109,7 @@ function normalizePayload(input: unknown): AdminProductPayload {
     old_id: payload.old_id == null ? null : Number(payload.old_id),
     name: String(payload.name ?? "").trim(),
     employee_price: Number(payload.employee_price ?? 0),
+    sale_type: payload.sale_type === "pct" ? "pct" : "kg",
     unit: String(payload.unit ?? "un").trim() || "un",
     category_id: payload.category_id == null ? null : Number(payload.category_id),
     images: normalizeImages(payload.images),

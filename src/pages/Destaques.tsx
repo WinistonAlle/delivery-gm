@@ -739,6 +739,7 @@ const Destaques: React.FC = () => {
         category: p.category ?? "Outros",
         description: "",
         packageInfo: "",
+        saleType: "kg",
         weight: 0,
         isPackage: false,
         featured: true,

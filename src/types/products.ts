@@ -17,6 +17,8 @@ export interface ProductExtraInfo {
   funFact?: string;
 }
 
+export type ProductSaleType = "kg" | "pct";
+
 export interface Product {
   // ID interno do Supabase (UUID)
   id: string;
@@ -41,6 +43,7 @@ export interface Product {
   category: Category;
   description?: string;
   packageInfo: string; // Informação sobre a embalagem (ex: "Pacote de 1kg")
+  saleType: ProductSaleType; // `kg` = preco por kg, `pct` = preco fechado do pacote
   weight: number; // Peso em kg
   isPackage: boolean; // Se conta como pacote para pedido mínimo
   isLaunch?: boolean;
