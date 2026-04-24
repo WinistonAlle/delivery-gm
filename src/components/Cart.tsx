@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "@/contexts/useCart";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import {
   ArrowLeft,
   ArrowRight,
   BadgeCheck,
+  Clock,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { FREE_SHIPPING_THRESHOLD } from "@/data/shipping";
@@ -30,6 +31,35 @@ import {
   CUSTOMER_SESSION_EVENT,
   getCustomerSession,
 } from "@/lib/customerAuth";
+import { COUPONS_ENABLED } from "@/lib/featureFlags";
+
+function useCouponCountdown(active: boolean) {
+  const expiresRef = useRef<number | null>(null);
+  const [display, setDisplay] = useState("");
+  const [urgent, setUrgent] = useState(false);
+
+  useEffect(() => {
+    if (!active) { expiresRef.current = null; return; }
+    if (!expiresRef.current) {
+      expiresRef.current = Date.now() + 24 * 60 * 60 * 1000;
+    }
+    const tick = () => {
+      const rem = Math.max(0, (expiresRef.current ?? 0) - Date.now());
+      const total = Math.floor(rem / 1000);
+      const h = Math.floor(total / 3600);
+      const m = Math.floor((total % 3600) / 60);
+      const s = total % 60;
+      const pad = (n: number) => String(n).padStart(2, "0");
+      setDisplay(`${pad(h)}:${pad(m)}:${pad(s)}`);
+      setUrgent(total < 3600);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [active]);
+
+  return { display, urgent };
+}
 
 const Cart: React.FC = () => {
   const navigate = useNavigate();
@@ -46,8 +76,12 @@ const Cart: React.FC = () => {
     packageCount,
     totalWeight,
     meetsMinimumOrder,
+    appliedCoupon,
+    discountAmount,
+    clearCoupon,
   } = useCart();
 
+  const couponCountdown = useCouponCountdown(!!appliedCoupon);
   const [attemptedNext, setAttemptedNext] = useState(false);
   const [hasCustomerSession, setHasCustomerSession] = useState(() => {
     const session = getCustomerSession();
@@ -316,6 +350,47 @@ const Cart: React.FC = () => {
                   <span className="font-medium">Subtotal:</span>
                   <span className="font-bold">R$ {safeCartTotal.toFixed(2)}</span>
                 </div>
+
+                {COUPONS_ENABLED && appliedCoupon && (
+                  <div className={`rounded-xl border px-3 py-2 ${couponCountdown.urgent ? "border-red-200 bg-red-50" : "border-green-200 bg-green-50"}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className={`text-xs font-bold ${couponCountdown.urgent ? "text-red-800" : "text-green-800"}`}>
+                          {appliedCoupon.type === "free_shipping"
+                            ? "🚚 Frete grátis aplicado"
+                            : `🎉 ${appliedCoupon.value}% de desconto`}
+                        </p>
+                        <p className={`text-[11px] ${couponCountdown.urgent ? "text-red-600" : "text-green-600"}`}>
+                          Cupom: {appliedCoupon.code}
+                        </p>
+                        {couponCountdown.display && (
+                          <div className="mt-1 flex items-center gap-1">
+                            <Clock className={`h-3 w-3 ${couponCountdown.urgent ? "text-red-500" : "text-amber-500"}`} />
+                            <span className={`font-mono text-[11px] font-bold tabular-nums ${couponCountdown.urgent ? "text-red-600" : "text-amber-700"}`}>
+                              {couponCountdown.display}
+                            </span>
+                            {couponCountdown.urgent && (
+                              <span className="text-[10px] font-semibold text-red-500">— corre!</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div className="shrink-0 text-right">
+                        {discountAmount > 0 && (
+                          <p className="text-sm font-bold text-green-700">
+                            -{discountAmount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                          </p>
+                        )}
+                        <button
+                          onClick={clearCoupon}
+                          className="text-[10px] text-slate-400 hover:text-red-500 underline"
+                        >
+                          remover
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {meetsMinimumOrder && missingForFreeShipping > 0 ? (
                   <Card className="border-amber-200 bg-amber-50 shadow-none">

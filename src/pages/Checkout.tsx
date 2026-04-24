@@ -32,6 +32,7 @@ import {
 import { trackCustomerEvent, trackCustomerEventOnce } from "@/lib/customerInsights";
 import { createFullAddress, fetchAddressFromCEP, formatCEP } from "@/utils/formatUtils";
 import { getDisplayProductPrice } from "../../shared/productPricing";
+import { COUPONS_ENABLED } from "@/lib/featureFlags";
 
 function safeGetSession() {
   return getCustomerSession() as CustomerSession | null;
@@ -99,7 +100,7 @@ const paymentOptions = [
 
 const Checkout: React.FC = () => {
   const navigate = useNavigate();
-  const { cartItems, cartTotal, clearCart, addToCart } = useCart();
+  const { cartItems, cartTotal, clearCart, addToCart, appliedCoupon, discountAmount } = useCart();
 
   const [session, setSession] = useState<CustomerSession | null>(() => safeGetSession());
   const customerDocumentCpf = session?.document_cpf?.toString?.() ?? "";
@@ -139,9 +140,10 @@ const Checkout: React.FC = () => {
     const city = SHIPPING_RATES.find((rate) => rate.city === selectedCity);
     return Number(city?.cost ?? 0);
   }, [selectedCity]);
-  const isFreeShipping = cartTotal >= FREE_SHIPPING_THRESHOLD;
+  const activeDiscount = COUPONS_ENABLED ? discountAmount : 0;
+  const isFreeShipping = cartTotal >= FREE_SHIPPING_THRESHOLD || (COUPONS_ENABLED && appliedCoupon?.type === "free_shipping");
   const finalShipping = selectedCity ? (isFreeShipping ? 0 : shippingCost) : 0;
-  const finalTotal = cartTotal + finalShipping;
+  const finalTotal = Math.max(0, cartTotal + finalShipping - activeDiscount);
   const newAddressSummary = useMemo(
     () =>
       createFullAddress(
@@ -348,6 +350,8 @@ const Checkout: React.FC = () => {
         paymentMethod,
         notes: notes.trim(),
         shippingCost: finalShipping,
+        couponCode: COUPONS_ENABLED ? appliedCoupon?.code : undefined,
+        discountAmount: COUPONS_ENABLED && activeDiscount > 0 ? activeDiscount : undefined,
         items: cartItems.map((ci) => ({
           product: ci.product,
           quantity: ci.quantity,
@@ -433,6 +437,7 @@ const Checkout: React.FC = () => {
         "",
         `*Entrega para:* ${selectedCity || "Não informada"}`,
         `*Taxa de entrega:* ${finalShipping > 0 ? formatCurrency(finalShipping) : "Grátis"}`,
+        ...(COUPONS_ENABLED && activeDiscount > 0 ? [`*Desconto:* -${formatCurrency(activeDiscount)} (${appliedCoupon?.code})`] : []),
         `*Forma de pagamento:* ${formatPaymentMethodLabel(paymentMethod)}`,
         "",
         "*Dados do Cliente:*",
@@ -800,6 +805,18 @@ const Checkout: React.FC = () => {
                     <span>Frete</span>
                     <span className="font-semibold text-white">{finalShipping > 0 ? formatCurrency(finalShipping) : "Grátis"}</span>
                   </div>
+                  {COUPONS_ENABLED && activeDiscount > 0 && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-green-400">Desconto ({appliedCoupon?.code})</span>
+                      <span className="font-semibold text-green-400">-{formatCurrency(activeDiscount)}</span>
+                    </div>
+                  )}
+                  {COUPONS_ENABLED && appliedCoupon?.type === "free_shipping" && finalShipping === 0 && cartTotal < FREE_SHIPPING_THRESHOLD && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-green-400">Frete grátis (cupom)</span>
+                      <span className="font-semibold text-green-400">{appliedCoupon.code}</span>
+                    </div>
+                  )}
                   <div className="h-px bg-white/10" />
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-white/80">Total final</span>

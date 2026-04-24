@@ -19,6 +19,7 @@ const SearchBar: React.FC<Props> = ({
   return (
     <div
       className="
+        search-bar-shell
         w-full rounded-3xl p-4 shadow-[0_18px_50px_rgba(12,18,38,0.10)]
         bg-white/60 backdrop-blur-2xl
         border border-white/70
@@ -27,13 +28,14 @@ const SearchBar: React.FC<Props> = ({
     >
       {/* Campo de busca */}
       <div className="relative">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+        <Search className="search-icon absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
         <input
           type="text"
           placeholder="Buscar por nome ou código..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="
+            search-input
             w-full pl-12 pr-4 py-3
             rounded-full
             bg-white/85 backdrop-blur-md
@@ -52,10 +54,11 @@ const SearchBar: React.FC<Props> = ({
           type="button"
           onClick={() => setSelectedCategory("all")}
           className={`
+            search-cat-pill
             px-4 py-2 rounded-full text-sm whitespace-nowrap transition-all duration-200
             ${
               selectedCategory === "all"
-                ? "bg-slate-900 text-white shadow-[0_8px_24px_rgba(15,23,42,0.35)]"
+                ? "search-cat-pill--active bg-slate-900 text-white shadow-[0_8px_24px_rgba(15,23,42,0.35)]"
                 : "bg-white/80 backdrop-blur-md text-slate-700 border border-slate-200 hover:bg-white"
             }
           `}
@@ -72,10 +75,11 @@ const SearchBar: React.FC<Props> = ({
               type="button"
               onClick={() => setSelectedCategory(isActive ? "all" : cat)}
               className={`
+                search-cat-pill
                 px-4 py-2 rounded-full text-sm whitespace-nowrap transition-all duration-200
                 ${
                   isActive
-                    ? "bg-slate-900 text-white shadow-[0_8px_24px_rgba(15,23,42,0.35)]"
+                    ? "search-cat-pill--active bg-slate-900 text-white shadow-[0_8px_24px_rgba(15,23,42,0.35)]"
                     : "bg-white/80 backdrop-blur-md text-slate-700 border border-slate-200 hover:bg-white"
                 }
               `}

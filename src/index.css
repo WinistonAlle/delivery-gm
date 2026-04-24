@@ -154,41 +154,61 @@ body {
 }
 
 :root[data-app-theme="natal"] {
-  --brand-50: #ecfdf5;
-  --brand-100: #d1fae5;
-  --brand-200: #a7f3d0;
-  --brand-300: #6ee7b7;
-  --brand-500: #10b981;
-  --brand-600: #059669;
-  --brand-700: #047857;
-  --brand-800: #065f46;
-  --brand-900: #064e3b;
-  --theme-bg-start: #f0fdf4;
-  --theme-bg-mid: #ecfdf5;
-  --theme-bg-end: #d1fae5;
-  --theme-panel-bg: rgba(236, 253, 245, 0.86);
-  --theme-panel-border: rgba(16, 185, 129, 0.28);
-  --theme-glow: rgba(16, 185, 129, 0.2);
-  --theme-accent-soft: rgba(16, 185, 129, 0.12);
+  /* Forest green profundo — sofisticado, não mint hospitalar */
+  --brand-50: #f0f7f4;
+  --brand-100: #d6ede4;
+  --brand-200: #aed9c7;
+  --brand-300: #7cbdaa;
+  --brand-500: #2d6a4f;
+  --brand-600: #1b4d3e;
+  --brand-700: #163d32;
+  --brand-800: #0f2d25;
+  --brand-900: #091f19;
+  /* Fundo creme quente — sensação de acolhimento, não frieza */
+  --theme-bg-start: #faf8f3;
+  --theme-bg-mid: #f5f0e8;
+  --theme-bg-end: #ede8de;
+  --theme-panel-bg: rgba(250, 248, 243, 0.92);
+  --theme-panel-border: rgba(45, 106, 79, 0.20);
+  /* Glow carmesim — calor festivo */
+  --theme-glow: rgba(155, 35, 53, 0.16);
+  --theme-accent-soft: rgba(27, 77, 62, 0.09);
+  /* Tokens exclusivos do tema natal */
+  --natal-crimson: #9b2335;
+  --natal-crimson-light: #c0392b;
+  --natal-gold: #c9a84c;
+  --natal-gold-light: #e6cc7a;
+  --natal-forest: #1b4d3e;
+  --natal-pine: #2d6a4f;
+  --natal-snow: #faf8f3;
 }
 
 :root[data-app-theme="blackfriday"] {
-  --brand-50: #f5f5f5;
-  --brand-100: #e5e5e5;
-  --brand-200: #d4d4d4;
-  --brand-300: #a3a3a3;
-  --brand-500: #404040;
-  --brand-600: #262626;
-  --brand-700: #171717;
-  --brand-800: #0a0a0a;
-  --brand-900: #000000;
-  --theme-bg-start: #f3f4f6;
-  --theme-bg-mid: #e5e7eb;
-  --theme-bg-end: #d1d5db;
-  --theme-panel-bg: rgba(255, 255, 255, 0.86);
-  --theme-panel-border: rgba(38, 38, 38, 0.14);
-  --theme-glow: rgba(23, 23, 23, 0.12);
-  --theme-accent-soft: rgba(23, 23, 23, 0.08);
+  /* Escala de cinzas quentes — carvão escuro, não preto puro */
+  --brand-50:  #f9f9f9;
+  --brand-100: #e8e8e8;
+  --brand-200: #c8c8c8;
+  --brand-300: #a0a0a0;
+  --brand-500: #ef4444;
+  --brand-600: #dc2626;
+  --brand-700: #b91c1c;
+  --brand-800: #2a2a38;
+  --brand-900: #1e1e2c;
+  /* Cinza-carvão — escuro mas com profundidade e textura */
+  --theme-bg-start: #1e1e2c;
+  --theme-bg-mid:   #232334;
+  --theme-bg-end:   #1a1a28;
+  /* Panels levemente mais claros que o fundo */
+  --theme-panel-bg:     rgba(74, 74, 96, 0.78);
+  --theme-panel-border: rgba(255, 255, 255, 0.16);
+  /* Glow vermelho — urgência de promoção */
+  --theme-glow:       rgba(239, 68, 68, 0.22);
+  --theme-accent-soft: rgba(239, 68, 68, 0.09);
+  /* Tokens exclusivos BF */
+  --bf-red:    #ef4444;
+  --bf-red-dk: #dc2626;
+  --bf-amber:  #f59e0b;
+  --bf-white:  #f8fafc;
 }
 
 :root[data-app-theme="pascoa"] {
@@ -201,9 +221,9 @@ body {
   --brand-700: #7c3aed;
   --brand-800: #6d28d9;
   --brand-900: #5b21b6;
-  --theme-bg-start: #fdf8fc;
-  --theme-bg-mid: #fffbea;
-  --theme-bg-end: #f4fbf7;
+  --theme-bg-start: #fdf4ff;
+  --theme-bg-mid: #faf0ff;
+  --theme-bg-end: #f3e6ff;
   --theme-panel-bg: rgba(255, 255, 255, 0.82);
   --theme-panel-border: rgba(196, 181, 253, 0.4);
   --theme-glow: rgba(244, 114, 182, 0.18);
@@ -230,22 +250,23 @@ body {
 }
 
 :root[data-app-theme="copa"] {
-  --brand-50: #ecfdf3;
-  --brand-100: #d1fae5;
-  --brand-200: #a7f3d0;
-  --brand-300: #6ee7b7;
-  --brand-500: #22c55e;
-  --brand-600: #16a34a;
-  --brand-700: #15803d;
-  --brand-800: #166534;
-  --brand-900: #14532d;
-  --theme-bg-start: #ecfeff;
-  --theme-bg-mid: #f0fdf4;
-  --theme-bg-end: #fef9c3;
-  --theme-panel-bg: rgba(236, 253, 243, 0.86);
-  --theme-panel-border: rgba(34, 197, 94, 0.28);
-  --theme-glow: rgba(22, 163, 74, 0.2);
-  --theme-accent-soft: rgba(34, 197, 94, 0.12);
+  --brand-50: #f0fdf4;
+  --brand-100: #dcfce7;
+  --brand-200: #bbf7d0;
+  --brand-300: #86efac;
+  --brand-500: #16a34a;
+  --brand-600: #15803d;
+  --brand-700: #166534;
+  --brand-800: #14532d;
+  --brand-900: #052e16;
+  /* Verde estádio → Amarelo seleção — campo iluminado */
+  --theme-bg-start: #e2f8eb;
+  --theme-bg-mid:   #f5fde8;
+  --theme-bg-end:   #fffbea;
+  --theme-panel-bg:     rgba(228, 252, 238, 0.94);
+  --theme-panel-border: rgba(22, 163, 74, 0.32);
+  --theme-glow:         rgba(22, 163, 74, 0.28);
+  --theme-accent-soft:  rgba(34, 197, 94, 0.16);
 }
 
 body {
@@ -259,7 +280,20 @@ body {
 }
 
 :root[data-app-theme="anonovo"] body {
-  color: #1f2937;
+  color: #1c1917;
+}
+
+/* Copa: Campo iluminado — listras horizontais sutis de grama */
+:root[data-app-theme="copa"] body {
+  background:
+    repeating-linear-gradient(
+      180deg,
+      rgba(22, 163, 74, 0.042) 0px,
+      rgba(22, 163, 74, 0.042) 52px,
+      transparent 52px,
+      transparent 104px
+    ),
+    linear-gradient(155deg, #e2f8eb 0%, #f5fde8 45%, #fffbea 100%);
 }
 
 .themed-panel {
@@ -469,57 +503,69 @@ body {
 
 :root[data-app-theme="junino"] .theme-season-hero::before {
   background-image:
+    radial-gradient(ellipse at 82% 10%, rgba(253, 230, 138, 0.32), transparent 38%),
+    radial-gradient(ellipse at 8% 30%,  rgba(249, 115, 22, 0.18), transparent 30%),
     repeating-linear-gradient(
       35deg,
-      rgba(249, 115, 22, 0.12) 0px,
-      rgba(249, 115, 22, 0.12) 10px,
+      rgba(249, 115, 22, 0.07) 0px,
+      rgba(249, 115, 22, 0.07) 10px,
       transparent 10px,
-      transparent 24px
-    ),
-    radial-gradient(circle at top right, var(--theme-accent-soft), transparent 58%);
+      transparent 26px
+    );
 }
 
 :root[data-app-theme="natal"] .theme-season-hero::before {
   background-image:
-    radial-gradient(circle at 15% 25%, rgba(16, 185, 129, 0.2), transparent 26%),
-    radial-gradient(circle at 85% 30%, rgba(220, 38, 38, 0.16), transparent 28%);
+    radial-gradient(circle at 14% 22%, rgba(155, 35, 53, 0.32), transparent 28%),
+    radial-gradient(circle at 86% 16%, rgba(27, 77, 62, 0.38), transparent 32%),
+    radial-gradient(circle at 50% 92%, rgba(201, 168, 76, 0.20), transparent 30%),
+    radial-gradient(circle at 50% 0%,  rgba(201, 168, 76, 0.14), transparent 44%);
 }
 
 :root[data-app-theme="anonovo"] .theme-season-hero::before {
   background-image:
-    radial-gradient(circle at 20% 22%, rgba(255, 255, 255, 0.16), transparent 20%),
-    radial-gradient(circle at 78% 16%, rgba(250, 204, 21, 0.15), transparent 22%),
-    radial-gradient(circle at 50% 0%, rgba(255, 248, 220, 0.1), transparent 32%);
+    radial-gradient(circle at 20% 22%, rgba(250, 204, 21, 0.26), transparent 26%),
+    radial-gradient(circle at 78% 16%, rgba(249, 115, 22, 0.20), transparent 28%),
+    radial-gradient(circle at 52% 85%, rgba(168, 85, 247, 0.16), transparent 32%),
+    radial-gradient(circle at 50% 0%,  rgba(255, 248, 200, 0.40), transparent 44%);
 }
 
 :root[data-app-theme="blackfriday"] .theme-season-hero::before {
   background-image:
+    radial-gradient(ellipse at 50% 100%, rgba(239, 68, 68, 0.28), transparent 44%),
+    radial-gradient(ellipse at 0%   50%, rgba(239, 68, 68, 0.14), transparent 36%),
+    radial-gradient(ellipse at 100% 50%, rgba(239, 68, 68, 0.14), transparent 36%),
     repeating-linear-gradient(
-      -35deg,
-      rgba(255, 255, 255, 0.08) 0px,
-      rgba(255, 255, 255, 0.08) 8px,
-      transparent 8px,
-      transparent 20px
+      -40deg,
+      rgba(255, 255, 255, 0.025) 0px,
+      rgba(255, 255, 255, 0.025) 5px,
+      transparent 5px,
+      transparent 16px
     );
 }
 
 :root[data-app-theme="copa"] .theme-season-hero::before {
   background-image:
-    radial-gradient(circle at 20% 30%, rgba(34, 197, 94, 0.2), transparent 24%),
-    radial-gradient(circle at 80% 30%, rgba(250, 204, 21, 0.2), transparent 24%),
-    radial-gradient(circle at 52% 80%, rgba(37, 99, 235, 0.14), transparent 28%);
+    radial-gradient(ellipse at 50%  -8%,  rgba(250, 204, 21, 0.40), transparent 50%),
+    radial-gradient(ellipse at 0%   55%,  rgba(22,  163, 74, 0.30), transparent 42%),
+    radial-gradient(ellipse at 100% 55%,  rgba(22,  163, 74, 0.30), transparent 42%),
+    radial-gradient(ellipse at 20%   0%,  rgba(37,  99,  235, 0.14), transparent 34%),
+    radial-gradient(ellipse at 80%   0%,  rgba(37,  99,  235, 0.14), transparent 34%),
+    radial-gradient(ellipse at 50% 110%,  rgba(251, 191, 36,  0.24), transparent 44%);
+  opacity: 1;
 }
 
 :root[data-app-theme="pascoa"] .theme-season-hero::before {
   background-image:
-    radial-gradient(circle at 16% 24%, rgba(247, 198, 217, 0.2), transparent 24%),
-    radial-gradient(circle at 84% 26%, rgba(190, 231, 208, 0.16), transparent 24%),
-    linear-gradient(180deg, rgba(216, 199, 243, 0.1), transparent 42%);
+    radial-gradient(ellipse at 50% 0%,  rgba(216, 199, 243, 0.38), transparent 44%),
+    radial-gradient(circle at 12% 26%,  rgba(247, 198, 217, 0.28), transparent 28%),
+    radial-gradient(circle at 88% 22%,  rgba(134, 239, 172, 0.20), transparent 26%),
+    radial-gradient(circle at 50% 90%,  rgba(253, 230, 138, 0.16), transparent 30%);
 }
 
-:root[data-app-theme="blackfriday"] .themed-panel,
-:root[data-app-theme="anonovo"] .themed-panel {
+:root[data-app-theme="blackfriday"] .themed-panel {
   color: #f8fafc;
+  border-color: rgba(255, 255, 255, 0.07) !important;
 }
 
 :root[data-app-theme="anonovo"] .themed-panel .text-slate-900,
@@ -537,15 +583,7 @@ body {
 
 :root[data-app-theme="blackfriday"] .themed-panel,
 :root[data-app-theme="blackfriday"] .themed-panel-soft {
-  color: #111827;
-}
-
-:root[data-app-theme="blackfriday"] .theme-season-hero .text-slate-900,
-:root[data-app-theme="blackfriday"] .theme-season-hero .text-slate-800,
-:root[data-app-theme="blackfriday"] .theme-season-hero .text-slate-700,
-:root[data-app-theme="blackfriday"] .theme-season-hero .text-slate-600,
-:root[data-app-theme="blackfriday"] .theme-season-hero .text-slate-500 {
-  color: #111827 !important;
+  color: #f8fafc;
 }
 
 .xmas-lights {
@@ -612,19 +650,24 @@ body {
   opacity: 0.75;
 }
 
-.xmas-bulb:nth-child(3n + 1) {
-  color: #ef4444;
+.xmas-bulb:nth-child(4n + 1) {
+  color: #c0392b;
   animation-delay: 0s;
 }
 
-.xmas-bulb:nth-child(3n + 2) {
-  color: #22c55e;
-  animation-delay: 0.25s;
+.xmas-bulb:nth-child(4n + 2) {
+  color: #2d6a4f;
+  animation-delay: 0.3s;
 }
 
-.xmas-bulb:nth-child(3n + 3) {
-  color: #facc15;
-  animation-delay: 0.45s;
+.xmas-bulb:nth-child(4n + 3) {
+  color: #c9a84c;
+  animation-delay: 0.55s;
+}
+
+.xmas-bulb:nth-child(4n + 4) {
+  color: #d0d0d0;
+  animation-delay: 0.8s;
 }
 
 @keyframes xmas-twinkle {
@@ -657,7 +700,7 @@ body {
   top: 6px;
   border-left: 14px solid transparent;
   border-right: 14px solid transparent;
-  border-bottom: 22px solid #22c55e;
+  border-bottom: 22px solid #3a9d6e;
 }
 
 .xmas-tree::after {
@@ -668,7 +711,7 @@ body {
   top: 22px;
   border-left: 20px solid transparent;
   border-right: 20px solid transparent;
-  border-bottom: 30px solid #15803d;
+  border-bottom: 30px solid #1b4d3e;
 }
 
 .xmas-tree-trunk {
@@ -687,10 +730,19 @@ body {
   top: 0;
   width: 12px;
   height: 12px;
-  background: #fde68a;
+  background: #e6cc7a;
   clip-path: polygon(50% 0%, 62% 35%, 100% 35%, 69% 57%, 80% 100%, 50% 72%, 20% 100%, 31% 57%, 0% 35%, 38% 35%);
   transform: translateX(-50%);
-  box-shadow: 0 0 16px rgba(253, 224, 71, 0.85);
+  box-shadow:
+    0 0 14px rgba(230, 204, 122, 0.95),
+    0 0 28px rgba(230, 204, 122, 0.5),
+    0 0 4px rgba(255, 255, 255, 0.8);
+  animation: xmas-star-glow 2.2s ease-in-out infinite;
+}
+
+@keyframes xmas-star-glow {
+  0%, 100% { opacity: 0.82; filter: brightness(1); }
+  50% { opacity: 1; filter: brightness(1.3); }
 }
 
 .xmas-tree-ornament {
@@ -704,22 +756,22 @@ body {
 .xmas-tree-ornament-red {
   left: 16px;
   top: 29px;
-  color: #ef4444;
-  background: currentColor;
+  color: #c0392b;
+  background: radial-gradient(circle at 35% 32%, rgba(255,255,255,0.55), currentColor 55%);
 }
 
 .xmas-tree-ornament-gold {
   left: 30px;
   top: 40px;
-  color: #facc15;
-  background: currentColor;
+  color: #c9a84c;
+  background: radial-gradient(circle at 35% 32%, rgba(255,255,255,0.55), currentColor 55%);
 }
 
 .xmas-tree-ornament-blue {
   left: 21px;
   top: 50px;
-  color: #60a5fa;
-  background: currentColor;
+  color: #4a90d9;
+  background: radial-gradient(circle at 35% 32%, rgba(255,255,255,0.55), currentColor 55%);
 }
 
 .xmas-tree-left {
@@ -862,6 +914,321 @@ body {
       0 3px 10px rgba(255, 255, 255, 0.45),
       -28px -14px 0 -2px #fff;
   }
+}
+
+/* =============================================================
+   NATAL: Fio de luzes — upgrade para fio dourado
+============================================================= */
+:root[data-app-theme="natal"] .xmas-lights::before {
+  border-top-color: rgba(201, 168, 76, 0.62);
+  box-shadow: 0 0 10px rgba(201, 168, 76, 0.22);
+}
+
+/* =============================================================
+   NATAL: Neve — partículas CSS-only, leve e performática
+============================================================= */
+.natal-snow-container {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.natal-snowflake {
+  position: absolute;
+  top: -14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 0 5px rgba(255, 255, 255, 0.4);
+  will-change: transform;
+  animation: natal-snow-fall linear infinite;
+}
+
+@keyframes natal-snow-fall {
+  0% {
+    transform: translateY(-14px) translateX(0) rotate(0deg);
+    opacity: 0.9;
+  }
+  70% {
+    opacity: 0.55;
+  }
+  100% {
+    transform: translateY(calc(100% + 320px)) translateX(var(--snow-drift, 22px)) rotate(270deg);
+    opacity: 0;
+  }
+}
+
+/* =============================================================
+   NATAL: Estrela de Belém
+============================================================= */
+.natal-star-belem {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.natal-star-belem::before {
+  content: "";
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  background: #e6cc7a;
+  clip-path: polygon(50% 0%, 62% 35%, 100% 35%, 69% 57%, 80% 100%, 50% 72%, 20% 100%, 31% 57%, 0% 35%, 38% 35%);
+  box-shadow:
+    0 0 20px rgba(230, 204, 122, 0.95),
+    0 0 40px rgba(230, 204, 122, 0.5),
+    0 0 6px rgba(255, 255, 255, 0.8);
+  animation: natal-star-pulse 2.4s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.natal-star-belem::after {
+  content: "";
+  position: absolute;
+  left: -20px;
+  top: -20px;
+  width: 62px;
+  height: 62px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(230, 204, 122, 0.38), transparent 68%);
+  animation: natal-star-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes natal-star-pulse {
+  0%, 100% { opacity: 0.78; transform: scale(0.92); }
+  50% { opacity: 1; transform: scale(1.12); }
+}
+
+.natal-star-belem-hero {
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.natal-star-belem-hero::before {
+  width: 28px;
+  height: 28px;
+}
+
+.natal-star-belem-hero::after {
+  left: -26px;
+  top: -26px;
+  width: 80px;
+  height: 80px;
+}
+
+/* =============================================================
+   NATAL: Ramos de pinheiro — cantos do hero
+============================================================= */
+.natal-pine-left,
+.natal-pine-right {
+  position: absolute;
+  bottom: 0;
+  z-index: 2;
+  pointer-events: none;
+  width: 90px;
+  height: 110px;
+}
+
+.natal-pine-left { left: 0; }
+.natal-pine-right { right: 0; transform: scaleX(-1); }
+
+.natal-pine-left::before,
+.natal-pine-right::before {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 90px;
+  height: 90px;
+  background: radial-gradient(ellipse at 28% 92%, rgba(27, 77, 62, 0.90) 0%, rgba(22, 61, 50, 0.72) 38%, transparent 66%);
+  filter: blur(1.5px);
+}
+
+.natal-pine-left::after,
+.natal-pine-right::after {
+  content: "";
+  position: absolute;
+  bottom: 18px;
+  left: 0;
+  width: 68px;
+  height: 68px;
+  background: radial-gradient(ellipse at 26% 88%, rgba(45, 106, 79, 0.62) 0%, transparent 62%);
+}
+
+/* =============================================================
+   NATAL: Glow dourado no hero (acima dos galhos)
+============================================================= */
+.natal-hero-glow {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.natal-hero-glow::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 180px;
+  height: 120px;
+  border-radius: 999px;
+  background: radial-gradient(ellipse, rgba(201, 168, 76, 0.22), transparent 68%);
+  filter: blur(12px);
+}
+
+@media (max-width: 768px) {
+  .natal-pine-left,
+  .natal-pine-right {
+    width: 64px;
+    height: 80px;
+  }
+
+  .natal-pine-left::before,
+  .natal-pine-right::before {
+    width: 64px;
+    height: 64px;
+  }
+
+  .natal-pine-left::after,
+  .natal-pine-right::after {
+    width: 48px;
+    height: 48px;
+    bottom: 12px;
+  }
+
+  .natal-star-belem-hero {
+    top: 12px;
+  }
+
+  .natal-star-belem-hero::before {
+    width: 22px;
+    height: 22px;
+  }
+
+  .natal-star-belem-hero::after {
+    left: -18px;
+    top: -18px;
+    width: 62px;
+    height: 62px;
+  }
+}
+
+/* =============================================================
+   JUNINO: Melhorias de paleta
+============================================================= */
+:root[data-app-theme="junino"] {
+  --brand-50: #fff7ed;
+  --brand-100: #ffedd5;
+  --brand-200: #fed7aa;
+  --brand-300: #fdba74;
+  --brand-500: #ea580c;
+  --brand-600: #c2410c;
+  --brand-700: #9a3412;
+  --brand-800: #7c2d12;
+  --brand-900: #431407;
+  /* Fundo mais quente — pôr-do-sol de arraial */
+  --theme-bg-start: #fff9f0;
+  --theme-bg-mid: #fff4e0;
+  --theme-bg-end: #ffe8bc;
+  --theme-panel-bg: rgba(255, 249, 240, 0.90);
+  --theme-panel-border: rgba(234, 88, 12, 0.28);
+  --theme-glow: rgba(194, 65, 12, 0.24);
+  --theme-accent-soft: rgba(249, 115, 22, 0.12);
+}
+
+:root[data-app-theme="blackfriday"] body { color: #f8fafc; }
+
+:root[data-app-theme="blackfriday"] .text-slate-900,
+:root[data-app-theme="blackfriday"] .text-slate-800,
+:root[data-app-theme="blackfriday"] .text-slate-700,
+:root[data-app-theme="blackfriday"] .text-gray-900,
+:root[data-app-theme="blackfriday"] .text-gray-800,
+:root[data-app-theme="blackfriday"] .text-gray-700 {
+  color: rgba(241, 245, 249, 0.92) !important;
+}
+
+:root[data-app-theme="blackfriday"] .text-slate-600,
+:root[data-app-theme="blackfriday"] .text-gray-600 {
+  color: rgba(226, 232, 240, 0.84) !important;
+}
+
+:root[data-app-theme="blackfriday"] .text-slate-500,
+:root[data-app-theme="blackfriday"] .text-gray-500,
+:root[data-app-theme="blackfriday"] .text-gray-400 {
+  color: rgba(203, 213, 225, 0.72) !important;
+}
+
+/* =============================================================
+   PÁSCOA: Melhorias de paleta
+============================================================= */
+:root[data-app-theme="pascoa"] {
+  --brand-50: #fdf4ff;
+  --brand-100: #fae8ff;
+  --brand-200: #f0abfc;
+  --brand-300: #e879f9;
+  --brand-500: #a855f7;
+  --brand-600: #9333ea;
+  --brand-700: #7e22ce;
+  --brand-800: #6b21a8;
+  --brand-900: #581c87;
+  /* Primavera suave — não pasteurizado */
+  --theme-bg-start: #fdf8ff;
+  --theme-bg-mid: #faf0ff;
+  --theme-bg-end: #f3e8ff;
+  --theme-panel-bg: rgba(253, 248, 255, 0.92);
+  --theme-panel-border: rgba(168, 85, 247, 0.22);
+  --theme-glow: rgba(236, 72, 153, 0.18);
+  --theme-accent-soft: rgba(168, 85, 247, 0.10);
+}
+
+/* =============================================================
+   ANO NOVO: Paleta luminosa — branco, offwhite e ouro
+============================================================= */
+:root[data-app-theme="anonovo"] {
+  --brand-50: #fffdf5;
+  --brand-100: #fff8dc;
+  --brand-200: #fce9ad;
+  --brand-300: #f7d97b;
+  --brand-500: #c9971a;
+  --brand-600: #a37a12;
+  --brand-700: #7f5d0e;
+  --brand-800: #62480d;
+  --brand-900: #3d2d08;
+  /* Champanhe luminoso — branco marfim com brilho dourado */
+  --theme-bg-start: #fffdf7;
+  --theme-bg-mid: #fffaf0;
+  --theme-bg-end: #fdf5e4;
+  --theme-panel-bg: rgba(255, 255, 255, 0.88);
+  --theme-panel-border: rgba(201, 151, 26, 0.22);
+  --theme-glow: rgba(250, 204, 21, 0.20);
+  --theme-accent-soft: rgba(255, 248, 200, 0.30);
+}
+
+/* =============================================================
+   COPA: Melhorias de paleta
+============================================================= */
+:root[data-app-theme="copa"] {
+  --brand-50: #f0fdf4;
+  --brand-100: #dcfce7;
+  --brand-200: #bbf7d0;
+  --brand-300: #86efac;
+  --brand-500: #16a34a;
+  --brand-600: #15803d;
+  --brand-700: #166534;
+  --brand-800: #14532d;
+  --brand-900: #052e16;
+  /* Verde estádio → Amarelo seleção — campo iluminado */
+  --theme-bg-start: #e2f8eb;
+  --theme-bg-mid:   #f5fde8;
+  --theme-bg-end:   #fffbea;
+  --theme-panel-bg:     rgba(228, 252, 238, 0.94);
+  --theme-panel-border: rgba(22, 163, 74, 0.32);
+  --theme-glow:         rgba(22, 163, 74, 0.28);
+  --theme-accent-soft:  rgba(34, 197, 94, 0.16);
 }
 
 .newyear-header-glow,
@@ -1026,18 +1393,18 @@ body {
   font-weight: 900;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #fffdf5;
+  color: #92400e;
   text-shadow:
-    0 1px 0 rgba(120, 53, 15, 0.18),
-    0 0 18px rgba(250, 204, 21, 0.24);
+    0 1px 0 rgba(255, 255, 255, 0.6),
+    0 0 18px rgba(250, 204, 21, 0.30);
 }
 
 .newyear-greeting-header {
   padding: 0.45rem 1rem;
   border-radius: 999px;
-  border: 1px solid rgba(255, 248, 220, 0.34);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(250, 204, 21, 0.12));
-  box-shadow: 0 10px 28px rgba(250, 204, 21, 0.12);
+  border: 1px solid rgba(201, 151, 26, 0.28);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.75), rgba(255, 248, 200, 0.60));
+  box-shadow: 0 10px 28px rgba(201, 151, 26, 0.14);
   font-size: 0.82rem;
 }
 
@@ -1166,12 +1533,22 @@ body {
 
 .copa-ball-hero-left {
   left: 18px;
-  transform: rotate(-14deg);
+  animation: copa-ball-float-left 3.8s ease-in-out infinite;
 }
 
 .copa-ball-hero-right {
   right: 18px;
-  transform: rotate(14deg);
+  animation: copa-ball-float-right 3.8s ease-in-out infinite;
+}
+
+@keyframes copa-ball-float-left {
+  0%, 100% { transform: rotate(-14deg) translateY(0px);   opacity: 0.88; }
+  50%       { transform: rotate(-14deg) translateY(-8px);  opacity: 1;    }
+}
+
+@keyframes copa-ball-float-right {
+  0%, 100% { transform: rotate(14deg) translateY(-8px);  opacity: 0.88; }
+  50%       { transform: rotate(14deg) translateY(0px);   opacity: 1;    }
 }
 
 .copa-flag {
@@ -1763,4 +2140,1077 @@ body {
 
 .focus\:ring-red-200:focus {
   --tw-ring-color: var(--brand-200) !important;
+}
+
+/* =============================================================
+   BLACK FRIDAY: Decorações do hero
+============================================================= */
+
+/* ---------- Watermark ---------- */
+.bf-hero-watermark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-8deg);
+  font-size: clamp(48px, 9vw, 88px);
+  font-weight: 900;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.04);
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  line-height: 1;
+}
+
+/* ---------- Fita ticker (rolagem horizontal) ---------- */
+.bf-ticker {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 34px;
+  background: var(--bf-red, #ef4444);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  z-index: 4;
+  pointer-events: none;
+  box-shadow: 0 -4px 18px rgba(239, 68, 68, 0.45);
+}
+
+.bf-ticker::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(0,0,0,0.22) 0%,
+    transparent 8%,
+    transparent 92%,
+    rgba(0,0,0,0.22) 100%
+  );
+  z-index: 1;
+  pointer-events: none;
+}
+
+.bf-ticker-track {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  animation: bf-ticker-scroll 16s linear infinite;
+  will-change: transform;
+  height: 100%;
+}
+
+.bf-ticker-track > span {
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+}
+
+.bf-ticker-item {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #ffffff;
+  line-height: 1;
+  height: 100%;
+}
+
+.bf-ticker-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+  margin: 0 14px;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+@keyframes bf-ticker-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* ---------- Fita de canto (ribbon corner) ---------- */
+.bf-corner-ribbon {
+  position: absolute;
+  top: 28px;
+  right: -28px;
+  width: 160px;
+  background: var(--bf-red, #ef4444);
+  color: #ffffff;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 7px 0;
+  transform: rotate(45deg);
+  box-shadow:
+    0 4px 20px rgba(239, 68, 68, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  pointer-events: none;
+  z-index: 5;
+  overflow: hidden;
+}
+
+.bf-corner-ribbon::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.15) 0%,
+    transparent 60%
+  );
+}
+
+/* ---------- Tags de promoção flutuantes ---------- */
+.bf-promo-tag {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  animation: bf-tag-float ease-in-out infinite;
+}
+
+.bf-promo-tag-body {
+  background: var(--bf-red, #ef4444);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  padding: 6px 14px 6px 12px;
+  border-radius: 4px 0 0 4px;
+  position: relative;
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.50);
+  line-height: 1;
+}
+
+.bf-promo-tag-body::after {
+  content: "";
+  position: absolute;
+  right: -10px;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-top: 15px solid transparent;
+  border-bottom: 15px solid transparent;
+  border-left: 10px solid var(--bf-red, #ef4444);
+}
+
+.bf-promo-tag-hole {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.4);
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
+  flex-shrink: 0;
+  margin-left: 16px;
+}
+
+@keyframes bf-tag-float {
+  0%, 100% { transform: translateY(0)    rotate(var(--tag-rot, -3deg)); opacity: 0.82; }
+  50%       { transform: translateY(-5px) rotate(var(--tag-rot, -3deg)); opacity: 1;    }
+}
+
+/* ---------- Raio (bolt) ---------- */
+.bf-hero-bolt {
+  position: absolute;
+  clip-path: polygon(62% 0%, 38% 46%, 65% 46%, 28% 100%, 54% 54%, 28% 54%);
+  pointer-events: none;
+  animation: bf-bolt-flash ease-in-out infinite;
+}
+
+@keyframes bf-bolt-flash {
+  0%, 100% { opacity: 0.12; filter: brightness(1);    }
+  40%, 60%  { opacity: 0.38; filter: brightness(1.4); }
+}
+
+/* =============================================================
+   COPA: Confetti caindo no hero
+============================================================= */
+.copa-confetti-piece {
+  position: absolute;
+  top: -14px;
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  pointer-events: none;
+  opacity: 0;
+  animation: copa-confetti-fall linear infinite;
+}
+
+@keyframes copa-confetti-fall {
+  0%   { transform: translateY(0px)   rotate(0deg)   translateX(0px);                  opacity: 0;    }
+  8%   {                                                                                opacity: 0.78; }
+  88%  {                                                                                opacity: 0.78; }
+  100% { transform: translateY(230px) rotate(440deg) translateX(var(--drift, 18px));   opacity: 0;    }
+}
+
+/* =============================================================
+   JUNINO: Lua + estrelas no hero
+============================================================= */
+.junino-hero-moon {
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 42% 42%, #fff7c2, #fde68a 52%, #fbbf24 100%);
+  box-shadow:
+    0 0 28px rgba(253, 230, 138, 0.72),
+    0 0 60px rgba(253, 230, 138, 0.36),
+    0 0 96px rgba(253, 230, 138, 0.16);
+  pointer-events: none;
+  animation: junino-moon-glow-hero 4.2s ease-in-out infinite;
+  z-index: 2;
+}
+
+.junino-hero-moon::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: var(--theme-bg-mid, #fff4e0);
+  opacity: 0.90;
+}
+
+@keyframes junino-moon-glow-hero {
+  0%, 100% { box-shadow: 0 0 28px rgba(253,230,138,0.72), 0 0 60px rgba(253,230,138,0.36); }
+  50%       { box-shadow: 0 0 42px rgba(253,230,138,0.92), 0 0 84px rgba(253,230,138,0.52); }
+}
+
+.junino-hero-star {
+  position: absolute;
+  clip-path: polygon(50% 0%, 62% 35%, 100% 35%, 69% 57%, 80% 100%, 50% 72%, 20% 100%, 31% 57%, 0% 35%, 38% 35%);
+  background: #fbbf24;
+  pointer-events: none;
+  z-index: 2;
+  animation: junino-hero-star-pulse ease-in-out infinite;
+}
+
+@keyframes junino-hero-star-pulse {
+  0%, 100% { opacity: 0.28; transform: scale(0.84); filter: brightness(1);   }
+  50%       { opacity: 0.88; transform: scale(1.18); filter: brightness(1.5); }
+}
+
+/* =============================================================
+   PÁSCOA: Pétalas flutuando no hero
+============================================================= */
+.pascoa-petal {
+  position: absolute;
+  top: -16px;
+  border-radius: 0 80% 0 80%;
+  pointer-events: none;
+  opacity: 0;
+  animation: pascoa-petal-drift ease-in-out infinite;
+}
+
+@keyframes pascoa-petal-drift {
+  0%   { transform: translateY(0px)   rotate(0deg)   translateX(0px);                       opacity: 0;    }
+  10%  {                                                                                     opacity: 0.60; }
+  84%  {                                                                                     opacity: 0.60; }
+  100% { transform: translateY(190px) rotate(240deg) translateX(var(--petal-drift, 22px)); opacity: 0;    }
+}
+
+/* =============================================================
+   BLACK FRIDAY: Harmonização — UI elements (dark mode)
+   Todos os elementos brancos adaptados ao fundo escuro
+============================================================= */
+
+/* Sticky search container */
+:root[data-app-theme="blackfriday"] .search-sticky-bar {
+  background: rgba(36, 36, 54, 0.94) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+}
+
+/* Search bar shell */
+:root[data-app-theme="blackfriday"] .search-bar-shell {
+  background: rgba(110, 114, 134, 0.18) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18) !important;
+}
+
+/* Search input field */
+:root[data-app-theme="blackfriday"] .search-input {
+  background: rgba(116, 121, 142, 0.88) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  color: #f8fafc !important;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14) !important;
+}
+
+:root[data-app-theme="blackfriday"] .search-input::placeholder {
+  color: rgba(226, 232, 240, 0.56) !important;
+}
+
+:root[data-app-theme="blackfriday"] .search-icon {
+  color: rgba(241, 245, 249, 0.58) !important;
+}
+
+/* Category filter pills */
+:root[data-app-theme="blackfriday"] .search-cat-pill {
+  background: rgba(106, 111, 131, 0.84) !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  color: rgba(241, 245, 249, 0.84) !important;
+}
+
+:root[data-app-theme="blackfriday"] .search-cat-pill:hover {
+  background: rgba(118, 123, 144, 0.92) !important;
+  color: #ffffff !important;
+}
+
+:root[data-app-theme="blackfriday"] .search-cat-pill--active {
+  background: #ef4444 !important;
+  border-color: transparent !important;
+  color: #ffffff !important;
+  box-shadow: 0 8px 20px rgba(239, 68, 68, 0.34) !important;
+}
+
+/* Clear search button */
+:root[data-app-theme="blackfriday"] .search-clear-btn {
+  background: rgba(95, 99, 118, 0.92) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+}
+
+:root[data-app-theme="blackfriday"] .search-clear-btn svg {
+  color: rgba(255, 255, 255, 0.50) !important;
+}
+
+/* Bottom navigation bar */
+:root[data-app-theme="blackfriday"] .bottom-nav-bar {
+  background: rgba(26, 26, 40, 0.97) !important;
+  border-top-color: rgba(239, 68, 68, 0.20) !important;
+  box-shadow: 0 -2px 24px rgba(0, 0, 0, 0.35) !important;
+}
+
+:root[data-app-theme="blackfriday"] .bottom-nav-bar button {
+  color: rgba(248, 250, 252, 0.48) !important;
+}
+
+:root[data-app-theme="blackfriday"] .bottom-nav-bar button.text-red-600 {
+  color: #ef4444 !important;
+}
+
+:root[data-app-theme="blackfriday"] .bottom-nav-bar .bg-red-50 {
+  background: rgba(239, 68, 68, 0.16) !important;
+}
+
+:root[data-app-theme="blackfriday"] .footer-shell {
+  background: rgba(56, 60, 76, 0.94) !important;
+  border-top-color: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 -10px 28px rgba(15, 23, 42, 0.16) !important;
+}
+
+:root[data-app-theme="blackfriday"] .footer-social-btn {
+  background: rgba(106, 111, 131, 0.82) !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  color: #f8fafc !important;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.18) !important;
+}
+
+:root[data-app-theme="blackfriday"] .footer-social-btn:hover {
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.24) !important;
+}
+
+:root[data-app-theme="blackfriday"] .footer-social-icon {
+  background: rgba(44, 47, 61, 0.96) !important;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.24) !important;
+}
+
+:root[data-app-theme="blackfriday"] .footer-developer .text-slate-500 {
+  color: rgba(226, 232, 240, 0.68) !important;
+}
+
+:root[data-app-theme="blackfriday"] .helper-chat-trigger {
+  background: rgba(86, 90, 109, 0.94) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  color: #f8fafc !important;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.24) !important;
+}
+
+:root[data-app-theme="blackfriday"] .helper-chat-trigger:hover {
+  background: rgba(98, 103, 124, 0.98) !important;
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.28) !important;
+}
+
+:root[data-app-theme="blackfriday"] .helper-chat-trigger-icon {
+  background: rgba(36, 39, 50, 0.94) !important;
+  color: #f8fafc !important;
+}
+
+:root[data-app-theme="blackfriday"] .helper-chat-trigger-copy,
+:root[data-app-theme="blackfriday"] .helper-chat-trigger-copy .text-base {
+  color: #f8fafc !important;
+}
+
+:root[data-app-theme="blackfriday"] .helper-chat-trigger-kicker {
+  color: rgba(226, 232, 240, 0.72) !important;
+}
+
+:root[data-app-theme="blackfriday"] .helper-chat-panel {
+  background: rgba(72, 76, 94, 0.96) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+}
+
+:root[data-app-theme="blackfriday"] .helper-chat-header {
+  background: rgba(30, 33, 44, 0.98) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.10) !important;
+}
+
+:root[data-app-theme="blackfriday"] .helper-chat-close {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #f8fafc !important;
+}
+
+:root[data-app-theme="blackfriday"] .helper-chat-scroll {
+  background: rgba(64, 68, 84, 0.96) !important;
+}
+
+:root[data-app-theme="blackfriday"] .helper-chat-footer {
+  background: rgba(72, 76, 94, 0.96) !important;
+  border-top-color: rgba(255, 255, 255, 0.10) !important;
+}
+
+:root[data-app-theme="blackfriday"] .helper-chat-status-chip {
+  background: rgba(255, 255, 255, 0.10) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: rgba(248, 250, 252, 0.92) !important;
+}
+
+:root[data-app-theme="blackfriday"] .helper-chat-bubble-bot {
+  background: rgba(101, 106, 127, 0.96) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: #f8fafc !important;
+}
+
+:root[data-app-theme="blackfriday"] .helper-chat-bubble-user {
+  background: rgba(33, 36, 48, 0.98) !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+:root[data-app-theme="blackfriday"] .helper-chat-typing-dot {
+  background: rgba(241, 245, 249, 0.72) !important;
+}
+
+:root[data-app-theme="blackfriday"] .helper-chat-action-btn,
+:root[data-app-theme="blackfriday"] .helper-chat-quick-btn {
+  background: rgba(95, 100, 120, 0.94) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: #f8fafc !important;
+}
+
+:root[data-app-theme="blackfriday"] .helper-chat-action-btn:hover,
+:root[data-app-theme="blackfriday"] .helper-chat-quick-btn:hover {
+  background: rgba(108, 113, 134, 0.98) !important;
+}
+
+:root[data-app-theme="blackfriday"] .helper-chat-input {
+  background: rgba(95, 100, 120, 0.94) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: #f8fafc !important;
+}
+
+:root[data-app-theme="blackfriday"] .helper-chat-input::placeholder {
+  color: rgba(226, 232, 240, 0.62) !important;
+}
+
+:root[data-app-theme="blackfriday"] .helper-chat-input:focus {
+  border-color: rgba(239, 68, 68, 0.48) !important;
+}
+
+:root[data-app-theme="blackfriday"] .helper-chat-send {
+  background: #ef4444 !important;
+  color: #ffffff !important;
+  box-shadow: 0 12px 24px rgba(239, 68, 68, 0.30) !important;
+}
+
+:root[data-app-theme="blackfriday"] .hero-default-panel {
+  background: rgba(34, 37, 49, 0.46) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.36) !important;
+}
+
+:root[data-app-theme="blackfriday"] .hero-default-panel h2,
+:root[data-app-theme="blackfriday"] .hero-default-copy {
+  text-shadow: 0 2px 12px rgba(15, 23, 42, 0.42);
+}
+
+:root[data-app-theme="blackfriday"] .hero-default-copy {
+  color: rgba(248, 250, 252, 0.94) !important;
+}
+
+:root[data-app-theme="blackfriday"] .hero-default-cta {
+  background: rgba(32, 35, 46, 0.96) !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.28) !important;
+}
+
+:root[data-app-theme="blackfriday"] .hero-default-cta:hover {
+  background: rgba(44, 47, 61, 0.98) !important;
+}
+
+/* Side drawer menu */
+:root[data-app-theme="blackfriday"] .side-drawer {
+  background: #1e1e2c !important;
+  border-left-color: rgba(239, 68, 68, 0.22) !important;
+  color: #f8fafc !important;
+}
+
+:root[data-app-theme="blackfriday"] .side-drawer .border-b {
+  border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+:root[data-app-theme="blackfriday"] .side-drawer .text-gray-500 {
+  color: rgba(248, 250, 252, 0.45) !important;
+}
+
+:root[data-app-theme="blackfriday"] .side-drawer .text-gray-800 {
+  color: rgba(248, 250, 252, 0.90) !important;
+}
+
+:root[data-app-theme="blackfriday"] .side-drawer .bg-gray-100 {
+  background: rgba(255, 255, 255, 0.10) !important;
+}
+
+:root[data-app-theme="blackfriday"] .side-drawer .bg-gray-200 {
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+
+:root[data-app-theme="blackfriday"] .side-drawer .hover\:bg-red-50:hover {
+  background: rgba(239, 68, 68, 0.14) !important;
+}
+
+:root[data-app-theme="blackfriday"] .side-drawer .bg-red-100 {
+  background: rgba(239, 68, 68, 0.20) !important;
+}
+
+:root[data-app-theme="blackfriday"] .side-drawer .bg-gray-800 {
+  background: rgba(255, 255, 255, 0.80) !important;
+}
+
+/* Catalog section heading and count */
+:root[data-app-theme="blackfriday"] .catalog-heading {
+  color: #f8fafc !important;
+}
+
+:root[data-app-theme="blackfriday"] .catalog-count {
+  color: rgba(248, 250, 252, 0.42) !important;
+}
+
+/* Pagination */
+:root[data-app-theme="blackfriday"] .pagination-btn {
+  background: rgba(34, 34, 52, 0.97) !important;
+  border-color: rgba(255, 255, 255, 0.10) !important;
+  color: rgba(248, 250, 252, 0.82) !important;
+}
+
+:root[data-app-theme="blackfriday"] .pagination-btn:not(:disabled):hover {
+  background: rgba(239, 68, 68, 0.16) !important;
+  border-color: rgba(239, 68, 68, 0.40) !important;
+  color: #ef4444 !important;
+}
+
+:root[data-app-theme="blackfriday"] .pagination-select {
+  background: rgba(34, 34, 52, 0.97) !important;
+  border-color: rgba(255, 255, 255, 0.10) !important;
+  color: rgba(248, 250, 252, 0.82) !important;
+}
+
+/* Product cards — bem mais claros que o fundo para contraste real */
+:root[data-app-theme="blackfriday"] [data-card] {
+  background: rgba(95, 99, 118, 0.92) !important;
+  backdrop-filter: blur(14px) !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.22), 0 1px 0 rgba(255,255,255,0.10) inset !important;
+}
+
+:root[data-app-theme="blackfriday"] [data-card]:hover {
+  border-color: rgba(239, 68, 68, 0.45) !important;
+  box-shadow: 0 20px 42px rgba(15, 23, 42, 0.16), 0 10px 24px rgba(239, 68, 68, 0.12) !important;
+  transform: translateY(-2px);
+}
+
+:root[data-app-theme="blackfriday"] [data-card].border-red-200 {
+  border-color: rgba(239, 68, 68, 0.55) !important;
+  box-shadow: 0 18px 40px rgba(239, 68, 68, 0.28) !important;
+}
+
+/* Product card text overrides */
+:root[data-app-theme="blackfriday"] [data-card] .text-slate-900,
+:root[data-app-theme="blackfriday"] [data-card] .text-slate-800 {
+  color: #f8fafc !important;
+}
+
+:root[data-app-theme="blackfriday"] [data-card] .product-card-title {
+  color: rgba(226, 232, 240, 0.96) !important;
+}
+
+:root[data-app-theme="blackfriday"] [data-card] .text-gray-500,
+:root[data-app-theme="blackfriday"] [data-card] .text-gray-400 {
+  color: rgba(226, 232, 240, 0.72) !important;
+}
+
+:root[data-app-theme="blackfriday"] [data-card] .text-gray-600 {
+  color: rgba(241, 245, 249, 0.82) !important;
+}
+
+/* Card inner sections (info panel, image area) */
+:root[data-app-theme="blackfriday"] [data-card] .bg-white\/95,
+:root[data-app-theme="blackfriday"] [data-card] .bg-white {
+  background: rgba(84, 88, 106, 0.96) !important;
+}
+
+:root[data-app-theme="blackfriday"] [data-card] .bg-white\/60 {
+  background: rgba(103, 108, 128, 0.82) !important;
+}
+
+:root[data-app-theme="blackfriday"] [data-card] .border-white\/90,
+:root[data-app-theme="blackfriday"] [data-card] .border-white\/80 {
+  border-color: rgba(255, 255, 255, 0.16) !important;
+}
+
+:root[data-app-theme="blackfriday"] [data-card] .bg-gray-200 {
+  background: rgba(255, 255, 255, 0.16) !important;
+}
+
+:root[data-app-theme="blackfriday"] [data-card] .text-gray-400.text-xs {
+  color: rgba(203, 213, 225, 0.62) !important;
+}
+
+/* Pill badges inside cards */
+:root[data-app-theme="blackfriday"] [data-card] .bg-gray-100 {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: rgba(248, 250, 252, 0.84) !important;
+}
+
+:root[data-app-theme="blackfriday"] [data-card] .bg-green-50 {
+  background: rgba(220, 252, 231, 0.96) !important;
+}
+
+/* Botões +/- de quantidade */
+:root[data-app-theme="blackfriday"] [data-card] .product-card-qty-btn {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  color: #f8fafc !important;
+  box-shadow: none !important;
+}
+
+:root[data-app-theme="blackfriday"] [data-card] .product-card-qty-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.20) !important;
+  border-color: rgba(255, 255, 255, 0.26) !important;
+}
+
+:root[data-app-theme="blackfriday"] [data-card] .product-card-qty-btn:disabled {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.10) !important;
+  color: rgba(255, 255, 255, 0.30) !important;
+  opacity: 1 !important;
+}
+
+/* Botão + quando há item no carrinho — usa bg-slate-900 hardcoded, vira vermelho BF */
+:root[data-app-theme="blackfriday"] [data-card] .product-card-qty-btn.bg-slate-900 {
+  background: #ef4444 !important;
+  border-color: transparent !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.45) !important;
+}
+
+:root[data-app-theme="blackfriday"] [data-card] .product-card-qty-btn.bg-slate-900:hover {
+  background: #dc2626 !important;
+  box-shadow: 0 6px 18px rgba(239, 68, 68, 0.55) !important;
+}
+
+/* Input de quantidade */
+:root[data-app-theme="blackfriday"] [data-card] .product-card-qty-input {
+  background: rgba(255, 255, 255, 0.10) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+:root[data-app-theme="blackfriday"] [data-card] .product-card-qty-input:focus {
+  border-color: rgba(239, 68, 68, 0.55) !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Botão confirmar quantidade */
+:root[data-app-theme="blackfriday"] [data-card] .product-card-qty-apply {
+  background: #ef4444 !important;
+  border-color: transparent !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.40) !important;
+}
+
+/* Skeleton loading */
+:root[data-app-theme="blackfriday"] .bg-gray-200.rounded {
+  background: rgba(226, 232, 240, 0.62) !important;
+}
+
+:root[data-app-theme="blackfriday"] .bg-gray-200.rounded-lg {
+  background: rgba(226, 232, 240, 0.62) !important;
+}
+
+/* =============================================================
+   COPA: Decorações do hero — Estrelas, holofotes, grama
+============================================================= */
+
+/* Grama no rodapé do hero */
+.copa-hero-grass {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 30px;
+  pointer-events: none;
+  z-index: 2;
+  background: linear-gradient(to top, rgba(21, 128, 61, 0.48), transparent);
+}
+
+.copa-hero-grass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(22, 163, 74, 0.14) 0px,
+    rgba(22, 163, 74, 0.14) 14px,
+    rgba(21, 128, 61, 0.08) 14px,
+    rgba(21, 128, 61, 0.08) 28px
+  );
+}
+
+/* Holofotes do estádio */
+.copa-hero-spotlight {
+  position: absolute;
+  bottom: 0;
+  width: 5px;
+  height: 88%;
+  background: linear-gradient(to top, rgba(250, 204, 21, 0.50), rgba(250, 204, 21, 0));
+  filter: blur(4px);
+  border-radius: 999px;
+  pointer-events: none;
+  transform-origin: bottom center;
+  animation: copa-spot-sway ease-in-out infinite alternate;
+  z-index: 1;
+}
+
+@keyframes copa-spot-sway {
+  0%   { transform: rotate(var(--spot-rot, -12deg)) scaleY(0.82); opacity: 0.50; }
+  100% { transform: rotate(calc(var(--spot-rot, -12deg) * -0.6)) scaleY(1.18); opacity: 0.88; }
+}
+
+/* Estrelas de campeonato */
+.copa-hero-star {
+  position: absolute;
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  background: radial-gradient(circle at 40% 38%, #fde68a, #f59e0b);
+  filter: drop-shadow(0 0 5px rgba(250, 204, 21, 0.60));
+  pointer-events: none;
+  z-index: 3;
+  animation: copa-star-pulse ease-in-out infinite;
+}
+
+@keyframes copa-star-pulse {
+  0%, 100% { opacity: 0.52; transform: scale(0.86); filter: drop-shadow(0 0 4px rgba(250,204,21,0.40)); }
+  50%       { opacity: 1;    transform: scale(1.12); filter: drop-shadow(0 0 10px rgba(250,204,21,0.80)); }
+}
+
+/* Bandeira Brasil mini no hero — versão aprimorada (já existe outra no footer) */
+.copa-hero-flag {
+  position: absolute;
+  width: 48px;
+  height: 33px;
+  border-radius: 3px;
+  background: #16a34a;
+  pointer-events: none;
+  overflow: hidden;
+  box-shadow: 0 6px 18px rgba(22, 163, 74, 0.35);
+  animation: copa-flag-wave 2.8s ease-in-out infinite;
+}
+
+.copa-hero-flag::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  background: #facc15;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.copa-hero-flag::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: #2563eb;
+  transform: translate(-50%, -50%);
+}
+
+@keyframes copa-flag-wave {
+  0%, 100% { transform: rotate(-4deg) translateY(0px);  }
+  50%       { transform: rotate(2deg)  translateY(-4px); }
+}
+
+/* =============================================================
+   COPA: Camada de fundo — troféu, estrelas, gol, campo
+   (position: fixed, z-index: 0, pointer-events: none)
+============================================================= */
+
+/* Wrapper fixo — fica atrás de todo o conteúdo */
+.copa-bg-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+/* ===== TROFÉU ===== */
+.copa-bg-trophy-wrap {
+  position: absolute;
+  right: clamp(3%, 6vw, 8%);
+  top: 14%;
+  width: clamp(68px, 10vw, 128px);
+  height: clamp(96px, 14vw, 172px);
+  opacity: 0.09;
+  animation: copa-trophy-breathe 4.5s ease-in-out infinite alternate;
+}
+
+@keyframes copa-trophy-breathe {
+  0%   { opacity: 0.07; transform: translateY(0px);  filter: drop-shadow(0 0 18px rgba(250,204,21,0.28)); }
+  100% { opacity: 0.13; transform: translateY(-8px); filter: drop-shadow(0 0 32px rgba(250,204,21,0.50)); }
+}
+
+/* Copa (topo arredondado da taça) */
+.copa-bg-trophy-cup {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 70%;
+  height: 42%;
+  background: linear-gradient(145deg, #fef3c7 0%, #f59e0b 52%, #b45309 100%);
+  border-radius: 48% 48% 30% 30% / 34% 34% 44% 44%;
+}
+
+/* Alças */
+.copa-bg-trophy-handle {
+  position: absolute;
+  top: 4%;
+  width: 25%;
+  height: 30%;
+  border-style: solid;
+  border-color: #f59e0b;
+  border-radius: 50%;
+  border-width: clamp(3px, 0.4vw, 6px);
+}
+
+.copa-bg-trophy-handle-l {
+  left: 2%;
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+  transform: rotate(-28deg);
+}
+
+.copa-bg-trophy-handle-r {
+  right: 2%;
+  border-left-color: transparent;
+  border-bottom-color: transparent;
+  transform: rotate(28deg);
+}
+
+/* Orbe / globo (parte esférica da taça FIFA) */
+.copa-bg-trophy-orb {
+  position: absolute;
+  top: 37%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 32%;
+  height: 20%;
+  background: radial-gradient(circle at 36% 34%, #fde68a, #b45309);
+  border-radius: 50%;
+}
+
+/* Haste */
+.copa-bg-trophy-stem {
+  position: absolute;
+  top: 54%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 12%;
+  height: 30%;
+  background: linear-gradient(to bottom, #d97706, #92400e);
+  border-radius: 2px;
+}
+
+/* Base */
+.copa-bg-trophy-base {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 86%;
+  height: 8%;
+  background: linear-gradient(90deg, #92400e 0%, #fde68a 50%, #92400e 100%);
+  border-radius: 3px;
+}
+
+/* ===== 5 ESTRELAS DO BRASIL ===== */
+.copa-bg-stars-row {
+  position: absolute;
+  top: clamp(10%, 13vh, 16%);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: clamp(8px, 2vw, 22px);
+  animation: copa-stars-row-breathe 3.8s ease-in-out infinite alternate;
+}
+
+@keyframes copa-stars-row-breathe {
+  0%   { opacity: 0.09; }
+  100% { opacity: 0.16; }
+}
+
+.copa-bg-champion-star {
+  width: clamp(18px, 3vw, 40px);
+  height: clamp(18px, 3vw, 40px);
+  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+  background: linear-gradient(145deg, #fef3c7, #f59e0b);
+  filter: drop-shadow(0 0 6px rgba(250, 204, 21, 0.55));
+}
+
+/* ===== GOL COM REDE ===== */
+.copa-bg-goal-wrap {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: clamp(220px, 60vw, 680px);
+  height: clamp(110px, 30vw, 340px);
+  opacity: 0.07;
+}
+
+/* Travessão */
+.copa-bg-goal-crossbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: clamp(3px, 0.45vw, 6px);
+  background: linear-gradient(90deg, #14532d, #22c55e 50%, #14532d);
+  border-radius: 3px;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.50);
+}
+
+/* Postes */
+.copa-bg-goal-post {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: clamp(3px, 0.45vw, 6px);
+  background: linear-gradient(to bottom, #22c55e, #14532d);
+  border-radius: 3px;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.40);
+}
+
+.copa-bg-goal-post-l { left: 0; }
+.copa-bg-goal-post-r { right: 0; }
+
+/* Rede */
+.copa-bg-goal-net {
+  position: absolute;
+  top: clamp(3px, 0.45vw, 6px);
+  left: clamp(3px, 0.45vw, 6px);
+  right: clamp(3px, 0.45vw, 6px);
+  bottom: 0;
+  background-image:
+    linear-gradient(rgba(22, 163, 74, 0.60) 1.5px, transparent 1.5px),
+    linear-gradient(90deg, rgba(22, 163, 74, 0.60) 1.5px, transparent 1.5px);
+  background-size: clamp(16px, 3.5vw, 32px) clamp(16px, 3.5vw, 32px);
+  -webkit-mask-image:
+    linear-gradient(to bottom, rgba(0,0,0,0.90) 0%, rgba(0,0,0,0.40) 65%, rgba(0,0,0,0.10) 100%);
+  mask-image:
+    linear-gradient(to bottom, rgba(0,0,0,0.90) 0%, rgba(0,0,0,0.40) 65%, rgba(0,0,0,0.10) 100%);
+}
+
+/* Brilho do gramado abaixo do gol */
+.copa-bg-goal-grass {
+  position: absolute;
+  bottom: 0;
+  left: -15%;
+  right: -15%;
+  height: clamp(12px, 2.5vw, 24px);
+  background: linear-gradient(to top, rgba(21, 128, 61, 0.22), transparent);
+  border-radius: 999px;
+}
+
+/* ===== AMBIENT GLOWS ===== */
+.copa-bg-glow-top {
+  position: absolute;
+  top: -10%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 70%;
+  height: 40%;
+  background: radial-gradient(ellipse, rgba(250,204,21,0.10) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.copa-bg-glow-left {
+  position: absolute;
+  top: 30%;
+  left: -8%;
+  width: 40%;
+  height: 50%;
+  background: radial-gradient(ellipse, rgba(22,163,74,0.09) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.copa-bg-glow-right {
+  position: absolute;
+  top: 30%;
+  right: -8%;
+  width: 40%;
+  height: 50%;
+  background: radial-gradient(ellipse, rgba(22,163,74,0.09) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* ===== MOBILE ===== */
+@media (max-width: 640px) {
+  .copa-bg-trophy-wrap {
+    right: 1%;
+    top: 7%;
+    opacity: 0.07;
+  }
+
+  .copa-bg-stars-row {
+    top: 7%;
+    gap: 6px;
+  }
+
+  .copa-bg-goal-wrap {
+    opacity: 0.055;
+  }
 }

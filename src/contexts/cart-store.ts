@@ -1,6 +1,13 @@
 import { createContext } from "react";
 import type { Product, CartItem } from "@/types/products";
 
+export type AppliedCoupon = {
+  code: string;
+  type: "percent" | "free_shipping";
+  value: number;
+  label: string;
+};
+
 export interface CartContextType {
   cartItems: CartItem[];
   addToCart: (product: Product, quantity?: number) => void;
@@ -21,6 +28,10 @@ export interface CartContextType {
   addMultipleToCart: (products: { product: Product; quantity: number }[]) => void;
   animateCartIcon: number;
   showFreeShippingAnimation: boolean;
+  appliedCoupon: AppliedCoupon | null;
+  discountAmount: number;
+  applyCoupon: (coupon: AppliedCoupon) => void;
+  clearCoupon: () => void;
 }
 
 export const CartContext = createContext<CartContextType | undefined>(undefined);

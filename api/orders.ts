@@ -35,6 +35,8 @@ type CreateOrderParams = {
   paymentMethod?: string;
   notes?: string;
   shippingCost?: number;
+  couponCode?: string;
+  discountAmount?: number;
   items: Array<{
     product: ProductSnapshot;
     quantity: number;
@@ -86,6 +88,8 @@ function normalizePayload(body: unknown): CreateOrderParams {
     paymentMethod: String(payload.paymentMethod ?? "").trim(),
     notes: String(payload.notes ?? "").trim(),
     shippingCost: Number(payload.shippingCost ?? 0),
+    couponCode: String(payload.couponCode ?? "").trim() || undefined,
+    discountAmount: Number(payload.discountAmount ?? 0),
     items: normalizedItems,
   };
 }
@@ -163,6 +167,8 @@ async function createOrderInDatabase(params: CreateOrderParams) {
     customerCep,
     paymentMethod,
     notes,
+    couponCode,
+    discountAmount = 0,
     items,
   } = params;
 
@@ -191,7 +197,8 @@ async function createOrderInDatabase(params: CreateOrderParams) {
   }
 
   const normalizedShippingCost = resolveShippingCost(customerCity, itemsTotal);
-  const finalTotal = itemsTotal + normalizedShippingCost;
+  const safeDiscount = Math.min(Math.max(0, discountAmount), itemsTotal);
+  const finalTotal = Math.max(0, itemsTotal + normalizedShippingCost - safeDiscount);
   const orderNumber = generateOrderNumber();
 
   const baseOrderPayload = {
@@ -207,10 +214,13 @@ async function createOrderInDatabase(params: CreateOrderParams) {
     payment_method: paymentMethod || null,
     notes: notes || null,
     status: "recebido",
+    coupon_code: couponCode || null,
+    discount_cents: Math.round(safeDiscount * 100),
     metadata: {
       customer_name: customerName,
       items_total: itemsTotal,
       shipping_cost: normalizedShippingCost,
+      discount: safeDiscount,
     },
   };
 
@@ -264,6 +274,15 @@ async function createOrderInDatabase(params: CreateOrderParams) {
   }
 
   if (!order) throw new Error("Erro ao criar pedido.");
+
+  // Marca o cupom como usado (best-effort)
+  if (couponCode) {
+    await supabase
+      .from("user_coupons")
+      .update({ used: true })
+      .eq("code", couponCode)
+      .eq("customer_phone", customerPhone);
+  }
 
   const itemsPayload = items.map((item) => ({
     order_id: order.id,

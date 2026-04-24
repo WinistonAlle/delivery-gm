@@ -19,6 +19,10 @@ import customerAddressesHandler from "./api/customer-addresses";
 import deliveryOpsHandler from "./api/delivery-ops";
 import ordersHandler from "./api/orders";
 import reportsDashboardHandler from "./api/reports-dashboard";
+import couponSlotsHandler from "./api/coupon-slots";
+import spinRouletteHandler from "./api/spin-roulette";
+import userCouponHandler from "./api/user-coupon";
+import adminCouponsHandler from "./api/admin-coupons";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -68,6 +72,10 @@ app.all("/api/customer-addresses", adaptHandler(customerAddressesHandler));
 app.all("/api/delivery-ops", adaptHandler(deliveryOpsHandler));
 app.all("/api/orders", adaptHandler(ordersHandler));
 app.all("/api/reports-dashboard", adaptHandler(reportsDashboardHandler));
+app.all("/api/coupon-slots", adaptHandler(couponSlotsHandler));
+app.all("/api/spin-roulette", adaptHandler(spinRouletteHandler));
+app.all("/api/user-coupon", adaptHandler(userCouponHandler));
+app.all("/api/admin-coupons", adaptHandler(adminCouponsHandler));
 
 app.use(express.static(distDir, { index: false, maxAge: "1h" }));
 

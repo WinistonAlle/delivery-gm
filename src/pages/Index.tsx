@@ -40,6 +40,8 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { getLocalTheme, type AppThemeKey } from "@/lib/appTheme";
+import { buildUpsellCombos } from "@/lib/upsell";
+import { mapCatalogProductRow, isVisibleCatalogProduct } from "@/lib/catalogProducts";
 import {
   getCustomerSession,
   logoutCustomerSession,
@@ -53,17 +55,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { getDisplayProductPrice } from "../../shared/productPricing";
-
-const CATEGORY_NAME_BY_ID: Record<number, string> = {
-  1: "Pão de Queijo",
-  2: "Salgados Assados",
-  3: "Salgados P/ Fritar",
-  4: "Pães e Massas Doces",
-  5: "Biscoito de Queijo",
-  6: "Salgados Grandes",
-  7: "Alho em creme",
-  8: "Outros",
-};
+import CouponRouletteModal from "@/components/CouponRouletteModal";
+import { COUPONS_ENABLED } from "@/lib/featureFlags";
 
 const ITEMS_PER_PAGE = 24;
 const PRODUCTS_CACHE_KEY = "gm_catalog_products_v1";
@@ -80,10 +73,92 @@ const JUNINO_FLAG_COLORS = [
   "#ec4899",
 ];
 const NEW_YEAR_FIREWORKS = [
-  { x: "12%", y: "20%", size: "0.9", delay: "0s", color: "#f8fafc" },
-  { x: "26%", y: "10%", size: "1.15", delay: "0.45s", color: "#fbbf24" },
-  { x: "74%", y: "18%", size: "1.05", delay: "0.2s", color: "#fde68a" },
-  { x: "86%", y: "12%", size: "0.82", delay: "0.72s", color: "#ffffff" },
+  { x: "12%", y: "22%", size: "0.92", delay: "0s",    color: "#f59e0b" },
+  { x: "28%", y: "12%", size: "1.18", delay: "0.45s", color: "#ec4899" },
+  { x: "52%", y: "8%",  size: "0.85", delay: "1.0s",  color: "#a855f7" },
+  { x: "74%", y: "18%", size: "1.08", delay: "0.2s",  color: "#f97316" },
+  { x: "88%", y: "14%", size: "0.88", delay: "0.72s", color: "#14b8a6" },
+];
+
+const NATAL_SNOWFLAKES = [
+  { left: "7%",  size: "6px",  duration: "9s",    delay: "0s",   drift: "20px"  },
+  { left: "18%", size: "4px",  duration: "11s",   delay: "1.4s", drift: "-15px" },
+  { left: "31%", size: "7px",  duration: "8s",    delay: "2.8s", drift: "18px"  },
+  { left: "45%", size: "5px",  duration: "10s",   delay: "0.6s", drift: "-22px" },
+  { left: "58%", size: "6px",  duration: "12s",   delay: "3.2s", drift: "16px"  },
+  { left: "70%", size: "4px",  duration: "9.5s",  delay: "1.8s", drift: "-12px" },
+  { left: "82%", size: "8px",  duration: "10.5s", delay: "4.6s", drift: "24px"  },
+  { left: "93%", size: "5px",  duration: "8.5s",  delay: "5.2s", drift: "-18px" },
+];
+
+const BF_PROMO_TAGS = [
+  { label: "PROMO",        left: "5%",  top: "12%", rot: "-4deg", delay: "0s"    },
+  { label: "PROMOÇÃO",     left: "68%", top: "8%",  rot: "3deg",  delay: "0.7s"  },
+  { label: "BLACK FRIDAY", left: "72%", top: "52%", rot: "-2deg", delay: "1.3s"  },
+];
+
+const BF_BOLTS = [
+  { left: "58%", top: "6%",  width: "42px", height: "76px", delay: "0.4s", duration: "2.6s" },
+  { left: "6%",  top: "34%", width: "28px", height: "52px", delay: "1.1s", duration: "2.2s" },
+];
+
+const BF_TICKER_ITEMS = [
+  "Black Friday", "Promo", "Promoções Imperdíveis",
+  "Peça Agora", "Ofertas", "Só Hoje",
+  "Black Friday", "Promo", "Promoções Imperdíveis",
+  "Peça Agora", "Ofertas", "Só Hoje",
+];
+
+const COPA_CONFETTI = [
+  { left: "4%",  delay: "0s",    duration: "3.0s", color: "#16a34a", drift: "14px",  w: "7px",  h: "13px" },
+  { left: "10%", delay: "0.4s",  duration: "2.6s", color: "#facc15", drift: "-12px", w: "10px", h: "16px" },
+  { left: "17%", delay: "1.0s",  duration: "3.4s", color: "#2563eb", drift: "20px",  w: "6px",  h: "11px" },
+  { left: "24%", delay: "0.2s",  duration: "2.8s", color: "#15803d", drift: "-16px", w: "9px",  h: "15px" },
+  { left: "32%", delay: "0.8s",  duration: "3.1s", color: "#fbbf24", drift: "18px",  w: "7px",  h: "13px" },
+  { left: "40%", delay: "1.4s",  duration: "2.5s", color: "#1d4ed8", drift: "-14px", w: "8px",  h: "14px" },
+  { left: "49%", delay: "0.6s",  duration: "3.3s", color: "#16a34a", drift: "12px",  w: "6px",  h: "12px" },
+  { left: "57%", delay: "0.15s", duration: "2.9s", color: "#facc15", drift: "-20px", w: "9px",  h: "15px" },
+  { left: "65%", delay: "1.2s",  duration: "3.6s", color: "#2563eb", drift: "16px",  w: "7px",  h: "13px" },
+  { left: "73%", delay: "0.5s",  duration: "2.7s", color: "#15803d", drift: "-10px", w: "10px", h: "16px" },
+  { left: "81%", delay: "1.0s",  duration: "3.2s", color: "#fbbf24", drift: "22px",  w: "6px",  h: "11px" },
+  { left: "88%", delay: "0.35s", duration: "2.4s", color: "#1d4ed8", drift: "-18px", w: "8px",  h: "14px" },
+  { left: "94%", delay: "0.9s",  duration: "3.5s", color: "#16a34a", drift: "14px",  w: "7px",  h: "13px" },
+];
+
+const COPA_STARS_HERO = [
+  { left: "7%",  top: "14%", size: "20px", delay: "0s",    duration: "2.6s" },
+  { left: "19%", top: "30%", size: "13px", delay: "0.75s", duration: "1.9s" },
+  { left: "46%", top: "7%",  size: "11px", delay: "0.5s",  duration: "1.7s" },
+  { left: "74%", top: "10%", size: "22px", delay: "0.3s",  duration: "2.9s" },
+  { left: "86%", top: "26%", size: "15px", delay: "1.1s",  duration: "2.2s" },
+];
+
+const COPA_SPOTLIGHTS = [
+  { left: "16%", rot: "-14deg", delay: "0s",   duration: "3.6s" },
+  { left: "84%", rot: "14deg",  delay: "0.9s", duration: "3.2s" },
+];
+
+const COPA_FLAGS_HERO = [
+  { left: "6%",  top: "38%", delay: "0s",   duration: "2.8s" },
+  { left: "88%", top: "32%", delay: "0.6s", duration: "3.1s" },
+];
+
+const JUNINO_STARS_HERO = [
+  { left: "5%",  top: "26%", size: "20px", duration: "2.4s", delay: "0s"    },
+  { left: "13%", top: "10%", size: "12px", duration: "1.8s", delay: "0.7s"  },
+  { left: "39%", top: "8%",  size: "14px", duration: "2.8s", delay: "0.35s" },
+  { left: "61%", top: "6%",  size: "10px", duration: "2.0s", delay: "1.0s"  },
+  { left: "79%", top: "32%", size: "13px", duration: "1.6s", delay: "0.55s" },
+];
+
+const PASCOA_PETALS = [
+  { left: "4%",  delay: "0s",   duration: "4.2s", color: "#f9a8d4", drift: "22px"  },
+  { left: "18%", delay: "0.8s", duration: "3.8s", color: "#c4b5fd", drift: "-16px" },
+  { left: "34%", delay: "1.6s", duration: "4.6s", color: "#86efac", drift: "26px"  },
+  { left: "53%", delay: "0.4s", duration: "4.0s", color: "#fde68a", drift: "-18px" },
+  { left: "69%", delay: "1.2s", duration: "3.6s", color: "#f9a8d4", drift: "20px"  },
+  { left: "84%", delay: "2.0s", duration: "4.4s", color: "#c4b5fd", drift: "-24px" },
+  { left: "92%", delay: "0.6s", duration: "5.0s", color: "#fdba74", drift: "14px"  },
 ];
 
 /* --------------------------------------------------------
@@ -140,6 +215,8 @@ type SmartCombo = {
   title: string;
   description: string;
   badge?: string;
+  audienceLabel?: string;
+  occasionLabel?: string;
   items: { product: Product; quantity: number }[];
   total: number;
 };
@@ -171,52 +248,52 @@ const THEME_HEADER_COLORS: Record<
     menuBorder: "rgba(252, 165, 165, 0.5)",
   },
   junino: {
-    solid: "#ea580c",
-    translucent: "rgba(234, 88, 12, 0.58)",
-    borderSolid: "#ea580c",
-    borderTranslucent: "rgba(254, 215, 170, 0.4)",
-    menuBg: "rgba(249, 115, 22, 0.8)",
+    solid: "#c2410c",
+    translucent: "rgba(194, 65, 12, 0.85)",
+    borderSolid: "#9a3412",
+    borderTranslucent: "rgba(253, 186, 116, 0.38)",
+    menuBg: "rgba(194, 65, 12, 0.82)",
     menuBorder: "rgba(253, 186, 116, 0.5)",
   },
   natal: {
-    solid: "#059669",
-    translucent: "rgba(5, 150, 105, 0.55)",
-    borderSolid: "#059669",
-    borderTranslucent: "rgba(167, 243, 208, 0.38)",
-    menuBg: "rgba(16, 185, 129, 0.75)",
-    menuBorder: "rgba(167, 243, 208, 0.5)",
+    solid: "#1B4D3E",
+    translucent: "rgba(27, 77, 62, 0.90)",
+    borderSolid: "#163D32",
+    borderTranslucent: "rgba(201, 168, 76, 0.42)",
+    menuBg: "rgba(27, 77, 62, 0.82)",
+    menuBorder: "rgba(201, 168, 76, 0.54)",
   },
   blackfriday: {
-    solid: "#0a0a0a",
-    translucent: "rgba(10, 10, 10, 0.62)",
-    borderSolid: "#171717",
-    borderTranslucent: "rgba(255, 255, 255, 0.18)",
-    menuBg: "rgba(38, 38, 38, 0.82)",
-    menuBorder: "rgba(255, 255, 255, 0.25)",
+    solid: "#1e1e2c",
+    translucent: "rgba(28, 28, 44, 0.96)",
+    borderSolid: "#ef4444",
+    borderTranslucent: "rgba(239, 68, 68, 0.28)",
+    menuBg: "rgba(32, 32, 50, 0.97)",
+    menuBorder: "rgba(239, 68, 68, 0.35)",
   },
   pascoa: {
-    solid: "#a78bfa",
-    translucent: "rgba(167, 139, 250, 0.58)",
-    borderSolid: "#8b5cf6",
-    borderTranslucent: "rgba(196, 181, 253, 0.44)",
-    menuBg: "rgba(248, 215, 230, 0.92)",
-    menuBorder: "rgba(167, 139, 250, 0.32)",
+    solid: "#7e22ce",
+    translucent: "rgba(126, 34, 206, 0.82)",
+    borderSolid: "#6b21a8",
+    borderTranslucent: "rgba(240, 171, 252, 0.4)",
+    menuBg: "rgba(126, 34, 206, 0.78)",
+    menuBorder: "rgba(240, 171, 252, 0.45)",
   },
   anonovo: {
-    solid: "#c9971a",
-    translucent: "rgba(217, 169, 52, 0.5)",
-    borderSolid: "#f8e7b6",
-    borderTranslucent: "rgba(255, 248, 220, 0.34)",
-    menuBg: "rgba(255, 255, 255, 0.16)",
-    menuBorder: "rgba(255, 244, 214, 0.42)",
+    solid: "#fffcf0",
+    translucent: "rgba(255, 252, 240, 0.95)",
+    borderSolid: "#c9971a",
+    borderTranslucent: "rgba(201, 151, 26, 0.30)",
+    menuBg: "rgba(146, 96, 12, 0.88)",
+    menuBorder: "rgba(201, 151, 26, 0.55)",
   },
   copa: {
-    solid: "#facc15",
-    translucent: "rgba(250, 204, 21, 0.62)",
-    borderSolid: "#facc15",
-    borderTranslucent: "rgba(254, 240, 138, 0.46)",
-    menuBg: "rgba(22, 163, 74, 0.82)",
-    menuBorder: "rgba(110, 231, 183, 0.52)",
+    solid: "#166534",
+    translucent: "rgba(22, 101, 52, 0.88)",
+    borderSolid: "#fbbf24",
+    borderTranslucent: "rgba(251, 191, 36, 0.4)",
+    menuBg: "rgba(22, 101, 52, 0.82)",
+    menuBorder: "rgba(251, 191, 36, 0.5)",
   },
 };
 
@@ -245,69 +322,69 @@ const THEME_COMBO_STYLES: Record<
   },
   junino: {
     cardClass:
-      "border-amber-200 bg-[linear-gradient(145deg,rgba(255,251,235,0.97),rgba(255,237,213,0.94))]",
-    glowClass: "bg-amber-300/35",
-    mediaClass: "border-amber-100 bg-white/80",
-    totalClass: "border-amber-100 bg-white/82",
-    hintClass: "bg-amber-50/90 text-amber-900",
+      "border-orange-200 bg-[linear-gradient(145deg,rgba(255,249,240,0.97),rgba(255,237,213,0.95))]",
+    glowClass: "bg-orange-300/40",
+    mediaClass: "border-orange-100 bg-white/82",
+    totalClass: "border-orange-100 bg-white/84",
+    hintClass: "bg-orange-50/92 text-orange-900",
     buttonClass:
-      "bg-orange-600 hover:bg-orange-700 text-white shadow-[0_10px_24px_rgba(234,88,12,0.32)]",
-    dialogItemClass: "border-amber-100 bg-amber-50/45",
+      "bg-[#c2410c] hover:bg-[#9a3412] text-white shadow-[0_10px_24px_rgba(194,65,12,0.38)]",
+    dialogItemClass: "border-orange-100 bg-orange-50/45",
   },
   natal: {
     cardClass:
-      "border-emerald-200 bg-[linear-gradient(145deg,rgba(240,253,244,0.97),rgba(220,252,231,0.94))]",
-    glowClass: "bg-emerald-300/30",
-    mediaClass: "border-emerald-100 bg-white/82",
-    totalClass: "border-emerald-100 bg-white/84",
-    hintClass: "bg-emerald-50/90 text-emerald-900",
+      "border-[rgba(27,77,62,0.22)] bg-[linear-gradient(145deg,rgba(250,248,243,0.97),rgba(230,244,238,0.95))]",
+    glowClass: "bg-[rgba(155,35,53,0.18)]",
+    mediaClass: "border-[rgba(27,77,62,0.16)] bg-white/84",
+    totalClass: "border-[rgba(27,77,62,0.16)] bg-white/86",
+    hintClass: "bg-[rgba(250,248,243,0.92)] text-[#163d32]",
     buttonClass:
-      "bg-emerald-600 hover:bg-emerald-700 text-white shadow-[0_10px_24px_rgba(5,150,105,0.3)]",
-    dialogItemClass: "border-emerald-100 bg-emerald-50/45",
+      "bg-[#1B4D3E] hover:bg-[#163D32] text-white shadow-[0_10px_24px_rgba(27,77,62,0.40)]",
+    dialogItemClass: "border-[rgba(27,77,62,0.14)] bg-white/60",
   },
   blackfriday: {
     cardClass:
-      "border-neutral-700 bg-[linear-gradient(145deg,rgba(38,38,38,0.97),rgba(10,10,10,0.94))]",
-    glowClass: "bg-amber-400/15",
-    mediaClass: "border-white/10 bg-white/5",
-    totalClass: "border-white/10 bg-white/10",
-    hintClass: "bg-white/10 text-white/80",
+      "border-white/[0.12] bg-[linear-gradient(145deg,rgba(92,96,116,0.96),rgba(68,72,90,0.96))] shadow-[0_18px_34px_rgba(15,23,42,0.18)]",
+    glowClass: "bg-red-500/12",
+    mediaClass: "border-white/[0.12] bg-[rgba(84,88,106,0.92)]",
+    totalClass: "border-white/[0.12] bg-[rgba(74,78,96,0.94)]",
+    hintClass: "bg-[rgba(255,255,255,0.10)] text-white/82",
     buttonClass:
-      "bg-amber-500 hover:bg-amber-400 text-black shadow-[0_10px_24px_rgba(245,158,11,0.28)]",
-    dialogItemClass: "border-neutral-700 bg-neutral-950/80",
+      "bg-[#ef4444] hover:bg-[#dc2626] text-white font-black shadow-[0_10px_28px_rgba(239,68,68,0.45)]",
+    dialogItemClass: "border-white/[0.12] bg-[rgba(84,88,106,0.94)] text-white",
   },
   pascoa: {
     cardClass:
-      "border-violet-200 bg-[linear-gradient(145deg,rgba(255,248,251,0.98),rgba(243,232,255,0.95))]",
-    glowClass: "bg-fuchsia-200/35",
-    mediaClass: "border-violet-100 bg-white/85",
-    totalClass: "border-violet-100 bg-white/88",
-    hintClass: "bg-fuchsia-50/90 text-violet-900",
+      "border-[rgba(168,85,247,0.2)] bg-[linear-gradient(145deg,rgba(253,248,255,0.97),rgba(243,232,255,0.95))]",
+    glowClass: "bg-fuchsia-300/30",
+    mediaClass: "border-[rgba(168,85,247,0.15)] bg-white/86",
+    totalClass: "border-[rgba(168,85,247,0.15)] bg-white/88",
+    hintClass: "bg-[rgba(253,248,255,0.92)] text-[#6b21a8]",
     buttonClass:
-      "bg-violet-600 hover:bg-violet-700 text-white shadow-[0_10px_24px_rgba(124,58,237,0.28)]",
-    dialogItemClass: "border-violet-100 bg-fuchsia-50/45",
+      "bg-[#7e22ce] hover:bg-[#6b21a8] text-white shadow-[0_10px_24px_rgba(126,34,206,0.35)]",
+    dialogItemClass: "border-[rgba(168,85,247,0.14)] bg-white/60",
   },
   anonovo: {
     cardClass:
-      "border-amber-200 bg-[linear-gradient(145deg,rgba(255,253,247,0.98),rgba(248,242,223,0.95))]",
-    glowClass: "bg-amber-300/30",
-    mediaClass: "border-amber-100 bg-white/84",
-    totalClass: "border-amber-100 bg-white/88",
-    hintClass: "bg-amber-50/90 text-amber-900",
+      "border-[rgba(201,151,26,0.22)] bg-[linear-gradient(145deg,rgba(255,253,247,0.97),rgba(255,248,220,0.95))]",
+    glowClass: "bg-amber-200/40",
+    mediaClass: "border-[rgba(201,151,26,0.18)] bg-white/86",
+    totalClass: "border-[rgba(201,151,26,0.18)] bg-white/88",
+    hintClass: "bg-[rgba(255,253,240,0.92)] text-[#92400e]",
     buttonClass:
-      "bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-[0_10px_24px_rgba(217,169,52,0.28)]",
-    dialogItemClass: "border-amber-100 bg-amber-50/45",
+      "bg-[#c9971a] hover:bg-[#a37a12] text-white shadow-[0_10px_24px_rgba(201,151,26,0.38)]",
+    dialogItemClass: "border-[rgba(201,151,26,0.15)] bg-white/90",
   },
   copa: {
     cardClass:
-      "border-green-200 bg-[linear-gradient(145deg,rgba(236,253,243,0.97),rgba(254,249,195,0.93))]",
-    glowClass: "bg-lime-300/25",
-    mediaClass: "border-green-100 bg-white/82",
-    totalClass: "border-green-100 bg-white/86",
-    hintClass: "bg-green-50/90 text-green-900",
+      "border-[rgba(22,101,52,0.28)] bg-[linear-gradient(145deg,rgba(228,252,238,0.98),rgba(254,252,232,0.95))]",
+    glowClass: "bg-green-300/35",
+    mediaClass: "border-[rgba(22,163,74,0.18)] bg-[rgba(228,252,238,0.86)]",
+    totalClass: "border-[rgba(22,163,74,0.18)] bg-[rgba(228,252,238,0.90)]",
+    hintClass: "bg-[rgba(228,252,238,0.94)] text-[#15803d]",
     buttonClass:
-      "bg-green-600 hover:bg-green-700 text-white shadow-[0_10px_24px_rgba(22,163,74,0.28)]",
-    dialogItemClass: "border-green-100 bg-green-50/45",
+      "bg-[#15803d] hover:bg-[#14532d] text-white font-bold shadow-[0_10px_28px_rgba(22,101,52,0.42)]",
+    dialogItemClass: "border-[rgba(22,101,52,0.18)] bg-[rgba(240,253,244,0.80)]",
   },
 };
 
@@ -466,6 +543,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ noticeCount = 0 }) => {
   return (
     <nav
       className="
+        bottom-nav-bar
         fixed bottom-0 left-0 right-0 z-40 md:hidden
         bg-white/95 backdrop-blur-md
         border-t border-gray-200
@@ -585,6 +663,7 @@ const Pagination: React.FC<PaginationProps> = ({
           disabled={!canPrev}
           onClick={onPrev}
           className="
+            pagination-btn
             inline-flex items-center gap-2
             rounded-lg border bg-white px-4 py-2 text-sm font-semibold
             hover:bg-gray-50 disabled:opacity-50
@@ -598,6 +677,7 @@ const Pagination: React.FC<PaginationProps> = ({
           disabled={!canNext}
           onClick={onNext}
           className="
+            pagination-btn
             inline-flex items-center gap-2
             rounded-lg border bg-white px-4 py-2 text-sm font-semibold
             hover:bg-gray-50 disabled:opacity-50
@@ -608,13 +688,14 @@ const Pagination: React.FC<PaginationProps> = ({
       </div>
 
       <div className="flex items-center gap-2 text-sm text-gray-700">
-        <span className="text-gray-500">Página</span>
+        <span className="catalog-count text-gray-500">Página</span>
 
         <select
           value={currentPage}
           disabled={disabled || totalPages <= 1}
           onChange={(e) => onPageChange(Number(e.target.value))}
           className="
+            pagination-select
             h-9 rounded-lg border bg-white px-3 text-sm
             focus:outline-none focus:ring-2 focus:ring-red-200
             disabled:opacity-60
@@ -640,7 +721,7 @@ const Pagination: React.FC<PaginationProps> = ({
 -------------------------------------------------------- */
 const Index: React.FC = () => {
   const navigate = useNavigate();
-  const { addMultipleToCart } = useCart();
+  const { addMultipleToCart, applyCoupon, isCartOpen, cartItems, appliedCoupon: cartCoupon } = useCart();
   const catalogRef = useRef<HTMLDivElement | null>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -696,6 +777,7 @@ const Index: React.FC = () => {
 
   // ✅ Avisos carregando (pra compor o overlay)
   const [noticesLoading, setNoticesLoading] = useState(true);
+  const [showRoulette, setShowRoulette] = useState(false);
 
   const hasLoadedFromCache = useRef(false);
   const employee: CustomerSession | null = safeGetEmployee();
@@ -706,6 +788,16 @@ const Index: React.FC = () => {
     employee?.is_admin ||
     employee?.role === "admin" ||
     employee?.tipo === "ADMIN";
+
+  // MODO TESTE: roleta aparece toda vez que entra no site (logado e sem cupom ativo)
+  useEffect(() => {
+    if (!COUPONS_ENABLED) return;
+    if (!isLoggedIn) return;
+    if (cartCoupon) return;
+    const timer = setTimeout(() => setShowRoulette(true), 1200);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoggedIn]);
 
   const persistLocalSetting = useCallback((key: string, value: string) => {
     try {
@@ -781,36 +873,6 @@ const Index: React.FC = () => {
     };
   }, []);
 
-  function mapRowToProduct(row: ProductRow): Product {
-    const employeePrice = Number(row.employee_price ?? row.price ?? 0);
-
-    const categoryName =
-      CATEGORY_NAME_BY_ID[row.category_id as number] ??
-      row.category ??
-      row.category_name ??
-      "Outros";
-
-    return {
-      id: row.id,
-      old_id: row.old_id ?? null,
-      name: row.name,
-      price: employeePrice,
-      employee_price: employeePrice,
-      images: row.images ?? (row.image ? [row.image] : []),
-      image_path: row.image_path ?? null,
-      category: categoryName,
-      description: row.description ?? "",
-      packageInfo: row.packageInfo ?? row.package_info ?? "",
-      saleType: row.saleType === "pct" || row.sale_type === "pct" ? "pct" : "kg",
-      weight: Number(row.weight ?? 0),
-      isPackage: row.isPackage ?? row.is_package ?? false,
-      featured: row.featured ?? row.isFeatured ?? false,
-      inStock: row.inStock ?? row.in_stock ?? true,
-      isLaunch: row.isLaunch ?? row.is_launch ?? false,
-      extraInfo: row.extraInfo ?? undefined,
-    };
-  }
-
   /* ---------------- Produtos ---------------- */
   useEffect(() => {
     let isMounted = true;
@@ -846,7 +908,9 @@ const Index: React.FC = () => {
         }
 
         if (isMounted && data) {
-          const mapped: Product[] = (data as ProductRow[]).map(mapRowToProduct);
+          const mapped: Product[] = (data as ProductRow[])
+            .map(mapCatalogProductRow)
+            .filter(isVisibleCatalogProduct);
 
           setProducts(mapped);
 
@@ -1290,67 +1354,8 @@ const Index: React.FC = () => {
   }, [featuredProducts, products, crossSellMap]);
 
   const smartCombos = useMemo<SmartCombo[]>(() => {
-    const inStock = products.filter((p) => p.inStock !== false);
-    if (!inStock.length) return [];
-
-    const byCategory = (category: string) =>
-      inStock
-        .filter((p) => p.category === category)
-        .sort(
-          (a, b) =>
-            getDisplayProductPrice(b) - getDisplayProductPrice(a)
-        );
-
-    const comboMineiroItems = [
-      ...byCategory("Salgados P/ Fritar").slice(0, 2).map((p) => ({ product: p, quantity: 2 })),
-      ...byCategory("Salgados Assados").slice(0, 1).map((p) => ({ product: p, quantity: 2 })),
-    ];
-
-    const comboCafeItems = [
-      ...byCategory("Pães e Massas Doces").slice(0, 1).map((p) => ({ product: p, quantity: 2 })),
-      ...byCategory("Biscoito de Queijo").slice(0, 1).map((p) => ({ product: p, quantity: 1 })),
-      ...byCategory("Pão de Queijo").slice(0, 1).map((p) => ({ product: p, quantity: 2 })),
-    ];
-
-    const comboFamiliaItems = byCategory("Pão de Queijo")
-      .slice(0, 3)
-      .map((p) => ({ product: p, quantity: 2 }));
-
-    const makeCombo = (
-      id: string,
-      title: string,
-      description: string,
-      items: { product: Product; quantity: number }[]
-    ): SmartCombo | null => {
-      if (!items.length) return null;
-      const total = items.reduce(
-        (sum, item) =>
-          sum + getDisplayProductPrice(item.product) * item.quantity,
-        0
-      );
-      return { id, title, description, items, total };
-    };
-
-    return [
-      makeCombo(
-        "combo-mineiro",
-        "Combo Mineiro Festa",
-        "Mix campeão para pedidos maiores com salgado de fritar e assado.",
-        comboMineiroItems
-      ),
-      makeCombo(
-        "combo-cafe",
-        "Combo Café da Tarde",
-        "Seleção pronta para acompanhar café e aumentar variedade do pedido.",
-        comboCafeItems
-      ),
-      makeCombo(
-        "combo-familia",
-        "Combo Família Pão de Queijo",
-        "Kit de alto giro para abastecer a semana e elevar ticket.",
-        comboFamiliaItems
-      ),
-    ].filter(Boolean) as SmartCombo[];
+    if (!products.length) return [];
+    return buildUpsellCombos(products);
   }, [products]);
 
   useEffect(() => {
@@ -1423,6 +1428,50 @@ const Index: React.FC = () => {
     <div className="min-h-screen flex flex-col relative pb-28 md:pb-0">
       {/* ✅ LOADING OVERLAY */}
       <UiverseLoading show={overlayLoading} />
+
+      {/* Roleta de cupom */}
+      {COUPONS_ENABLED && showRoulette && (
+        <CouponRouletteModal
+          onClose={() => setShowRoulette(false)}
+          onCouponApplied={(coupon) => {
+            applyCoupon(coupon);
+            setShowRoulette(false);
+          }}
+        />
+      )}
+
+      {/* Banner discreto para quem já tem cupom ativo */}
+      {COUPONS_ENABLED && !showRoulette && isLoggedIn && cartCoupon && (
+        <div className="fixed bottom-20 left-1/2 z-40 -translate-x-1/2 md:bottom-4">
+          <div className="flex items-center gap-2 rounded-full border border-green-200 bg-white px-4 py-2 shadow-lg">
+            <span className="text-base">🎟️</span>
+            <span className="text-sm font-bold text-green-700">
+              {cartCoupon.type === "free_shipping"
+                ? "Frete grátis ativo"
+                : `${cartCoupon.value}% de desconto ativo`}
+            </span>
+            <span className="font-mono text-xs text-green-600">{cartCoupon.code}</span>
+          </div>
+        </div>
+      )}
+
+      {/* COPA: Camada decorativa de fundo (troféu, estrelas, gol) */}
+      {activeTheme === "copa" && (
+        <div className="copa-bg-layer" aria-hidden="true">
+          {/* Glows ambientes */}
+          <div className="copa-bg-glow-top" />
+          <div className="copa-bg-glow-left" />
+          <div className="copa-bg-glow-right" />
+
+          {/* 5 Estrelas do Brasil — centralizadas no topo */}
+          <div className="copa-bg-stars-row">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={`bg-star-${i}`} className="copa-bg-champion-star" />
+            ))}
+          </div>
+
+        </div>
+      )}
 
       <div
         className="absolute -top-20 -left-20 h-72 w-72 rounded-full bg-red-200/40 blur-3xl pointer-events-none"
@@ -1604,6 +1653,7 @@ const Index: React.FC = () => {
       {/* DRAWER */}
       <aside
         className={`
+          side-drawer
           fixed right-0 top-0 bottom-0 z-50 w-72 max-w-[80%]
           bg-white text-gray-900 shadow-xl border-l border-gray-200
           transform transition-transform duration-200
@@ -1824,11 +1874,159 @@ const Index: React.FC = () => {
                 <div className="easter-chocolate-drip" aria-hidden="true" />
                 <div className="easter-bunny easter-bunny-hero" aria-hidden="true" />
                 <div className="easter-egg easter-egg-hero-accent" aria-hidden="true" />
+                {PASCOA_PETALS.map((petal, i) => (
+                  <div
+                    key={`petal-${i}`}
+                    className="pascoa-petal"
+                    style={{
+                      left: petal.left,
+                      width: "12px",
+                      height: "18px",
+                      background: petal.color,
+                      animationDelay: petal.delay,
+                      animationDuration: petal.duration,
+                      "--petal-drift": petal.drift,
+                    } as React.CSSProperties}
+                    aria-hidden="true"
+                  />
+                ))}
               </>
             )}
             {activeTheme === "copa" && (
               <>
+                {/* Holofotes do estádio */}
+                {COPA_SPOTLIGHTS.map((spot, i) => (
+                  <div
+                    key={`copa-spot-${i}`}
+                    className="copa-hero-spotlight"
+                    style={{
+                      left: spot.left,
+                      animationDelay: spot.delay,
+                      animationDuration: spot.duration,
+                      "--spot-rot": spot.rot,
+                    } as React.CSSProperties}
+                    aria-hidden="true"
+                  />
+                ))}
+
+
+                {/* Estrelas de campeonato */}
+                {COPA_STARS_HERO.map((star, i) => (
+                  <div
+                    key={`copa-star-${i}`}
+                    className="copa-hero-star"
+                    style={{
+                      left: star.left,
+                      top: star.top,
+                      width: star.size,
+                      height: star.size,
+                      animationDelay: star.delay,
+                      animationDuration: star.duration,
+                    }}
+                    aria-hidden="true"
+                  />
+                ))}
+
+                {/* Bandeirinhas do Brasil */}
+                {COPA_FLAGS_HERO.map((flag, i) => (
+                  <div
+                    key={`copa-flag-${i}`}
+                    className="copa-hero-flag"
+                    style={{
+                      left: flag.left,
+                      top: flag.top,
+                      animationDelay: flag.delay,
+                      animationDuration: flag.duration,
+                    }}
+                    aria-hidden="true"
+                  />
+                ))}
+
+                {/* Confetti colorido */}
+                {COPA_CONFETTI.map((piece, i) => (
+                  <div
+                    key={`copa-confetti-${i}`}
+                    className="copa-confetti-piece"
+                    style={{
+                      left: piece.left,
+                      width: piece.w,
+                      height: piece.h,
+                      background: piece.color,
+                      animationDelay: piece.delay,
+                      animationDuration: piece.duration,
+                      "--drift": piece.drift,
+                    } as React.CSSProperties}
+                    aria-hidden="true"
+                  />
+                ))}
+
+                {/* Faixa tricolor hero */}
                 <div className="copa-ribbon copa-ribbon-hero" aria-hidden="true" />
+
+                {/* Grama do campo */}
+                <div className="copa-hero-grass" aria-hidden="true" />
+              </>
+            )}
+            {activeTheme === "blackfriday" && (
+              <>
+                {/* Background watermark text */}
+                <div className="bf-hero-watermark" aria-hidden="true">BLACK FRIDAY</div>
+
+                {/* Corner ribbon */}
+                <div className="bf-corner-ribbon" aria-hidden="true">OFERTA</div>
+
+                {/* Floating promo tags */}
+                {BF_PROMO_TAGS.map((tag, i) => (
+                  <div
+                    key={`bf-tag-${i}`}
+                    className="bf-promo-tag"
+                    style={
+                      {
+                        left: tag.left,
+                        top: tag.top,
+                        animationDelay: tag.delay,
+                        animationDuration: "3.2s",
+                        "--tag-rot": tag.rot,
+                      } as React.CSSProperties
+                    }
+                    aria-hidden="true"
+                  >
+                    <div className="bf-promo-tag-hole" />
+                    <div className="bf-promo-tag-body">{tag.label}</div>
+                  </div>
+                ))}
+
+                {/* Lightning bolts */}
+                {BF_BOLTS.map((bolt, i) => (
+                  <div
+                    key={`bf-bolt-${i}`}
+                    className="bf-hero-bolt"
+                    style={{
+                      left: bolt.left,
+                      top: bolt.top,
+                      width: bolt.width,
+                      height: bolt.height,
+                      background: "#ef4444",
+                      animationDelay: bolt.delay,
+                      animationDuration: bolt.duration,
+                    }}
+                    aria-hidden="true"
+                  />
+                ))}
+
+                {/* Scrolling promotional ticker */}
+                <div className="bf-ticker" aria-hidden="true">
+                  <div className="bf-ticker-track">
+                    {BF_TICKER_ITEMS.map((item, i) => (
+                      i % 1 === 0 ? (
+                        <span key={`ticker-${i}`}>
+                          <span className="bf-ticker-item">{item}</span>
+                          <span className="bf-ticker-dot" />
+                        </span>
+                      ) : null
+                    ))}
+                  </div>
+                </div>
               </>
             )}
             {activeTheme === "anonovo" && (
@@ -1885,6 +2083,50 @@ const Index: React.FC = () => {
                     />
                   ))}
                 </div>
+                <div className="junino-hero-moon" aria-hidden="true" />
+                {JUNINO_STARS_HERO.map((star, i) => (
+                  <div
+                    key={`junino-star-${i}`}
+                    className="junino-hero-star"
+                    style={{
+                      left: star.left,
+                      top: star.top,
+                      width: star.size,
+                      height: star.size,
+                      animationDuration: star.duration,
+                      animationDelay: star.delay,
+                    }}
+                    aria-hidden="true"
+                  />
+                ))}
+              </>
+            )}
+            {activeTheme === "natal" && (
+              <>
+                {/* Neve sutil — CSS-only, performática */}
+                <div className="natal-snow-container" aria-hidden="true">
+                  {NATAL_SNOWFLAKES.map((flake, i) => (
+                    <span
+                      key={`snow-${i}`}
+                      className="natal-snowflake"
+                      style={{
+                        left: flake.left,
+                        width: flake.size,
+                        height: flake.size,
+                        animationDuration: flake.duration,
+                        animationDelay: flake.delay,
+                        "--snow-drift": flake.drift,
+                      } as React.CSSProperties}
+                    />
+                  ))}
+                </div>
+                {/* Estrela de Belém — topo centro */}
+                <div className="natal-star-belem natal-star-belem-hero" aria-hidden="true" />
+                {/* Glow dourado suave no topo */}
+                <div className="natal-hero-glow" aria-hidden="true" />
+                {/* Ramos de pinheiro nos cantos */}
+                <div className="natal-pine-left" aria-hidden="true" />
+                <div className="natal-pine-right" aria-hidden="true" />
               </>
             )}
             <div className="absolute inset-0 bg-gradient-to-br from-slate-950/60 via-slate-900/40 to-slate-950/55" />
@@ -1941,12 +2183,12 @@ const Index: React.FC = () => {
                 )
               ) : (
                 <div className="w-full flex items-center justify-center">
-                  <div className="max-w-3xl rounded-3xl border border-white/20 bg-white/10 backdrop-blur-md px-5 py-6 md:px-9 md:py-8 text-center text-white flex flex-col items-center shadow-[0_22px_56px_rgba(0,0,0,0.28)]">
+                  <div className="hero-default-panel max-w-3xl rounded-3xl border border-white/20 bg-white/10 backdrop-blur-md px-5 py-6 md:px-9 md:py-8 text-center text-white flex flex-col items-center shadow-[0_22px_56px_rgba(0,0,0,0.28)]">
                     <h2 className="text-3xl md:text-5xl font-extrabold leading-tight">
                       Produtos Gostinho Mineiro
                     </h2>
 
-                    <p className="text-sm md:text-lg text-white/90 mt-3 max-w-2xl">
+                    <p className="hero-default-copy text-sm md:text-lg text-white/90 mt-3 max-w-2xl">
                       Uma experiência premium de delivery, rápida e intuitiva. Escolha seus produtos, finalize em poucos passos e receba no conforto de casa.
                     </p>
 
@@ -1954,7 +2196,7 @@ const Index: React.FC = () => {
                       onClick={() =>
                         catalogRef.current?.scrollIntoView({ behavior: "smooth" })
                       }
-                      className="mt-6 inline-flex items-center justify-center px-6 py-3 rounded-full bg-white text-slate-900 font-semibold shadow-[0_10px_30px_rgba(255,255,255,0.25)] hover:bg-white/90 transition"
+                      className="hero-default-cta mt-6 inline-flex items-center justify-center px-6 py-3 rounded-full bg-white text-slate-900 font-semibold shadow-[0_10px_30px_rgba(255,255,255,0.25)] hover:bg-white/90 transition"
                     >
                       Ver catálogo de produtos
                     </button>
@@ -2038,6 +2280,9 @@ const Index: React.FC = () => {
 
                   <div className="relative z-10">
                     <h3 className="text-[19px] leading-tight font-extrabold text-slate-900 md:text-[22px]">{combo.title}</h3>
+                    <p className="mt-1 text-sm text-slate-600 line-clamp-2 md:text-[15px]">
+                      {combo.description}
+                    </p>
 
                     <div className="mt-3 grid grid-cols-[1fr_auto] gap-2.5 items-end md:mt-4 md:gap-3">
                       <div className={`rounded-[1.15rem] border p-2 shadow-sm md:rounded-2xl ${comboTheme.mediaClass}`}>
@@ -2104,6 +2349,7 @@ const Index: React.FC = () => {
           <div
             ref={searchBarContainerRef}
             className={`
+              search-sticky-bar
               z-30 bg-gray-50/95 backdrop-blur-md pb-3 transition-all duration-300
               ${
                 isMobile
@@ -2127,6 +2373,7 @@ const Index: React.FC = () => {
                 type="button"
                 onClick={handleClearSearch}
                 className={`
+                  search-clear-btn
                   absolute right-4
                   top-[18px]
                   h-9 w-9 rounded-full
@@ -2149,9 +2396,9 @@ const Index: React.FC = () => {
           {isMobile && hideHeader && <div className="h-[108px]" />}
 
           <div className="flex items-center justify-between mt-4 mb-4">
-            <h2 className="text-xl font-bold text-slate-900">Produtos</h2>
+            <h2 className="catalog-heading text-xl font-bold text-slate-900">Produtos</h2>
             {!loading && (
-              <p className="text-xs text-slate-500">
+              <p className="catalog-count text-xs text-slate-500">
                 Exibindo {paginated.length} de {filtered.length} produtos
               </p>
             )}
@@ -2327,9 +2574,9 @@ const developerText =
 const Footer: React.FC<{ activeTheme: AppThemeKey }> = ({ activeTheme }) => {
   return (
     <footer
-      className={`relative pt-4 pb-24 md:pb-2 ${
+      className={`footer-shell relative pt-4 pb-24 md:pb-2 ${
         activeTheme === "copa"
-          ? "border-t border-blue-300/70 bg-blue-200/80"
+          ? "border-t border-green-300/60 bg-green-100/70"
           : "border-t border-slate-300/80 bg-slate-200/75"
       }`}
     >
@@ -2411,13 +2658,13 @@ const Footer: React.FC<{ activeTheme: AppThemeKey }> = ({ activeTheme }) => {
                 transition={{ duration: 0.35, delay: index * 0.06 }}
                 whileHover={{ y: -4, scale: 1.06 }}
                 whileTap={{ scale: 0.97 }}
-                className="group relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-white/85 bg-white/88 text-slate-700 shadow-[0_14px_32px_rgba(15,23,42,0.10)] transition-shadow hover:shadow-[0_18px_40px_rgba(15,23,42,0.16)]"
+                className="footer-social-btn group relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border border-white/85 bg-white/88 text-slate-700 shadow-[0_14px_32px_rgba(15,23,42,0.10)] transition-shadow hover:shadow-[0_18px_40px_rgba(15,23,42,0.16)]"
               >
                 <span
                   className={`absolute inset-0 bg-gradient-to-r ${link.hoverGlow} opacity-0 transition-opacity duration-300 group-hover:opacity-100`}
                 />
                 <span
-                  className={`relative flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-white shadow-[0_8px_18px_rgba(15,23,42,0.18)] transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6 ${link.hoverIcon}`}
+                  className={`footer-social-icon relative flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-white shadow-[0_8px_18px_rgba(15,23,42,0.18)] transition-transform duration-300 group-hover:scale-110 group-hover:rotate-6 ${link.hoverIcon}`}
                 >
                   <link.icon className="h-5 w-5" />
                 </span>
@@ -2425,7 +2672,7 @@ const Footer: React.FC<{ activeTheme: AppThemeKey }> = ({ activeTheme }) => {
             ))}
           </div>
 
-          <div className="pt-2 text-center">
+          <div className="footer-developer pt-2 text-center">
             <p className="text-xs text-slate-500">{developerText}</p>
           </div>
         </div>

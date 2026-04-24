@@ -15,6 +15,8 @@ export interface CreateOrderParams {
   paymentMethod?: string;
   notes?: string;
   shippingCost?: number;
+  couponCode?: string;
+  discountAmount?: number;
   items: CartItem[];
 }
 

@@ -6,7 +6,7 @@ import { trackCustomerEventOnce } from "@/lib/customerInsights";
 import { CUSTOMER_SESSION_EVENT, getCustomerSession } from "@/lib/customerAuth";
 import { meetsMinimumOrder as satisfiesMinimumOrder } from "../../shared/orderRules";
 import { getDisplayProductPrice } from "../../shared/productPricing";
-import { CartContext, type CartContextType } from "@/contexts/cart-store";
+import { CartContext, type CartContextType, type AppliedCoupon } from "@/contexts/cart-store";
 
 // Gera uma assinatura do cliente atual pra separar os carrinhos.
 function getCustomerSignature(): string {
@@ -39,6 +39,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [animateCartIcon, setAnimateCartIcon] = useState(0);
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
 
   // ✅ Pop-up/animação de frete grátis REMOVIDOS
   const showFreeShippingAnimation = false;
@@ -120,6 +121,15 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
     (total, item) => total + getDisplayProductPrice(item.product) * item.quantity,
     0
   );
+
+  // Desconto do cupom
+  const discountAmount = (() => {
+    if (!appliedCoupon) return 0;
+    if (appliedCoupon.type === "percent") {
+      return Math.round(cartTotal * appliedCoupon.value) / 100;
+    }
+    return 0; // free_shipping é aplicado no checkout
+  })();
 
   // Quanto falta pro frete grátis (se você exibe isso em algum lugar)
   const freeShippingRemaining = Math.max(0, FREE_SHIPPING_THRESHOLD - cartTotal);
@@ -265,6 +275,14 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const applyCoupon = (coupon: AppliedCoupon) => {
+    setAppliedCoupon(coupon);
+  };
+
+  const clearCoupon = () => {
+    setAppliedCoupon(null);
+  };
+
   const toggleCart = () => setIsCartOpen((prev) => !prev);
   const openCart = () => setIsCartOpen(true);
   const closeCart = () => setIsCartOpen(false);
@@ -306,6 +324,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
     addMultipleToCart,
     animateCartIcon,
     showFreeShippingAnimation,
+    appliedCoupon,
+    discountAmount,
+    applyCoupon,
+    clearCoupon,
   };
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

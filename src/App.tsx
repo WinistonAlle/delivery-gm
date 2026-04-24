@@ -31,6 +31,8 @@ const ReportsDashboard = lazy(() => import("./pages/ReportsDashboard"));
 const DeliveryOps = lazy(() => import("./pages/DeliveryOps"));
 const AdminOrders = lazy(() => import("./pages/AdminOrders"));
 const PreparationGuides = lazy(() => import("./pages/PreparationGuides"));
+const AdminCoupons = lazy(() => import("./pages/AdminCoupons"));
+import { COUPONS_ENABLED } from "@/lib/featureFlags";
 
 const queryClient = new QueryClient();
 
@@ -362,6 +364,17 @@ function App() {
                     </RequireRole>
                   }
                 />
+
+                {COUPONS_ENABLED && (
+                  <Route
+                    path="/admin/cupons"
+                    element={
+                      <RequireRole allow={["admin"]} redirectTo="/catalogo">
+                        <AdminCoupons />
+                      </RequireRole>
+                    }
+                  />
+                )}
 
                 {/* 404 */}
                 <Route path="*" element={<NotFound />} />
