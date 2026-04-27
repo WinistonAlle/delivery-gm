@@ -1035,7 +1035,7 @@ const Index: React.FC = () => {
               const mappedManual = ordered
                 .map((r) => byId.get(String(r.product_id)))
                 .filter(Boolean)
-                .map(mapRowToProduct);
+                .map(mapCatalogProductRow);
 
               if (mappedManual.length > 0) {
                 setFeaturedProducts(mappedManual);
@@ -2606,10 +2606,10 @@ const Index: React.FC = () => {
       </Dialog>
 
       <Dialog open={snakeDialogOpen} onOpenChange={setSnakeDialogOpen}>
-        <DialogContent className="max-w-[95vw] border-0 bg-white/95 p-4 shadow-[0_30px_90px_rgba(15,23,42,0.22)] backdrop-blur-xl sm:max-w-3xl sm:p-6">
-          <DialogHeader className="space-y-2 text-left">
-            <DialogTitle className="text-2xl text-slate-900">Jogo da Cobinha</DialogTitle>
-            <DialogDescription className="text-slate-600">
+        <DialogContent className="max-h-[94dvh] max-w-[95vw] overflow-y-auto border-0 bg-white/95 p-3 shadow-[0_30px_90px_rgba(15,23,42,0.22)] backdrop-blur-xl sm:max-w-3xl sm:p-6">
+          <DialogHeader className="space-y-1.5 text-left">
+            <DialogTitle className="text-xl text-slate-900 sm:text-2xl">Jogo da Cobrinha</DialogTitle>
+            <DialogDescription className="text-sm text-slate-600">
               Easter egg liberado com 7 cliques na logo da página principal.
             </DialogDescription>
           </DialogHeader>
