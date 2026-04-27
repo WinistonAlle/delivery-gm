@@ -23,6 +23,7 @@ import couponSlotsHandler from "./api/coupon-slots";
 import spinRouletteHandler from "./api/spin-roulette";
 import userCouponHandler from "./api/user-coupon";
 import adminCouponsHandler from "./api/admin-coupons";
+import chatAssistantHandler from "./api/chat-assistant";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -76,6 +77,7 @@ app.all("/api/coupon-slots", adaptHandler(couponSlotsHandler));
 app.all("/api/spin-roulette", adaptHandler(spinRouletteHandler));
 app.all("/api/user-coupon", adaptHandler(userCouponHandler));
 app.all("/api/admin-coupons", adaptHandler(adminCouponsHandler));
+app.all("/api/chat-assistant", adaptHandler(chatAssistantHandler));
 
 app.use(express.static(distDir, { index: false, maxAge: "1h" }));
 
