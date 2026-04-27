@@ -1011,6 +1011,156 @@ function buildFaqAnswer(question: string, context: AssistantContext) {
   return buildFallbackAnswer(question, context);
 }
 
+function buildApiUrl(path: string) {
+  if (typeof window === "undefined") return path;
+  return new URL(path, window.location.origin).toString();
+}
+
+function shouldUseAiAgent(question: string, localAnswer: string) {
+  const deterministic = questionHasAny(question, [
+    "frete",
+    "entrega",
+    "cidade",
+    "regiao",
+    "pedido minimo",
+    "minimo",
+    "preco",
+    "valor",
+    "quanto custa",
+    "pagamento",
+    "pix",
+    "cartao",
+    "forno",
+    "assar",
+    "fritar",
+    "air fryer",
+    "airfryer",
+    "conservar",
+    "freezer",
+    "armazenar",
+    "horario",
+  ]);
+
+  if (buildMathAnswer(question) || deterministic) return false;
+
+  const openEnded = questionHasAny(question, [
+    "indique",
+    "indica",
+    "sugere",
+    "sugestao",
+    "recomenda",
+    "recomendacao",
+    "o que comprar",
+    "o que levar",
+    "combina",
+    "montar",
+    "me ajuda",
+    "festa",
+    "evento",
+    "aniversario",
+    "revenda",
+    "vender",
+    "crianca",
+    "lanche",
+    "cafe",
+  ]);
+
+  const fallbackLike =
+    localAnswer.startsWith("Eu consigo ajudar") ||
+    localAnswer.startsWith("Eu consigo te ajudar") ||
+    localAnswer.startsWith("Não achei uma resposta pronta");
+
+  return openEnded || fallbackLike;
+}
+
+function getAiRelevantProducts(question: string, context: AssistantContext) {
+  const byId = new Map<string, Product>();
+  const addProducts = (products: Product[]) => {
+    for (const product of products) {
+      if (product.inStock === false) continue;
+      byId.set(String(product.id), product);
+      if (byId.size >= 32) break;
+    }
+  };
+
+  addProducts(context.cartItems.map((item) => item.product));
+  addProducts(getRecommendationSet(question, context).products);
+  addProducts(findProductMatches(question, 8));
+
+  const category = inferCategory(question);
+  if (category) addProducts(getCategoryProducts(category, 8));
+
+  const topProducts = TOP_SELLING_PRODUCTS.map((name) =>
+    PRODUCTS.find((product) => normalizeQuestion(product.name) === normalizeQuestion(name))
+  ).filter(Boolean) as Product[];
+  addProducts(topProducts);
+
+  if (byId.size < 12) {
+    addProducts([
+      ...getCategoryProducts("Pão de Queijo", 4),
+      ...getCategoryProducts("Salgados Assados", 4),
+      ...getCategoryProducts("Salgados P/ Fritar", 4),
+      ...getCategoryProducts("Pães e Massas Doces", 3),
+    ]);
+  }
+
+  return Array.from(byId.values()).slice(0, 32).map((product) => ({
+    id: String(product.id),
+    name: product.name,
+    category: product.category,
+    price: getDisplayProductPrice(product),
+    packageInfo: product.packageInfo,
+    weight: product.weight,
+    inStock: product.inStock !== false,
+  }));
+}
+
+async function fetchAiAgentAnswer(
+  question: string,
+  localAnswer: string,
+  context: AssistantContext
+) {
+  const response = await fetch(buildApiUrl("/api/chat-assistant"), {
+    method: "POST",
+    credentials: "same-origin",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      question,
+      localAnswer,
+      customer: {
+        firstName: formatShortName(context.session),
+        city: context.shippingCity,
+      },
+      cart: {
+        itemsCount: context.itemsCount,
+        cartTotal: context.cartTotal,
+        packageCount: context.packageCount,
+        totalWeight: context.totalWeight,
+        freeShippingRemaining: context.freeShippingRemaining,
+        shippingCost: context.shippingCost,
+        shippingCity: context.shippingCity,
+        meetsMinimumOrder: context.meetsMinimumOrder,
+        items: context.cartItems.map((item) => ({
+          name: item.product.name,
+          quantity: item.quantity,
+          category: item.product.category,
+          price: getDisplayProductPrice(item.product),
+          packageInfo: item.product.packageInfo,
+        })),
+      },
+      products: getAiRelevantProducts(question, context),
+    }),
+  });
+
+  if (!response.ok) return null;
+
+  const data = (await response.json().catch(() => null)) as { answer?: unknown } | null;
+  const answer = typeof data?.answer === "string" ? data.answer.trim() : "";
+  return answer || null;
+}
+
 const HelperChat: React.FC = () => {
   const {
     cartItems,
@@ -1036,7 +1186,7 @@ const HelperChat: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const replyTimeoutRef = useRef<number | null>(null);
 
-  const canSend = draft.trim().length > 0;
+  const canSend = draft.trim().length > 0 && !isTyping;
   const shippingCity = getSessionCity(session);
   const shippingCost = shippingCity ? getShippingCostForCity(shippingCity, cartTotal) : null;
 
@@ -1196,11 +1346,12 @@ const HelperChat: React.FC = () => {
     const cleanQuestion = question.trim();
     if (!cleanQuestion) return;
 
-    const answer = personalizeAnswer(buildFaqAnswer(cleanQuestion, assistantContext), assistantContext);
+    const localAnswer = personalizeAnswer(buildFaqAnswer(cleanQuestion, assistantContext), assistantContext);
     const timestamp = Date.now();
 
     if (replyTimeoutRef.current !== null) {
       window.clearTimeout(replyTimeoutRef.current);
+      replyTimeoutRef.current = null;
     }
 
     setMessages((current) => [
@@ -1213,8 +1364,10 @@ const HelperChat: React.FC = () => {
     ]);
 
     setIsTyping(true);
+    setDraft("");
+    setIsOpen(true);
 
-    replyTimeoutRef.current = window.setTimeout(() => {
+    const deliverAnswer = (answer: string) => {
       setMessages((current) => [
         ...current,
         {
@@ -1225,10 +1378,23 @@ const HelperChat: React.FC = () => {
       ]);
       setIsTyping(false);
       replyTimeoutRef.current = null;
-    }, 450);
+    };
 
-    setDraft("");
-    setIsOpen(true);
+    if (!shouldUseAiAgent(cleanQuestion, localAnswer)) {
+      replyTimeoutRef.current = window.setTimeout(() => deliverAnswer(localAnswer), 450);
+      return;
+    }
+
+    void (async () => {
+      let answer = localAnswer;
+      try {
+        answer = (await fetchAiAgentAnswer(cleanQuestion, localAnswer, assistantContext)) ?? localAnswer;
+      } catch (error) {
+        console.debug("Agente de IA indisponível, usando resposta local:", error);
+      }
+
+      replyTimeoutRef.current = window.setTimeout(() => deliverAnswer(answer), 180);
+    })();
   };
 
   return (
