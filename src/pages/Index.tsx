@@ -2569,7 +2569,7 @@ const socialLinks = [
 ];
 
 const developerText =
-  "©️ 2026 Catálogo Interativo Delivery desenvolvido por Winiston Alle & Mateus Borges";
+  "©️ 2026 Catálogo Interativo varejo desenvolvido por Winiston Alle & Mateus Borges";
 
 const Footer: React.FC<{ activeTheme: AppThemeKey }> = ({ activeTheme }) => {
   return (
