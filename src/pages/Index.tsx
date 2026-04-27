@@ -36,6 +36,7 @@ import {
   Star,
   Sparkles,
   Palette,
+  BadgeCheck,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -57,6 +58,7 @@ import {
 import { getDisplayProductPrice } from "../../shared/productPricing";
 import CouponRouletteModal from "@/components/CouponRouletteModal";
 import { COUPONS_ENABLED } from "@/lib/featureFlags";
+import { FREE_SHIPPING_THRESHOLD } from "@/data/shipping";
 
 const ITEMS_PER_PAGE = 24;
 const PRODUCTS_CACHE_KEY = "gm_catalog_products_v1";
@@ -79,6 +81,17 @@ const NEW_YEAR_FIREWORKS = [
   { x: "74%", y: "18%", size: "1.08", delay: "0.2s",  color: "#f97316" },
   { x: "88%", y: "14%", size: "0.88", delay: "0.72s", color: "#14b8a6" },
 ];
+
+const FREE_SHIPPING_CONFETTI = Array.from({ length: 28 }, (_, index) => ({
+  id: index,
+  left: `${(index * 37) % 100}%`,
+  delay: `${(index % 8) * 0.13}s`,
+  duration: `${2.4 + (index % 5) * 0.18}s`,
+  color: ["#ef4444", "#f59e0b", "#22c55e", "#3b82f6", "#ec4899", "#facc15"][index % 6],
+  size: `${7 + (index % 4) * 2}px`,
+  rotate: `${(index * 29) % 180}deg`,
+  drift: `${index % 2 === 0 ? "" : "-"}${18 + (index % 6) * 6}px`,
+}));
 
 const NATAL_SNOWFLAKES = [
   { left: "7%",  size: "6px",  duration: "9s",    delay: "0s",   drift: "20px"  },
@@ -721,7 +734,7 @@ const Pagination: React.FC<PaginationProps> = ({
 -------------------------------------------------------- */
 const Index: React.FC = () => {
   const navigate = useNavigate();
-  const { addMultipleToCart, applyCoupon, isCartOpen, cartItems, appliedCoupon: cartCoupon } = useCart();
+  const { addMultipleToCart, applyCoupon, isCartOpen, cartItems, cartTotal, appliedCoupon: cartCoupon } = useCart();
   const catalogRef = useRef<HTMLDivElement | null>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -778,11 +791,16 @@ const Index: React.FC = () => {
   // ✅ Avisos carregando (pra compor o overlay)
   const [noticesLoading, setNoticesLoading] = useState(true);
   const [showRoulette, setShowRoulette] = useState(false);
+  const [showFreeShippingCelebration, setShowFreeShippingCelebration] = useState(false);
+  const freeShippingEligibilityReady = useRef(false);
+  const wasEligibleForFreeShipping = useRef(false);
 
   const hasLoadedFromCache = useRef(false);
   const employee: CustomerSession | null = safeGetEmployee();
   const isLoggedIn = !!(employee?.id || employee?.phone || employee?.cpf);
   const displayName = employee?.full_name ?? employee?.name ?? "Cliente";
+  const safeCartTotal = Number.isFinite(cartTotal) ? cartTotal : 0;
+  const hasFreeShipping = cartItems.length > 0 && safeCartTotal >= FREE_SHIPPING_THRESHOLD;
 
   const isAdmin =
     employee?.is_admin ||
@@ -798,6 +816,37 @@ const Index: React.FC = () => {
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoggedIn]);
+
+  useEffect(() => {
+    if (!freeShippingEligibilityReady.current) {
+      wasEligibleForFreeShipping.current = hasFreeShipping;
+      freeShippingEligibilityReady.current = true;
+      return;
+    }
+
+    if (!hasFreeShipping) {
+      wasEligibleForFreeShipping.current = false;
+      setShowFreeShippingCelebration(false);
+      return;
+    }
+
+    if (isCartOpen) {
+      wasEligibleForFreeShipping.current = true;
+      return;
+    }
+
+    if (!wasEligibleForFreeShipping.current) {
+      setShowFreeShippingCelebration(true);
+      const timeout = window.setTimeout(() => {
+        setShowFreeShippingCelebration(false);
+      }, 4400);
+
+      wasEligibleForFreeShipping.current = true;
+      return () => window.clearTimeout(timeout);
+    }
+
+    wasEligibleForFreeShipping.current = true;
+  }, [hasFreeShipping, isCartOpen]);
 
   const persistLocalSetting = useCallback((key: string, value: string) => {
     try {
@@ -1439,6 +1488,59 @@ const Index: React.FC = () => {
           }}
         />
       )}
+
+      <AnimatePresence>
+        {showFreeShippingCelebration && !isCartOpen && (
+          <motion.div
+            className="pointer-events-none fixed inset-0 z-[70] overflow-hidden px-5 pt-[calc(env(safe-area-inset-top)+6rem)]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <div className="free-shipping-confetti-layer" aria-hidden="true">
+              {FREE_SHIPPING_CONFETTI.map((piece) => (
+                <span
+                  key={piece.id}
+                  className="free-shipping-confetti"
+                  style={{
+                    left: piece.left,
+                    animationDelay: piece.delay,
+                    animationDuration: piece.duration,
+                    backgroundColor: piece.color,
+                    width: piece.size,
+                    height: piece.size,
+                    transform: `rotate(${piece.rotate})`,
+                    "--confetti-drift": piece.drift,
+                  } as React.CSSProperties}
+                />
+              ))}
+            </div>
+
+            <motion.div
+              className="pointer-events-auto mx-auto max-w-[330px] rounded-2xl border border-green-100 bg-white p-5 text-center shadow-[0_24px_70px_rgba(15,23,42,0.25)]"
+              initial={{ y: -18, scale: 0.96 }}
+              animate={{ y: 0, scale: 1 }}
+              exit={{ y: -12, scale: 0.98 }}
+              transition={{ type: "spring", stiffness: 360, damping: 28 }}
+            >
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-700">
+                <BadgeCheck className="h-6 w-6" />
+              </div>
+              <p className="text-lg font-bold text-slate-950">Frete grátis liberado</p>
+              <p className="mt-1 text-sm leading-relaxed text-slate-600">
+                Seu pedido atingiu o valor mínimo para entrega grátis.
+              </p>
+              <Button
+                type="button"
+                className="mt-4 h-10 w-full bg-green-600 text-white hover:bg-green-700"
+                onClick={() => setShowFreeShippingCelebration(false)}
+              >
+                Continuar comprando
+              </Button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Banner discreto para quem já tem cupom ativo */}
       {COUPONS_ENABLED && !showRoulette && isLoggedIn && cartCoupon && (
