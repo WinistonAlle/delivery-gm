@@ -32,7 +32,6 @@ export const SHIPPING_RATES: ShippingRate[] = [
 export const FREE_SHIPPING_THRESHOLD = 150;
 export const MIN_PACKAGES = 5;
 export const MIN_WEIGHT_KG = 5;
-export const MIN_ORDER_VALUE = 150;
 
 export function normalizeMatch(value: string) {
   return String(value ?? "")
@@ -58,6 +57,6 @@ export function getShippingCostForCity(city: string, itemsTotal: number) {
   return rate.cost;
 }
 
-export function meetsMinimumOrder(params: { packageCount: number; orderValue: number }) {
-  return params.packageCount >= MIN_PACKAGES || params.orderValue >= MIN_ORDER_VALUE;
+export function meetsMinimumOrder(params: { packageCount: number; totalWeightKg: number }) {
+  return params.packageCount >= MIN_PACKAGES || params.totalWeightKg >= MIN_WEIGHT_KG;
 }

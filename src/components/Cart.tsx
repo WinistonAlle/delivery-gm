@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { useCart } from "@/contexts/useCart";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { getDisplayProductPrice } from "../../shared/productPricing";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,7 +19,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { FREE_SHIPPING_THRESHOLD } from "@/data/shipping";
-import { MIN_ORDER_VALUE, MIN_PACKAGES } from "@/data/products";
+import { MIN_PACKAGES, MIN_WEIGHT_KG } from "@/data/products";
 import {
   captureAbandonmentIfNeeded,
   incrementMetric,
@@ -90,7 +89,9 @@ const Cart: React.FC = () => {
 
   const safeCartTotal = Number.isFinite(cartTotal) ? cartTotal : 0;
   const missingForFreeShipping = Math.max(0, FREE_SHIPPING_THRESHOLD - safeCartTotal);
-  const missingForMinimumValue = Math.max(0, MIN_ORDER_VALUE - safeCartTotal);
+  const hasFreeShipping = cartItems.length > 0 && missingForFreeShipping <= 0;
+  const safeTotalWeight = Number.isFinite(totalWeight) ? totalWeight : 0;
+  const missingForMinimumWeight = Math.max(0, MIN_WEIGHT_KG - safeTotalWeight);
 
   useEffect(() => {
     const syncSession = () => {
@@ -111,6 +112,24 @@ const Cart: React.FC = () => {
   useEffect(() => {
     markCartDraft(cartItems.length > 0);
   }, [cartItems.length]);
+
+  useEffect(() => {
+    if (!isCartOpen) return;
+
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousOverscroll = document.body.style.overscrollBehavior;
+
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    document.body.style.overscrollBehavior = "none";
+
+    return () => {
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      document.body.style.overflow = previousBodyOverflow;
+      document.body.style.overscrollBehavior = previousOverscroll;
+    };
+  }, [isCartOpen]);
 
   useEffect(() => {
     captureAbandonmentIfNeeded();
@@ -173,7 +192,7 @@ const Cart: React.FC = () => {
             onClick={handleClose}
             variant="ghost"
             size="icon"
-            className="fixed top-4 right-4 z-50 md:hidden bg-white rounded-full shadow-md"
+            className="fixed right-4 top-[calc(env(safe-area-inset-top)+0.75rem)] z-[60] md:hidden bg-white rounded-full shadow-md"
             aria-label="Fechar carrinho"
           >
             <X className="h-5 w-5" />
@@ -188,13 +207,13 @@ const Cart: React.FC = () => {
           />
 
           <motion.aside
-            className="fixed top-0 right-0 z-50 h-screen w-full sm:w-96 bg-white shadow-xl flex flex-col overflow-hidden"
+            className="fixed inset-y-0 right-0 z-50 h-[100dvh] max-h-[100dvh] w-full sm:w-96 bg-white shadow-xl flex flex-col overflow-hidden"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "tween", duration: 0.3 }}
           >
-            <div className="p-4 bg-red-600 text-white flex justify-between items-center">
+            <div className="shrink-0 bg-red-600 px-4 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)] text-white flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <Button
                   variant="ghost"
@@ -216,81 +235,79 @@ const Cart: React.FC = () => {
               </Button>
             </div>
 
-            <>
-              <ScrollArea className="flex-grow overflow-y-auto">
-                <div className="p-4 space-y-3">
-                  {cartItems.length === 0 ? (
-                    <div className="text-center text-gray-500 py-10">
-                      <ShoppingCart className="h-14 w-14 mx-auto mb-3 opacity-20" />
-                      <p>Seu carrinho está vazio.</p>
-                    </div>
-                  ) : (
-                    cartItems.map((item) => {
-                      const images = Array.isArray(item.product.images) ? item.product.images : [];
-                      const thumb = images[0] || item.product.image_path || "/placeholder.svg";
-                      const price = getDisplayProductPrice(item.product);
-                      const subtotal = price * item.quantity;
+            <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
+              <div className="space-y-3 p-4 pb-6">
+                {cartItems.length === 0 ? (
+                  <div className="text-center text-gray-500 py-10">
+                    <ShoppingCart className="h-14 w-14 mx-auto mb-3 opacity-20" />
+                    <p>Seu carrinho está vazio.</p>
+                  </div>
+                ) : (
+                  cartItems.map((item) => {
+                    const images = Array.isArray(item.product.images) ? item.product.images : [];
+                    const thumb = images[0] || item.product.image_path || "/placeholder.svg";
+                    const price = getDisplayProductPrice(item.product);
+                    const subtotal = price * item.quantity;
 
-                      return (
-                        <div key={item.product.id} className="bg-gray-50 rounded-lg p-3">
-                          <div className="flex justify-between items-start gap-2">
-                            <div className="flex gap-3">
-                              <div className="w-12 h-12 rounded-md overflow-hidden bg-gray-200">
-                                <img src={thumb} alt={item.product.name} className="w-full h-full object-cover" />
-                              </div>
-                              <div>
-                                <p className="text-sm font-medium line-clamp-2">{item.product.name}</p>
-                                <p className="text-sm text-red-600 font-semibold">
-                                  {price.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                                </p>
-                              </div>
+                    return (
+                      <div key={item.product.id} className="bg-gray-50 rounded-lg p-3">
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="flex gap-3">
+                            <div className="w-12 h-12 rounded-md overflow-hidden bg-gray-200">
+                              <img src={thumb} alt={item.product.name} className="w-full h-full object-cover" />
                             </div>
-
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeFromCart(item.product.id)}
-                              className="text-gray-500 hover:text-red-500"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <div>
+                              <p className="text-sm font-medium line-clamp-2">{item.product.name}</p>
+                              <p className="text-sm text-red-600 font-semibold">
+                                {price.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                              </p>
+                            </div>
                           </div>
 
-                          <div className="flex items-center mt-2">
-                            <Button
-                              onClick={() => decreaseQuantity(item.product.id)}
-                              variant="outline"
-                              size="icon"
-                              className="rounded-full h-[34.56px] w-[34.56px] md:h-8 md:w-8"
-                            >
-                              <Minus className="h-[17.28px] w-[17.28px] md:h-4 md:w-4" />
-                            </Button>
-
-                            <Input
-                              value={String(item.quantity)}
-                              onChange={(e) => handleQuantityChange(item.product.id, e.target.value)}
-                              className="mx-2 h-[34.56px] w-[51.84px] text-center text-sm md:h-8 md:w-12"
-                            />
-
-                            <Button
-                              onClick={() => addToCart(item.product)}
-                              variant="outline"
-                              size="icon"
-                              className="rounded-full h-[34.56px] w-[34.56px] md:h-8 md:w-8"
-                            >
-                              <Plus className="h-[17.28px] w-[17.28px] md:h-4 md:w-4" />
-                            </Button>
-
-                            <span className="ml-auto font-semibold text-sm">
-                              {subtotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                            </span>
-                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeFromCart(item.product.id)}
+                            className="text-gray-500 hover:text-red-500"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                      );
-                    })
-                  )}
-                </div>
-              </ScrollArea>
+
+                        <div className="flex items-center mt-2">
+                          <Button
+                            onClick={() => decreaseQuantity(item.product.id)}
+                            variant="outline"
+                            size="icon"
+                            className="rounded-full h-[34.56px] w-[34.56px] md:h-8 md:w-8"
+                          >
+                            <Minus className="h-[17.28px] w-[17.28px] md:h-4 md:w-4" />
+                          </Button>
+
+                          <Input
+                            value={String(item.quantity)}
+                            onChange={(e) => handleQuantityChange(item.product.id, e.target.value)}
+                            className="mx-2 h-[34.56px] w-[51.84px] text-center text-sm md:h-8 md:w-12"
+                          />
+
+                          <Button
+                            onClick={() => addToCart(item.product)}
+                            variant="outline"
+                            size="icon"
+                            className="rounded-full h-[34.56px] w-[34.56px] md:h-8 md:w-8"
+                          >
+                            <Plus className="h-[17.28px] w-[17.28px] md:h-4 md:w-4" />
+                          </Button>
+
+                          <span className="ml-auto font-semibold text-sm">
+                            {subtotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
 
               <div className="px-4 py-2 bg-gray-50 border-t">
                 {cartItems.length > 0 ? (
@@ -324,25 +341,25 @@ const Cart: React.FC = () => {
                 ) : null}
               </div>
 
-              <div className="p-4 border-t bg-white space-y-3">
+              <div className="cart-checkout-panel sticky bottom-0 space-y-3 border-t bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 shadow-[0_-12px_28px_rgba(15,23,42,0.08)]">
                 <div className="text-xs flex items-center gap-3 text-gray-600 bg-gray-50 rounded-md p-2">
                   <span className={packageCount >= MIN_PACKAGES ? "text-green-600 font-bold" : ""}>
                     Pacotes: {packageCount}/{MIN_PACKAGES}
                   </span>
-                  <span className={safeCartTotal >= MIN_ORDER_VALUE ? "text-green-600 font-bold" : ""}>
-                    Valor: R$ {safeCartTotal.toFixed(2)}/R$ {MIN_ORDER_VALUE.toFixed(2)}
+                  <span className={safeTotalWeight >= MIN_WEIGHT_KG ? "text-green-600 font-bold" : ""}>
+                    Peso: {safeTotalWeight.toFixed(1)}kg/{MIN_WEIGHT_KG}kg
                   </span>
                 </div>
 
                 {!meetsMinimumOrder ? (
                   <p className="text-xs font-medium bg-amber-50 p-2 rounded-md text-amber-700">
-                    ⚠️ Pedido mínimo: {MIN_PACKAGES} pacotes diversos ou R$ {MIN_ORDER_VALUE.toFixed(2)} no total.
+                    ⚠️ Pedido mínimo: {MIN_PACKAGES} pacotes diversos ou {MIN_WEIGHT_KG} kg no total.
                   </p>
                 ) : null}
 
-                {!meetsMinimumOrder && missingForMinimumValue > 0 ? (
+                {!meetsMinimumOrder && missingForMinimumWeight > 0 ? (
                   <p className="text-xs text-gray-500">
-                    Faltam R$ {missingForMinimumValue.toFixed(2)} para liberar por valor mínimo.
+                    Faltam {missingForMinimumWeight.toFixed(1)} kg para liberar por peso mínimo.
                   </p>
                 ) : null}
 
@@ -419,7 +436,7 @@ const Cart: React.FC = () => {
                   <p className="text-red-500 text-xs">⚠️ Adicione itens ao carrinho para continuar</p>
                 ) : null}
               </div>
-            </>
+            </div>
           </motion.aside>
         </>
       )}

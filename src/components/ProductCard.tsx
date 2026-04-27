@@ -370,6 +370,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           >
             <h3
               className={`
+                product-card-title
                 font-semibold mb-1 line-clamp-2 min-w-0 min-h-[2.4rem] md:min-h-[3rem]
                 ${hideImages ? "text-[13px]" : "text-[13px] md:text-base"}
                 [[data-featured-card='true']_&]:text-[14px]
@@ -383,12 +384,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
             <p className="text-[11px] md:text-xs text-gray-500 mb-1 line-clamp-2 min-w-0 min-h-[2rem] md:min-h-[2.5rem]">
               {product.packageInfo}
             </p>
-
-            {product.description && (
-              <p className="hidden md:block text-xs text-gray-500 mb-2 line-clamp-2">
-                {product.description}
-              </p>
-            )}
 
             <div className="hidden md:flex items-center gap-2 mb-2 text-[11px] text-gray-500">
               {product.isPackage && (
@@ -444,7 +439,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
                   }}
                   variant="outline"
                   size="icon"
-                  className="rounded-full h-7 w-7 md:h-8 md:w-8"
+                  className="product-card-qty-btn rounded-full h-7 w-7 md:h-8 md:w-8"
                   disabled={quantity === 0}
                 >
                   <Minus className="h-4 w-4" />
@@ -460,7 +455,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
                     onClick={(e) => stop(e)}
                     onPointerDown={(e) => stop(e)}
                     inputMode="numeric"
-                    className="h-7 w-10 md:h-8 md:w-12 px-2 text-center text-xs md:text-sm"
+                    className="product-card-qty-input h-7 w-10 md:h-8 md:w-12 px-2 text-center text-xs md:text-sm"
                   />
 
                   {inputValue !== quantity.toString() && (
@@ -471,7 +466,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
                       }}
                       variant="outline"
                       size="sm"
-                      className="absolute -right-11 top-0 h-7 px-2 md:h-8 md:px-2"
+                      className="product-card-qty-apply absolute -right-11 top-0 h-7 px-2 md:h-8 md:px-2"
                     >
                       <Check className="h-3 w-3" />
                     </Button>
@@ -485,7 +480,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
                   }}
                   variant={quantity > 0 ? "default" : "outline"}
                   size="icon"
-                  className={`rounded-full h-7 w-7 md:h-8 md:w-8 ${
+                  className={`product-card-qty-btn rounded-full h-7 w-7 md:h-8 md:w-8 ${
                     quantity > 0 ? "bg-slate-900 text-white hover:bg-slate-800" : ""
                   }`}
                 >
@@ -511,6 +506,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
         product={product}
         isOpen={isDetailOpen}
         onClose={() => setIsDetailOpen(false)}
+        relatedProducts={relatedProducts}
+        crossSellRecommendations={crossSellRecommendations}
       />
     </>
   );

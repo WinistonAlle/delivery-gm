@@ -158,6 +158,10 @@ async function saveProduct(input: unknown) {
   if (weightError) throw weightError;
 }
 
+type ListProductsResponse = {
+  items: unknown[];
+};
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Cache-Control", "no-store");
 
@@ -165,18 +169,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await requireAdminSession(req);
 
     if (req.method === "GET") {
-      return res.status(200).json({ items: await listProducts() });
+      return res.status(200).json({ items: await listProducts() } satisfies ListProductsResponse);
     }
 
     if (req.method === "POST") {
       await saveProduct(req.body);
-      return res.status(200).json({ ok: true, items: await listProducts() });
+      return res.status(200).json({ ok: true, items: await listProducts() } satisfies ListProductsResponse & { ok: true });
     }
 
     if (req.method === "DELETE") {
       const productId = normalizeProductId(req.body?.id ?? req.query.id);
       await deleteProduct(productId);
-      return res.status(200).json({ ok: true });
+      return res.status(200).json({ ok: true, items: await listProducts() } satisfies ListProductsResponse & { ok: true });
     }
 
     res.setHeader("Allow", "GET, POST, DELETE");

@@ -525,11 +525,7 @@ const UiverseLoading: React.FC<{ show: boolean }> = ({ show }) => {
 /* --------------------------------------------------------
    BOTTOM NAV (MOBILE)
 -------------------------------------------------------- */
-interface BottomNavProps {
-  noticeCount?: number;
-}
-
-const BottomNav: React.FC<BottomNavProps> = ({ noticeCount = 0 }) => {
+const BottomNav: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -537,7 +533,6 @@ const BottomNav: React.FC<BottomNavProps> = ({ noticeCount = 0 }) => {
 
   const tabs = [
     { label: "Início", path: HOME_PATH, icon: Home },
-    { label: "Avisos", path: "/avisos", icon: Bell },
     { label: "Favoritos", path: "/favoritos", icon: Heart },
     { label: "Pedidos", path: "/meus-pedidos", icon: ClipboardList },
   ];
@@ -563,11 +558,10 @@ const BottomNav: React.FC<BottomNavProps> = ({ noticeCount = 0 }) => {
         shadow-[0_-4px_12px_rgba(0,0,0,0.06)]
       "
     >
-      <div className="flex justify-around py-2">
+      <div className="flex justify-around pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2">
         {tabs.map(({ label, path, icon: Icon }) => {
           const active = isActive(path);
           const isHome = label === "Início";
-          const isAvisos = label === "Avisos";
 
           return (
             <button
@@ -589,21 +583,6 @@ const BottomNav: React.FC<BottomNavProps> = ({ noticeCount = 0 }) => {
                 `}
               >
                 <Icon className="h-5 w-5" />
-
-                {isAvisos && noticeCount > 0 && (
-                  <span
-                    className="
-                      absolute -top-1.5 -right-1.5
-                      min-w-[16px] h-4 px-1
-                      rounded-full bg-red-500
-                      text-[10px] font-bold text-white
-                      flex items-center justify-center
-                      border-2 border-white
-                    "
-                  >
-                    {noticeCount > 9 ? "9+" : noticeCount}
-                  </span>
-                )}
               </div>
 
               <span>{label}</span>
@@ -852,7 +831,7 @@ const Index: React.FC = () => {
     try {
       localStorage.setItem(key, value);
     } catch (error) {
-      console.debug(`Nao foi possivel persistir ${key}:`, error);
+      console.debug(`Não foi possível persistir ${key}:`, error);
     }
   }, []);
 
@@ -1474,7 +1453,7 @@ const Index: React.FC = () => {
   }, [loading, featuredLoading, noticesLoading]);
 
   return (
-    <div className="min-h-screen flex flex-col relative pb-28 md:pb-0">
+    <div className="min-h-screen flex flex-col relative pb-[calc(env(safe-area-inset-bottom)+7rem)] md:pb-0">
       {/* ✅ LOADING OVERLAY */}
       <UiverseLoading show={overlayLoading} />
 
@@ -2560,7 +2539,7 @@ const Index: React.FC = () => {
         </section>
       </main>
 
-      <BottomNav noticeCount={notices.length} />
+      <BottomNav />
       <Footer activeTheme={activeTheme} />
       <HelperChat />
       <CartToggle />

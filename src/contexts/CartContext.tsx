@@ -301,7 +301,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const meetsMinimumOrder = satisfiesMinimumOrder({
     packageCount,
-    orderValue: cartTotal,
+    totalWeightKg: totalWeight,
   });
 
   const value: CartContextType = {

@@ -175,20 +175,24 @@ export async function upsertCustomerProfile(params: UpsertCustomerProfileParams)
   const howFoundUs = String(params.howFoundUs ?? "").trim();
   const howFoundUsDetails = String(params.howFoundUsDetails ?? "").trim();
 
-  if (fullName.length < 3) throw new Error("Nome do cliente invalido.");
-  if (phone.length < 10) throw new Error("Telefone do cliente invalido.");
-  if (documentCpf.length !== 11) throw new Error("CPF do cliente invalido.");
+  if (fullName.length < 3) throw new Error("Nome do cliente inválido.");
+  if (phone.length < 10) throw new Error("Telefone do cliente inválido.");
+  if (documentCpf.length !== 11) throw new Error("CPF do cliente inválido.");
 
   const supabase = getSupabaseAdminClient();
   const { data: existing, error: existingError } = await supabase
     .from("delivery_customers")
-    .select("id")
+    .select("id, document_cpf")
     .eq("phone", phone)
-    .maybeSingle<{ id: string }>();
+    .maybeSingle<{ id: string; document_cpf: string | null }>();
 
   if (existingError) throw existingError;
 
   let customerId = existing?.id ?? null;
+
+  if (existing?.document_cpf && onlyDigits(existing.document_cpf) !== documentCpf) {
+    throw new Error("Não foi possível concluir o cadastro com os dados informados.");
+  }
 
   if (customerId) {
     const { error } = await supabase
@@ -217,7 +221,7 @@ export async function upsertCustomerProfile(params: UpsertCustomerProfileParams)
       .select("id")
       .single<{ id: string }>();
 
-    if (error || !data) throw error ?? new Error("Nao foi possivel criar o cliente.");
+    if (error || !data) throw error ?? new Error("Não foi possível criar o cliente.");
     customerId = data.id;
   }
 
@@ -257,7 +261,7 @@ export async function upsertCustomerProfile(params: UpsertCustomerProfileParams)
   }
 
   const session = await getCustomerProfileByPhone(phone);
-  if (!session) throw new Error("Nao foi possivel carregar o perfil do cliente.");
+  if (!session) throw new Error("Não foi possível carregar o perfil do cliente.");
   return session;
 }
 
@@ -278,9 +282,9 @@ export async function addCustomerAddress(params: AddCustomerAddressParams) {
   const label = String(params.label ?? "").trim();
   const setPrimary = Boolean(params.setPrimary);
 
-  if (phone.length < 10) throw new Error("Telefone do cliente invalido.");
-  if (address.length < 6) throw new Error("Endereco invalido.");
-  if (city.length < 2) throw new Error("Cidade invalida.");
+  if (phone.length < 10) throw new Error("Telefone do cliente inválido.");
+  if (address.length < 6) throw new Error("Endereço inválido.");
+  if (city.length < 2) throw new Error("Cidade inválida.");
 
   const supabase = getSupabaseAdminClient();
   const { data: customer, error: customerError } = await supabase
@@ -290,7 +294,7 @@ export async function addCustomerAddress(params: AddCustomerAddressParams) {
     .maybeSingle<{ id: string }>();
 
   if (customerError) throw customerError;
-  if (!customer?.id) throw new Error("Cliente nao encontrado.");
+  if (!customer?.id) throw new Error("Cliente não encontrado.");
 
   const { data: existingAddresses, error: lookupError } = await supabase
     .from("delivery_customer_addresses")
@@ -329,7 +333,7 @@ export async function addCustomerAddress(params: AddCustomerAddressParams) {
     }
 
     const session = await getCustomerProfileByPhone(phone);
-    if (!session) throw new Error("Nao foi possivel carregar os enderecos do cliente.");
+    if (!session) throw new Error("Não foi possível carregar os endereços do cliente.");
     return session;
   }
 
@@ -363,6 +367,6 @@ export async function addCustomerAddress(params: AddCustomerAddressParams) {
   }
 
   const session = await getCustomerProfileByPhone(phone);
-  if (!session) throw new Error("Nao foi possivel carregar os enderecos do cliente.");
+  if (!session) throw new Error("Não foi possível carregar os endereços do cliente.");
   return session;
 }

@@ -1,17 +1,7 @@
 import type { Product } from "@/types/products";
 import { supabase } from "@/lib/supabase";
 import { getDisplayProductPrice } from "../../shared/productPricing";
-
-const CATEGORY_NAME_BY_ID: Record<number, string> = {
-  1: "Pão de Queijo",
-  2: "Salgados Assados",
-  3: "Salgados P/ Fritar",
-  4: "Pães e Massas Doces",
-  5: "Biscoito de Queijo",
-  6: "Salgados Grandes",
-  7: "Alho em creme",
-  8: "Outros",
-};
+import { mapCatalogProductRow, isVisibleCatalogProduct } from "@/lib/catalogProducts";
 
 const LS_COMBOS_KEY = "gm_admin_delivery_combos_v1";
 const LS_CART_REC_KEY = "gm_admin_delivery_rec_cart_v1";
@@ -48,8 +38,6 @@ export type CrossSellRule = {
   priority: number;
   is_active: boolean;
 };
-
-type ProductCategory = Product["category"];
 
 type ProductRow = Record<string, unknown> & {
   id?: string | null;
@@ -116,22 +104,6 @@ type IdRow = Record<string, unknown> & {
   id?: string | number | null;
 };
 
-const CATEGORY_VALUES: ProductCategory[] = [
-  "Salgados P/ Fritar",
-  "Salgados Assados",
-  "Pães e Massas Doces",
-  "Pão de Queijo",
-  "Biscoito de Queijo",
-  "Kits e Combos",
-  "Salgados Grandes",
-  "Alho em creme",
-  "Outros",
-];
-
-function isProductCategory(value: string): value is ProductCategory {
-  return CATEGORY_VALUES.includes(value as ProductCategory);
-}
-
 const readJson = <T>(key: string, fallback: T): T => {
   try {
     const raw = localStorage.getItem(key);
@@ -149,36 +121,6 @@ const writeJson = <T>(key: string, value: T) => {
     // ignore localStorage errors
   }
 };
-
-function mapRowToProduct(row: ProductRow): Product {
-  const employeePrice = Number(row.employee_price ?? row.price ?? 0);
-  const categoryName =
-    CATEGORY_NAME_BY_ID[Number(row.category_id ?? 0)] ??
-    row.category ??
-    row.category_name ??
-    "Outros";
-  const normalizedCategory = isProductCategory(categoryName) ? categoryName : "Outros";
-
-  return {
-    id: String(row.id ?? ""),
-    old_id: row.old_id == null ? null : Number(row.old_id),
-    name: row.name ?? "",
-    price: employeePrice,
-    employee_price: employeePrice,
-    images: row.images ?? (row.image ? [row.image] : []),
-    image_path: row.image_path ?? null,
-    category: normalizedCategory,
-    description: row.description ?? "",
-    packageInfo: row.packageInfo ?? row.package_info ?? "",
-    saleType: row.saleType === "pct" || row.sale_type === "pct" ? "pct" : "kg",
-    weight: Number(row.weight ?? 0),
-    isPackage: row.isPackage ?? row.is_package ?? false,
-    featured: row.featured ?? row.isFeatured ?? false,
-    inStock: row.inStock ?? row.in_stock ?? true,
-    isLaunch: row.isLaunch ?? row.is_launch ?? false,
-    extraInfo: row.extraInfo ?? undefined,
-  };
-}
 
 function resolveCombos(
   combos: Omit<DeliveryComboConfig, "items">[],
@@ -210,7 +152,7 @@ function resolveCombos(
 export async function fetchCatalogProducts(): Promise<Product[]> {
   const { data, error } = await supabase.from("products").select("*").order("name", { ascending: true });
   if (error) throw error;
-  return ((data ?? []) as ProductRow[]).map(mapRowToProduct);
+  return ((data ?? []) as ProductRow[]).map(mapCatalogProductRow).filter(isVisibleCatalogProduct);
 }
 
 export async function loadPublicCombos(products: Product[]): Promise<DeliveryComboResolved[]> {

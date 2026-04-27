@@ -1,28 +1,28 @@
 # Delivery GM
 
-Aplicacao de delivery da Gostinho Mineiro, focada em cliente final, construida com React, Vite e Supabase.
+Aplicação de delivery da Gostinho Mineiro, focada em cliente final, construída com React, Vite e Supabase.
 
-## Visao Geral
+## Visão Geral
 
 O sistema cobre o fluxo completo do cliente:
 
-- cadastro com telefone, CPF e endereco
+- cadastro com telefone, CPF e endereço
 - login por telefone
-- catalogo de produtos
+- catálogo de produtos
 - favoritos
 - carrinho
 - checkout com frete por cidade
-- gravacao do pedido no Supabase
+- gravação do pedido no Supabase
 - envio do pedido para WhatsApp
-- historico em "Meus Pedidos"
+- histórico em "Meus Pedidos"
 
-Tambem inclui telas internas de administracao para:
+Também inclui telas internas de administração para:
 
 - produtos
 - destaques do carrossel
 - avisos
-- operacao de pedidos
-- relatorios
+- operação de pedidos
+- relatórios
 
 ## Stack
 
@@ -36,18 +36,18 @@ Tambem inclui telas internas de administracao para:
 
 ## Estrutura Principal
 
-- [src/pages/Index.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/Index.tsx): catalogo principal
+- [src/pages/Index.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/Index.tsx): catálogo principal
 - [src/pages/Login.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/Login.tsx): entrada por telefone
 - [src/pages/Cadastro.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/Cadastro.tsx): cadastro de cliente
 - [src/pages/Checkout.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/Checkout.tsx): checkout e fechamento do pedido
 - [src/pages/MyOrdersPage.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/MyOrdersPage.tsx): pedidos do cliente
-- [src/services/orders.ts](/Users/winistonalle/Desktop/copia-para-delivery/src/services/orders.ts): persistencia do pedido
-- [src/lib/customerAuth.ts](/Users/winistonalle/Desktop/copia-para-delivery/src/lib/customerAuth.ts): sessao e dados locais do cliente
+- [src/services/orders.ts](/Users/winistonalle/Desktop/copia-para-delivery/src/services/orders.ts): persistência do pedido
+- [src/lib/customerAuth.ts](/Users/winistonalle/Desktop/copia-para-delivery/src/lib/customerAuth.ts): sessão e dados locais do cliente
 - [supabase-local-complete.sql](/Users/winistonalle/Desktop/copia-para-delivery/supabase-local-complete.sql): schema completo do banco
 
 ## Como Rodar
 
-1. Instale as dependencias:
+1. Instale as dependências:
 
 ```bash
 npm install
@@ -79,9 +79,9 @@ npm run dev
 npm run build
 ```
 
-## Producao em servidor proprio
+## Produção em servidor próprio
 
-Para subir em um servidor Node atras do Cloudflare:
+Para subir em um servidor Node atrás do Cloudflare:
 
 ```bash
 npm ci
@@ -89,7 +89,7 @@ npm run build
 npm run start:prod
 ```
 
-Documentacao completa:
+Documentação completa:
 
 - [DEPLOY-CLOUDFLARE.md](/Users/winistonalle/Desktop/copia-para-delivery/docs/DEPLOY-CLOUDFLARE.md)
 
@@ -108,9 +108,9 @@ O schema atual de `orders` foi ajustado para o modelo de cliente:
 
 As colunas legadas `employee_name` e `employee_cpf` ficaram como compatibilidade para leitura antiga.
 
-## Observacoes
+## Observações
 
-- o sistema esta orientado a cliente; modulos antigos de RH e separacao foram removidos do app principal
-- a sessao principal do cliente agora usa `customer_session`, com fallback temporario para `employee_session`
-- o numero de WhatsApp configurado para pedidos e `61985941557`
-- a documentacao funcional detalhada continua em [docs/SISTEMA-DELIVERY.md](/Users/winistonalle/Desktop/copia-para-delivery/docs/SISTEMA-DELIVERY.md)
+- o sistema está orientado a cliente; módulos antigos de RH e separação foram removidos do app principal
+- a sessão principal do cliente agora usa `customer_session`, com fallback temporário para `employee_session`
+- o número de WhatsApp configurado para pedidos é `61985941557`
+- a documentação funcional detalhada continua em [docs/SISTEMA-DELIVERY.md](/Users/winistonalle/Desktop/copia-para-delivery/docs/SISTEMA-DELIVERY.md)

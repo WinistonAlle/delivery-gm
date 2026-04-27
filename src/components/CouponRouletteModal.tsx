@@ -266,7 +266,7 @@ export const CouponRouletteModal: React.FC<Props> = ({ onClose, onCouponApplied 
       style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(4px)" }}
     >
       <div
-        className="relative w-full overflow-hidden rounded-[32px] bg-white shadow-[0_32px_80px_rgba(0,0,0,0.5)]"
+        className="relative max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-[32px] bg-white shadow-[0_32px_80px_rgba(0,0,0,0.5)]"
         style={{ maxWidth: 380 }}
         onClick={(e) => e.stopPropagation()}
       >

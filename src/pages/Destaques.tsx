@@ -116,7 +116,6 @@ const BottomNav: React.FC = () => {
 
   const tabs = [
     { label: "Início", path: HOME_PATH, icon: Home },
-    { label: "Avisos", path: "/avisos", icon: Bell },
     { label: "Favoritos", path: "/favoritos", icon: Heart },
     { label: "Pedidos", path: "/meus-pedidos", icon: ClipboardList },
   ];

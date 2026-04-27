@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Bot, MapPin, MessageCircle, Package2, Send, ShoppingCart, Sparkles, X } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  MIN_ORDER_VALUE,
   MIN_PACKAGES,
+  MIN_WEIGHT_KG,
   PRODUCTS,
   TOP_SELLING_PRODUCTS,
 } from "@/data/products";
@@ -33,6 +32,7 @@ type AssistantContext = {
   itemsCount: number;
   cartTotal: number;
   packageCount: number;
+  totalWeight: number;
   meetsMinimumOrder: boolean;
   freeShippingRemaining: number;
   shippingCost: number | null;
@@ -41,10 +41,10 @@ type AssistantContext = {
 
 const QUICK_QUESTIONS = [
   "Quais pães de queijo vocês têm?",
-  "Qual pão de queijo é mais vendido?",
+  "Me indique produtos para começar",
   "Quantos salgados para 50 pessoas?",
   "Qual é o frete para minha região?",
-  "Qual é o pedido mínimo?",
+  "Quanto é 12 x 7?",
   "Me indique produtos para festa",
 ];
 
@@ -72,6 +72,11 @@ function tokenizeQuestion(question: string) {
 
 function formatCurrency(value: number) {
   return `R$ ${value.toFixed(2).replace(".", ",")}`;
+}
+
+function formatNumber(value: number) {
+  if (Number.isInteger(value)) return String(value);
+  return String(Number(value.toFixed(4))).replace(".", ",");
 }
 
 function levenshteinDistance(a: string, b: string) {
@@ -321,6 +326,48 @@ function buildPreparationVideoAnswer(question: string) {
   return "";
 }
 
+function evaluateMathExpression(rawExpression: string) {
+  const expression = rawExpression
+    .replace(/,/g, ".")
+    .replace(/[xX×]/g, "*")
+    .replace(/÷/g, "/")
+    .replace(/\s+/g, "");
+
+  if (!/^[\d+\-*/().%]+$/.test(expression)) return null;
+  if (!/\d/.test(expression) || !/[+\-*/%]/.test(expression)) return null;
+  if (expression.length > 80) return null;
+
+  try {
+    const value = Function(`"use strict"; return (${expression});`)();
+    return typeof value === "number" && Number.isFinite(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function buildMathAnswer(question: string) {
+  const normalized = normalizeQuestion(question);
+  const percentMatch = normalized.match(/(\d+(?:[,.]\d+)?)\s*%?\s*(?:por cento|%)?\s*(?:de|sobre)\s*(\d+(?:[,.]\d+)?)/);
+
+  if (percentMatch && questionHasAny(question, ["%", "por cento", "calcula", "quanto"])) {
+    const percent = Number(percentMatch[1].replace(",", "."));
+    const base = Number(percentMatch[2].replace(",", "."));
+    if (Number.isFinite(percent) && Number.isFinite(base)) {
+      const result = (percent / 100) * base;
+      return `Calculadora secreta ativada: ${formatNumber(percent)}% de ${formatNumber(base)} dá ${formatNumber(result)}. Prometo não contar para o pão de queijo que eu também sei matemática.`;
+    }
+  }
+
+  const expressionMatch = question.match(/(?:quanto\s+(?:e|é)|calcula(?:r)?|conta|resultado(?: de)?|faz)\s*([0-9xX×÷+\-*/().,%\s]+)/i);
+  const looseExpressionMatch = question.match(/^\s*([0-9xX×÷+\-*/().,%\s]{3,})\s*$/);
+  const expression = expressionMatch?.[1] ?? looseExpressionMatch?.[1] ?? "";
+  const result = evaluateMathExpression(expression);
+
+  if (result === null) return "";
+
+  return `Calculadora secreta ativada: ${expression.trim()} = ${formatNumber(result)}. Eu vim falar de delivery, mas uma continha honesta eu encaro.`;
+}
+
 function renderMessageContent(content: string) {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const parts = content.split(urlRegex).filter(Boolean);
@@ -459,6 +506,80 @@ function getComplementarySuggestions(cartItems: CartItem[], limit = 4) {
     .slice(0, limit);
 }
 
+function describeProducts(products: Product[]) {
+  return products
+    .map((product) => `${product.name} (${getProductPrice(product)}, ${product.packageInfo})`)
+    .join("; ");
+}
+
+function getRecommendationSet(question: string, context: AssistantContext) {
+  if (context.itemsCount > 0 && questionHasAny(question, ["meu carrinho", "completar pedido", "combina", "fechar pedido"])) {
+    return {
+      intro: "Pelo que já está no seu carrinho, eu completaria com",
+      products: getComplementarySuggestions(context.cartItems, 4),
+    };
+  }
+
+  if (questionHasAny(question, ["revenda", "vender", "mercearia", "padaria", "lanchonete"])) {
+    return {
+      intro: "Para revenda, eu começaria por itens de giro fácil",
+      products: [
+        ...getCategoryProducts("Pão de Queijo", 2),
+        ...getCategoryProducts("Salgados P/ Fritar", 1),
+        ...getCategoryProducts("Salgados Assados", 1),
+      ].slice(0, 4),
+    };
+  }
+
+  if (questionHasAny(question, ["crianca", "criança", "infantil", "escola", "lancheira"])) {
+    return {
+      intro: "Para crianças ou lanche mais simples, eu iria em opções fáceis de servir",
+      products: [
+        ...getCategoryProducts("Pão de Queijo", 2),
+        ...getCategoryProducts("Salgados Assados", 2),
+      ].slice(0, 4),
+    };
+  }
+
+  if (questionHasAny(question, ["cafe", "cafe da tarde", "lanche", "manha"])) {
+    return {
+      intro: "Para café da tarde, eu sugiro",
+      products: [
+        ...getCategoryProducts("Pão de Queijo", 2),
+        ...getCategoryProducts("Pães e Massas Doces", 2),
+      ].slice(0, 4),
+    };
+  }
+
+  if (questionHasAny(question, ["festa", "evento", "aniversario", "reuniao", "confraternizacao"])) {
+    return {
+      intro: "Para festa, eu montaria um mix com",
+      products: [
+        ...getCategoryProducts("Salgados P/ Fritar", 2),
+        ...getCategoryProducts("Salgados Assados", 1),
+        ...getCategoryProducts("Pão de Queijo", 1),
+      ].slice(0, 4),
+    };
+  }
+
+  const category = inferCategory(question);
+  if (category) {
+    return {
+      intro: `Dentro de ${category}, eu olharia primeiro`,
+      products: getCategoryProducts(category, 4),
+    };
+  }
+
+  return {
+    intro: "Para começar bem no catálogo, eu olharia estes itens",
+    products: [
+      ...getCategoryProducts("Pão de Queijo", 2),
+      ...getCategoryProducts("Salgados Assados", 1),
+      ...getCategoryProducts("Salgados P/ Fritar", 1),
+    ].slice(0, 4),
+  };
+}
+
 function buildCartSnapshotAnswer(context: AssistantContext) {
   if (!context.itemsCount) {
     return "Seu carrinho ainda está vazio. Se quiser, eu posso te indicar itens para começar ou te dizer o que mais sai no catálogo.";
@@ -466,7 +587,7 @@ function buildCartSnapshotAnswer(context: AssistantContext) {
 
   const minimumHint = context.meetsMinimumOrder
     ? "Seu pedido já bate o mínimo."
-    : `Seu pedido ainda não bate o mínimo de ${MIN_PACKAGES} pacotes ou ${formatCurrency(MIN_ORDER_VALUE)}.`;
+    : `Seu pedido ainda não bate o mínimo de ${MIN_PACKAGES} pacotes ou ${MIN_WEIGHT_KG} kg.`;
 
   const shippingHint =
     context.shippingCity && context.shippingCost !== null
@@ -477,31 +598,31 @@ function buildCartSnapshotAnswer(context: AssistantContext) {
         ? `Faltam ${formatCurrency(context.freeShippingRemaining)} para liberar frete grátis.`
         : "Seu carrinho já liberou frete grátis.";
 
-  return `Hoje seu carrinho está com ${context.itemsCount} item(ns), ${context.packageCount} pacote(s) e total de ${formatCurrency(context.cartTotal)}. ${minimumHint} ${shippingHint}`;
+  return `Hoje seu carrinho está com ${context.itemsCount} item(ns), ${context.packageCount} pacote(s), ${context.totalWeight.toFixed(1)} kg e total de ${formatCurrency(context.cartTotal)}. ${minimumHint} ${shippingHint}`;
 }
 
 function buildMinimumOrderAnswer(context: AssistantContext) {
   if (!context.itemsCount) {
-    return `Hoje o carrinho trabalha com pedido mínimo de ${MIN_PACKAGES} pacotes ou ${formatCurrency(MIN_ORDER_VALUE)}. Quando você adicionar itens, eu consigo te dizer exatamente o que ainda falta para bater o mínimo.`;
+    return `Hoje o carrinho trabalha com pedido mínimo de ${MIN_PACKAGES} pacotes ou ${MIN_WEIGHT_KG} kg. Quando você adicionar itens, eu consigo te dizer exatamente o que ainda falta para bater o mínimo.`;
   }
 
   if (context.meetsMinimumOrder) {
-    return `Seu carrinho já atingiu o mínimo. No momento você está com ${context.packageCount} pacote(s) e ${formatCurrency(context.cartTotal)} em itens, então já pode seguir para o checkout sem depender de completar mais nada.`;
+    return `Seu carrinho já atingiu o mínimo. No momento você está com ${context.packageCount} pacote(s), ${context.totalWeight.toFixed(1)} kg e ${formatCurrency(context.cartTotal)} em itens, então já pode seguir para o checkout.`;
   }
 
   const missingPackages = Math.max(0, MIN_PACKAGES - context.packageCount);
-  const missingValue = Math.max(0, MIN_ORDER_VALUE - context.cartTotal);
+  const missingWeight = Math.max(0, MIN_WEIGHT_KG - context.totalWeight);
   const parts: string[] = [];
 
   if (missingPackages > 0) {
     parts.push(`${missingPackages} pacote(s)`);
   }
 
-  if (missingValue > 0) {
-    parts.push(`${formatCurrency(missingValue)}`);
+  if (missingWeight > 0) {
+    parts.push(`${missingWeight.toFixed(1)} kg`);
   }
 
-  return `Seu carrinho está com ${context.packageCount} pacote(s) e ${formatCurrency(context.cartTotal)} em itens. Para atingir o mínimo, ainda faltam ${parts.join(" ou ")}. Se quiser, eu posso te sugerir itens para completar o pedido.`;
+  return `Seu carrinho está com ${context.packageCount} pacote(s), ${context.totalWeight.toFixed(1)} kg e ${formatCurrency(context.cartTotal)} em itens. Para atingir o mínimo, ainda faltam ${parts.join(" ou ")}. Se quiser, eu posso te sugerir itens para completar o pedido.`;
 }
 
 function buildStorageAnswer(question: string) {
@@ -590,55 +711,17 @@ function buildBestSellerAnswer(question: string) {
 }
 
 function buildRecommendationAnswer(question: string, context: AssistantContext) {
-  if (
-    context.itemsCount > 0 &&
-    questionHasAny(question, [
-      "meu carrinho",
-      "completar pedido",
-      "combina com meu carrinho",
-      "mais um item",
-      "fechar pedido",
-    ])
-  ) {
-    const suggestions = getComplementarySuggestions(context.cartItems, 4);
+  const { intro, products } = getRecommendationSet(question, context);
 
-    if (suggestions.length) {
-      return `Pelo que já está no seu carrinho, eu completaria com ${suggestions
-        .map((product) => `${product.name} (${getProductPrice(product)})`)
-        .join("; ")}.`;
-    }
+  if (products.length) {
+    const followUp = context.itemsCount > 0
+      ? "Eles ajudam a completar o pedido sem repetir o que já está no carrinho."
+      : "Se você me disser se é festa, café, revenda ou lanche, eu afino melhor.";
+
+    return `${intro}: ${describeProducts(products)}. ${followUp}`;
   }
 
-  if (questionHasAny(question, ["cafe", "cafe da tarde", "lanche"])) {
-    const recommendations = [
-      ...getCategoryProducts("Pão de Queijo", 2),
-      ...getCategoryProducts("Pães e Massas Doces", 2),
-    ].slice(0, 4);
-
-    if (recommendations.length) {
-      return `Para café da tarde, eu sugiro ${recommendations
-        .map((product) => `${product.name} (${getProductPrice(product)})`)
-        .join("; ")}.`;
-    }
-  }
-
-  if (questionHasAny(question, ["festa", "evento", "aniversario"])) {
-    return buildSavorySuggestions(question);
-  }
-
-  const general = [
-    ...getCategoryProducts("Pão de Queijo", 2),
-    ...getCategoryProducts("Salgados Assados", 1),
-    ...getCategoryProducts("Salgados P/ Fritar", 1),
-  ].slice(0, 4);
-
-  if (general.length) {
-    return `Se você quer começar pelos itens mais fáceis de vender ou servir, eu olharia estes: ${general
-      .map((product) => `${product.name} (${getProductPrice(product)})`)
-      .join("; ")}.`;
-  }
-
-  return "Posso te indicar opções para festa, café da tarde, revenda ou pão de queijo. Se quiser, me diga a ocasião.";
+  return "Posso te indicar opções para festa, café da tarde, revenda, crianças ou pão de queijo. Se você me disser a ocasião, eu monto uma lista mais certeira.";
 }
 
 function buildGreetingAnswer(context: AssistantContext) {
@@ -656,6 +739,12 @@ function buildGreetingAnswer(context: AssistantContext) {
   return `${greetingLead} Posso te ajudar com dúvidas do catálogo, preço de produtos, sugestões para festa, preparo, frete, pedido mínimo e cidades atendidas.`;
 }
 
+function buildWelcomeMessage(session: CustomerSession | null) {
+  const firstName = formatShortName(session);
+  const lead = firstName ? `Oi, ${firstName}!` : "Oi!";
+  return `${lead} Eu consigo responder dúvidas do catálogo, indicar produtos, sugerir itens para festa e também analisar seu carrinho, frete e pedido mínimo.`;
+}
+
 function buildHoursAnswer() {
   return "Os horários de atendimento e entrega podem variar. O melhor caminho é seguir para o pedido ou confirmar diretamente pelo canal de atendimento da loja.";
 }
@@ -666,6 +755,20 @@ function buildPaymentAnswer(context: AssistantContext) {
   }
 
   return "As formas de pagamento aparecem na finalização do pedido. Se quiser, monte o carrinho que eu te oriento no restante do fluxo.";
+}
+
+function personalizeAnswer(answer: string, context: AssistantContext) {
+  const firstName = formatShortName(context.session);
+  if (!firstName) return answer;
+
+  const normalizedAnswer = normalizeQuestion(answer);
+  const normalizedName = normalizeQuestion(firstName);
+
+  if (normalizedAnswer.startsWith(`oi ${normalizedName}`) || normalizedAnswer.startsWith(normalizedName)) {
+    return answer;
+  }
+
+  return `${firstName}, ${answer.charAt(0).toLowerCase()}${answer.slice(1)}`;
 }
 
 function buildFallbackAnswer(question: string, context: AssistantContext) {
@@ -774,6 +877,11 @@ function buildFaqAnswer(question: string, context: AssistantContext) {
     return buildGreetingAnswer(context);
   }
 
+  const mathAnswer = buildMathAnswer(question);
+  if (mathAnswer) {
+    return mathAnswer;
+  }
+
   const tutorialAnswer = buildPreparationVideoAnswer(question);
   if (tutorialAnswer) {
     return tutorialAnswer;
@@ -790,9 +898,17 @@ function buildFaqAnswer(question: string, context: AssistantContext) {
       "sugere",
       "sugestao",
       "indique",
+      "indica",
+      "indicar",
+      "me indique produtos",
+      "indique produtos",
+      "produto para",
       "recomenda",
+      "recomendacao",
       "melhor para festa",
       "melhor para cafe",
+      "o que comprar",
+      "o que levar",
     ])
   ) {
     return buildRecommendationAnswer(question, context);
@@ -901,6 +1017,7 @@ const HelperChat: React.FC = () => {
     itemsCount,
     cartTotal,
     packageCount,
+    totalWeight,
     meetsMinimumOrder,
     freeShippingRemaining,
     openCart,
@@ -913,8 +1030,7 @@ const HelperChat: React.FC = () => {
     {
       id: "welcome",
       role: "bot",
-      content:
-        "Oi! Eu consigo responder dúvidas do catálogo, encontrar produtos, sugerir itens para festa e também analisar seu carrinho, frete e pedido mínimo.",
+      content: buildWelcomeMessage(session),
     },
   ]);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -931,6 +1047,7 @@ const HelperChat: React.FC = () => {
       itemsCount,
       cartTotal,
       packageCount,
+      totalWeight,
       meetsMinimumOrder,
       freeShippingRemaining,
       shippingCost,
@@ -942,6 +1059,7 @@ const HelperChat: React.FC = () => {
       itemsCount,
       cartTotal,
       packageCount,
+      totalWeight,
       meetsMinimumOrder,
       freeShippingRemaining,
       shippingCost,
@@ -1002,7 +1120,14 @@ const HelperChat: React.FC = () => {
   }, [assistantContext]);
 
   useEffect(() => {
-    const syncSession = () => setSession(getCustomerSession());
+    const syncSession = () => {
+      const nextSession = getCustomerSession();
+      setSession(nextSession);
+      setMessages((current) => {
+        if (current.length !== 1 || current[0]?.id !== "welcome") return current;
+        return [{ ...current[0], content: buildWelcomeMessage(nextSession) }];
+      });
+    };
     window.addEventListener(CUSTOMER_SESSION_EVENT, syncSession);
     window.addEventListener("storage", syncSession);
     return () => {
@@ -1010,6 +1135,38 @@ const HelperChat: React.FC = () => {
       window.removeEventListener("storage", syncSession);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+    if (!mediaQuery.matches) return;
+
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousBodyOverscroll = document.body.style.overscrollBehavior;
+
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    document.body.style.overscrollBehavior = "none";
+
+    return () => {
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      document.body.style.overflow = previousBodyOverflow;
+      document.body.style.overscrollBehavior = previousBodyOverscroll;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsOpen(false);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -1039,7 +1196,7 @@ const HelperChat: React.FC = () => {
     const cleanQuestion = question.trim();
     if (!cleanQuestion) return;
 
-    const answer = buildFaqAnswer(cleanQuestion, assistantContext);
+    const answer = personalizeAnswer(buildFaqAnswer(cleanQuestion, assistantContext), assistantContext);
     const timestamp = Date.now();
 
     if (replyTimeoutRef.current !== null) {
@@ -1075,17 +1232,31 @@ const HelperChat: React.FC = () => {
   };
 
   return (
-    <div className="fixed left-3 right-3 bottom-[156px] z-40 md:left-6 md:right-auto md:bottom-6">
+    <div className={`pointer-events-none fixed inset-x-0 bottom-0 md:left-6 md:right-auto md:bottom-6 md:w-[390px] ${isOpen ? "z-[70]" : "z-40"}`}>
       <AnimatePresence initial={false}>
         {isOpen && (
-          <motion.section
-            initial={{ opacity: 0, y: 16, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 16, scale: 0.96 }}
-            transition={{ duration: 0.18 }}
-            className="mb-3 w-full max-w-[390px] overflow-hidden rounded-[28px] border border-white/20 bg-white/95 shadow-[0_24px_60px_rgba(15,23,42,0.22)] backdrop-blur-xl"
-          >
-            <div className="flex items-start justify-between gap-3 border-b border-slate-200 bg-slate-950 px-4 py-4">
+          <>
+            <motion.button
+              type="button"
+              className="pointer-events-auto fixed inset-0 z-0 bg-slate-950/35 backdrop-blur-[2px] md:hidden"
+              aria-label="Fechar assistente"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsOpen(false)}
+            />
+
+            <motion.section
+              role="dialog"
+              aria-modal="true"
+              aria-label="Assistente inteligente"
+              initial={{ opacity: 0, y: 16, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 16, scale: 0.98 }}
+              transition={{ duration: 0.18 }}
+              className="helper-chat-panel pointer-events-auto fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+4.75rem)] top-[calc(env(safe-area-inset-top)+0.75rem)] z-10 flex min-h-0 flex-col overflow-hidden rounded-[22px] border border-white/20 bg-white/95 shadow-[0_24px_60px_rgba(15,23,42,0.24)] backdrop-blur-xl md:static md:mb-3 md:h-auto md:max-h-[min(720px,calc(100vh-7rem))] md:w-full md:rounded-[28px]"
+            >
+            <div className="helper-chat-header shrink-0 flex items-start justify-between gap-3 border-b border-slate-200 bg-slate-950 px-4 py-4">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-white">
                   <Bot className="h-5 w-5 text-white" />
@@ -1099,7 +1270,7 @@ const HelperChat: React.FC = () => {
                     {statusChips.map((chip) => (
                       <span
                         key={chip}
-                        className="rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/90"
+                        className="helper-chat-status-chip rounded-full border border-white/10 bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/90"
                       >
                         {chip}
                       </span>
@@ -1111,14 +1282,14 @@ const HelperChat: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-700 shadow-sm"
+                className="helper-chat-close flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-slate-700 shadow-sm md:h-9 md:w-9"
                 aria-label="Fechar assistente"
               >
-                <X className="h-4 w-4" />
+                <X className="h-5 w-5 md:h-4 md:w-4" />
               </button>
             </div>
 
-            <ScrollArea className="h-[340px] bg-slate-100 px-4 py-4">
+            <div className="helper-chat-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain bg-slate-100 px-4 py-4 [-webkit-overflow-scrolling:touch] md:h-[340px] md:flex-none">
               <div className="space-y-3">
                 {messages.map((message) => {
                   const isBot = message.role === "bot";
@@ -1131,8 +1302,8 @@ const HelperChat: React.FC = () => {
                       <div
                         className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
                           isBot
-                            ? "border border-slate-200 bg-white text-slate-700"
-                            : "bg-slate-900 text-white"
+                            ? "helper-chat-bubble helper-chat-bubble-bot border border-slate-200 bg-white text-slate-700"
+                            : "helper-chat-bubble helper-chat-bubble-user bg-slate-900 text-white"
                         }`}
                       >
                         {renderMessageContent(message.content)}
@@ -1142,20 +1313,20 @@ const HelperChat: React.FC = () => {
                 })}
                 {isTyping ? (
                   <div className="flex justify-start">
-                    <div className="max-w-[88%] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-relaxed text-slate-500 shadow-sm">
+                    <div className="helper-chat-bubble helper-chat-bubble-bot max-w-[88%] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-relaxed text-slate-500 shadow-sm">
                       <span className="flex items-center gap-1.5" aria-label="Assistente digitando">
-                        <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.3s]" />
-                        <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.15s]" />
-                        <span className="h-2 w-2 animate-bounce rounded-full bg-slate-400" />
+                        <span className="helper-chat-typing-dot h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.3s]" />
+                        <span className="helper-chat-typing-dot h-2 w-2 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.15s]" />
+                        <span className="helper-chat-typing-dot h-2 w-2 animate-bounce rounded-full bg-slate-400" />
                       </span>
                     </div>
                   </div>
                 ) : null}
                 <div ref={messagesEndRef} aria-hidden="true" />
               </div>
-            </ScrollArea>
+            </div>
 
-            <div className="border-t border-slate-200 bg-white/90 px-4 py-3">
+            <div className="helper-chat-footer shrink-0 border-t border-slate-200 bg-white/95 px-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 md:bg-white/90 md:pb-3">
               {assistantContext.itemsCount > 0 ? (
                 <div className="mb-3 flex flex-wrap gap-2">
                   <button
@@ -1164,7 +1335,7 @@ const HelperChat: React.FC = () => {
                       setIsOpen(false);
                       openCart();
                     }}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700"
+                    className="helper-chat-action-btn inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700"
                   >
                     <ShoppingCart className="h-3.5 w-3.5" />
                     Ver carrinho
@@ -1173,7 +1344,7 @@ const HelperChat: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => pushQuestion("Meu carrinho já bate o mínimo?")}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700"
+                    className="helper-chat-action-btn inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700"
                   >
                     <Package2 className="h-3.5 w-3.5" />
                     Analisar pedido
@@ -1182,7 +1353,7 @@ const HelperChat: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => pushQuestion("Qual é o frete para minha região?")}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700"
+                    className="helper-chat-action-btn inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700"
                   >
                     <MapPin className="h-3.5 w-3.5" />
                     Ver frete
@@ -1196,7 +1367,7 @@ const HelperChat: React.FC = () => {
                     key={item}
                     type="button"
                     onClick={() => pushQuestion(item)}
-                    className="shrink-0 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
+                    className="helper-chat-quick-btn shrink-0 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
                   >
                     {item}
                   </button>
@@ -1215,38 +1386,39 @@ const HelperChat: React.FC = () => {
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
                   placeholder="Pergunte sobre produtos, preço, preparo ou frete..."
-                  className="h-11 flex-1 rounded-full border border-slate-300 bg-white px-4 text-sm text-slate-800 outline-none transition focus:border-slate-500"
+                  className="helper-chat-input h-11 flex-1 rounded-full border border-slate-300 bg-white px-4 text-sm text-slate-800 outline-none transition focus:border-slate-500"
                 />
 
                 <button
                   type="submit"
                   disabled={!canSend}
-                  className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-900 text-white shadow-[0_12px_24px_rgba(15,23,42,0.28)] disabled:opacity-50"
+                  className="helper-chat-send flex h-11 w-11 items-center justify-center rounded-full bg-slate-900 text-white shadow-[0_12px_24px_rgba(15,23,42,0.28)] disabled:opacity-50"
                   aria-label="Enviar pergunta"
                 >
                   <Send className="h-4 w-4" />
                 </button>
               </form>
             </div>
-          </motion.section>
+            </motion.section>
+          </>
         )}
       </AnimatePresence>
 
-      <div className="flex justify-start md:justify-start">
+      <div className="pointer-events-none flex justify-start px-3 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] md:px-0 md:pb-0">
         <button
           type="button"
           onClick={() => setIsOpen((current) => !current)}
-          className="group inline-flex h-12 w-12 items-center justify-center rounded-full border border-slate-200/80 bg-white/88 text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.14)] backdrop-blur transition-[width,box-shadow,background-color] duration-500 ease-out md:h-16 md:w-16 md:justify-start md:overflow-hidden md:hover:w-[280px] md:hover:bg-white md:hover:shadow-[0_22px_42px_rgba(15,23,42,0.20)]"
+          className="helper-chat-trigger pointer-events-auto group inline-flex h-12 w-12 items-center justify-center rounded-full border border-slate-200/80 bg-white/88 text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.14)] backdrop-blur transition-[width,box-shadow,background-color] duration-500 ease-out md:h-16 md:w-16 md:justify-start md:overflow-hidden md:hover:w-[280px] md:hover:bg-white md:hover:shadow-[0_22px_42px_rgba(15,23,42,0.20)]"
           aria-expanded={isOpen}
           aria-label="Abrir assistente inteligente"
         >
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-700 md:ml-2 md:h-12 md:w-12 md:shrink-0 md:bg-slate-100 md:text-slate-700">
+          <span className="helper-chat-trigger-icon flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-700 md:ml-2 md:h-12 md:w-12 md:shrink-0 md:bg-slate-100 md:text-slate-700">
             <MessageCircle className="h-4.5 w-4.5 md:h-6 md:w-6" />
           </span>
 
-          <span className="hidden min-w-0 pointer-events-none text-left md:ml-3 md:block">
+          <span className="helper-chat-trigger-copy hidden min-w-0 pointer-events-none text-left md:ml-3 md:block">
             <span className="block max-w-0 -translate-x-3 whitespace-nowrap opacity-0 transition-[max-width,opacity,transform] duration-500 ease-out md:group-hover:max-w-[190px] md:group-hover:translate-x-0 md:group-hover:opacity-100">
-              <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+              <span className="helper-chat-trigger-kicker flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
                 <Sparkles className="h-3.5 w-3.5" />
                 IA do catálogo
               </span>

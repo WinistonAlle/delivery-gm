@@ -8,12 +8,11 @@ import Cart from "@/components/Cart";
 import { Button } from "@/components/ui/button";
 import logoGostinho from "@/images/logoc.png";
 import { getCustomerSession, type CustomerSession } from "@/lib/customerAuth";
+import { mapCatalogProductRow, isVisibleCatalogProduct } from "@/lib/catalogProducts";
 
 function safeGetSession() {
   return getCustomerSession();
 }
-
-type ProductRow = Record<string, unknown>;
 
 function getFavoriteStorageKey() {
   try {
@@ -36,29 +35,6 @@ function readFavoriteIds(): string[] {
   } catch {
     return [];
   }
-}
-
-function mapRowToProduct(row: ProductRow): Product {
-  const value = Number(row.employee_price ?? row.price ?? 0);
-  return {
-    id: row.id,
-    old_id: row.old_id ?? null,
-    name: row.name,
-    price: value,
-    employee_price: value,
-    images: row.images ?? (row.image ? [row.image] : []),
-    image_path: row.image_path ?? null,
-    category: row.category ?? row.category_name ?? "Outros",
-    description: row.description ?? "",
-    packageInfo: row.packageInfo ?? row.package_info ?? "",
-    saleType: row.saleType === "pct" || row.sale_type === "pct" ? "pct" : "kg",
-    weight: Number(row.weight ?? 0),
-    isPackage: row.isPackage ?? row.is_package ?? false,
-    featured: row.featured ?? row.isFeatured ?? false,
-    inStock: row.inStock ?? row.in_stock ?? true,
-    isLaunch: row.isLaunch ?? row.is_launch ?? false,
-    extraInfo: row.extraInfo ?? undefined,
-  };
 }
 
 const FavoritesPage: React.FC = () => {
@@ -96,11 +72,14 @@ const FavoritesPage: React.FC = () => {
 
         if (error) throw error;
 
-        const byId = new Map((data as ProductRow[] | null | undefined)?.map((row) => [String(row.id), row]) ?? []);
+        const byId = new Map(
+          ((data ?? []) as Record<string, unknown>[]).map((row) => [String(row.id), row])
+        );
         const ordered = ids
           .map((id) => byId.get(String(id)))
           .filter(Boolean)
-          .map(mapRowToProduct);
+          .map((row) => mapCatalogProductRow(row as Record<string, unknown>))
+          .filter(isVisibleCatalogProduct);
 
         if (!alive) return;
         setProducts(ordered);

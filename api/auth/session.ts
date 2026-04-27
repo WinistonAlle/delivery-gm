@@ -21,7 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(200).json({ session });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Erro ao carregar sessao.";
+    const message = error instanceof Error ? error.message : "Erro ao carregar sessão.";
     return res.status(503).json({ error: message });
   }
 }

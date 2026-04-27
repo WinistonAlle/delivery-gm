@@ -45,5 +45,5 @@ export async function createOrder(params: CreateOrderParams): Promise<CreateOrde
     return (await response.json()) as CreateOrderResponse;
   }
   const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-  throw new Error(payload?.error || "Nao foi possivel registrar o pedido.");
+  throw new Error(payload?.error || "Não foi possível registrar o pedido.");
 }

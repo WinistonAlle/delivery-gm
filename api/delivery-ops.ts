@@ -28,12 +28,12 @@ const EVENT_STAGE_MAP: Record<
   { key: string; label: string; rank: number }
 > = {
   site_visit: { key: "visita", label: "Saiu na visita", rank: 1 },
-  signup_completed: { key: "cadastro", label: "Saiu apos cadastro", rank: 2 },
-  login_success: { key: "login", label: "Saiu apos login", rank: 3 },
+  signup_completed: { key: "cadastro", label: "Saiu após cadastro", rank: 2 },
+  login_success: { key: "login", label: "Saiu após login", rank: 3 },
   cart_started: { key: "carrinho", label: "Saiu no carrinho", rank: 4 },
   checkout_started: { key: "checkout", label: "Saiu no checkout", rank: 5 },
   checkout_view: { key: "checkout", label: "Saiu no checkout", rank: 5 },
-  order_completed: { key: "pedido", label: "Pedido concluido", rank: 6 },
+  order_completed: { key: "pedido", label: "Pedido concluído", rank: 6 },
 };
 
 function normalizeString(value: unknown) {
@@ -218,7 +218,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(error.statusCode).json({ error: error.message });
     }
     const message =
-      error instanceof Error ? error.message : "Erro ao carregar operacao delivery.";
+      error instanceof Error ? error.message : "Erro ao carregar operação delivery.";
     return res.status(400).json({ error: message });
   }
 }

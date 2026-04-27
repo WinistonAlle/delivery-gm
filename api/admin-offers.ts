@@ -389,7 +389,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(error.statusCode).json({ error: error.message });
     }
 
-    const message = error instanceof Error ? error.message : "Erro ao salvar configuracoes.";
+    const message = error instanceof Error ? error.message : "Erro ao salvar configurações.";
     return res.status(500).json({ error: message });
   }
 }

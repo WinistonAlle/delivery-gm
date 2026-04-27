@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
+  ArrowLeft,
   ChevronRight,
   CreditCard,
   MapPin,
@@ -541,6 +542,18 @@ const Checkout: React.FC = () => {
   return (
     <div className="min-h-screen bg-white px-4 py-6 md:px-6 md:py-10">
       <div className="relative mx-auto max-w-7xl">
+        <div className="mb-4">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 rounded-2xl border-slate-200 bg-white px-4 text-slate-700 shadow-sm hover:bg-slate-50"
+            onClick={() => navigate("/catalogo")}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Voltar ao catálogo
+          </Button>
+        </div>
+
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_400px]">
           <motion.div
             initial={{ opacity: 0, y: 20 }}

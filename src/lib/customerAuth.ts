@@ -514,14 +514,14 @@ export async function createAdditionalCustomerAddress(params: {
 
     const payload = await readJson<{ session?: CustomerSession; error?: string }>(response);
     if (!response.ok || !payload.session) {
-      throw new Error(payload.error || "Nao foi possivel salvar o endereco.");
+      throw new Error(payload.error || "Não foi possível salvar o endereço.");
     }
 
     hydrateCustomerSession(payload.session);
     return payload.session;
   } catch (error) {
     throw new Error(
-      toUserFacingAuthError(error, "Nao foi possivel salvar o endereco.")
+      toUserFacingAuthError(error, "Não foi possível salvar o endereço.")
     );
   }
 }

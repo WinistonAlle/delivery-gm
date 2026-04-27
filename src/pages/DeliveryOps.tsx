@@ -134,7 +134,7 @@ function extractItemsTotal(order: OrderRow) {
 }
 
 function paymentLabel(value: string | null) {
-  if (!value) return "Nao informado";
+  if (!value) return "Não informado";
   const clean = value.replace(/[_-]/g, " ").trim();
   return clean.charAt(0).toUpperCase() + clean.slice(1);
 }

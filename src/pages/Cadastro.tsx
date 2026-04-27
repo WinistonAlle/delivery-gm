@@ -899,7 +899,7 @@ const Cadastro: React.FC = () => {
       </StyledCard>
 
       <AlertDialog open={exitDialogOpen} onOpenChange={handleExitDialogOpenChange}>
-        <AlertDialogContent className="overflow-hidden border border-white/50 bg-[linear-gradient(180deg,rgba(255,255,255,0.82)_0%,rgba(255,247,245,0.76)_100%)] p-0 shadow-[0_30px_80px_rgba(85,24,24,0.28)] backdrop-blur-2xl sm:max-w-md sm:rounded-[32px]">
+        <AlertDialogContent className="overflow-y-auto border border-white/50 bg-[linear-gradient(180deg,rgba(255,255,255,0.82)_0%,rgba(255,247,245,0.76)_100%)] p-0 shadow-[0_30px_80px_rgba(85,24,24,0.28)] backdrop-blur-2xl sm:max-w-md sm:rounded-[32px]">
           <div className="relative">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.85),transparent_48%),linear-gradient(180deg,rgba(255,255,255,0.24),transparent)]" />
             <div className="relative p-6 sm:p-7">

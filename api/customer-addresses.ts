@@ -30,7 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(error.statusCode).json({ error: error.message });
     }
 
-    const message = error instanceof Error ? error.message : "Erro ao salvar endereco.";
+    const message = error instanceof Error ? error.message : "Erro ao salvar endereço.";
     return res.status(400).json({ error: message });
   }
 }

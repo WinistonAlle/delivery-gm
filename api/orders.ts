@@ -1,11 +1,12 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { isSessionError, requireCustomerSession } from "./_lib/authSession";
 import { upsertCustomerProfile } from "./_lib/customerProfiles";
+import { assertRateLimit, isRateLimitError } from "./_lib/rateLimit";
 import { getSupabaseAdminClient } from "./_lib/supabaseAdmin";
 import {
   FREE_SHIPPING_THRESHOLD,
-  MIN_ORDER_VALUE,
   MIN_PACKAGES,
+  MIN_WEIGHT_KG,
   SHIPPING_RATES,
   getShippingRateByCity,
   meetsMinimumOrder,
@@ -36,14 +37,31 @@ type CreateOrderParams = {
   notes?: string;
   shippingCost?: number;
   couponCode?: string;
-  discountAmount?: number;
   items: Array<{
     product: ProductSnapshot;
     quantity: number;
   }>;
 };
 
+type CustomerCoupon = {
+  id: string;
+  code: string;
+  customer_phone: string;
+  type: "percent" | "free_shipping";
+  value: number;
+  used: boolean;
+  expires_at: string;
+};
+
 const ALLOWED_PAYMENT_METHODS = new Set(["pix", "card", "cash"]);
+
+function getRequestIp(req: VercelRequest) {
+  const forwarded = req.headers["x-forwarded-for"];
+  const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+  return String(raw ?? req.socket?.remoteAddress ?? "unknown")
+    .split(",")[0]
+    .trim();
+}
 
 function generateOrderNumber() {
   const now = new Date();
@@ -54,7 +72,7 @@ function generateOrderNumber() {
 
 function normalizePayload(body: unknown): CreateOrderParams {
   if (!body || typeof body !== "object") {
-    throw new Error("Payload de pedido invalido.");
+    throw new Error("Payload de pedido inválido.");
   }
 
   const payload = body as Partial<CreateOrderParams>;
@@ -146,15 +164,80 @@ function deriveIsPackage(product: ProductSnapshot) {
   );
 }
 
-function resolveShippingCost(city: string, itemsTotal: number) {
+function resolveShippingCost(
+  city: string,
+  itemsTotal: number,
+  couponType?: CustomerCoupon["type"]
+) {
   const rate = getShippingRateByCity(city);
   if (!rate) {
-    throw new Error("Cidade de entrega invalida ou nao atendida.");
+    throw new Error("Cidade de entrega inválida ou não atendida.");
   }
 
-  if (itemsTotal >= FREE_SHIPPING_THRESHOLD) return 0;
+  if (itemsTotal >= FREE_SHIPPING_THRESHOLD || couponType === "free_shipping") return 0;
 
   return rate.cost;
+}
+
+async function validateCoupon(
+  customerPhone: string,
+  couponCode: string | undefined
+): Promise<CustomerCoupon | null> {
+  if (!couponCode) return null;
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("user_coupons")
+    .select("id, code, customer_phone, type, value, used, expires_at")
+    .eq("customer_phone", customerPhone)
+    .eq("code", couponCode)
+    .maybeSingle<CustomerCoupon>();
+
+  if (error) throw error;
+  if (!data) {
+    throw new Error("Cupom inválido.");
+  }
+  if (data.used) {
+    throw new Error("Cupom já utilizado.");
+  }
+  if (new Date(data.expires_at).getTime() <= Date.now()) {
+    throw new Error("Cupom expirado.");
+  }
+  if (data.type !== "percent" && data.type !== "free_shipping") {
+    throw new Error("Cupom inválido.");
+  }
+
+  return {
+    ...data,
+    value: Number(data.value ?? 0),
+  };
+}
+
+async function reserveCoupon(coupon: CustomerCoupon | null) {
+  if (!coupon) return null;
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("user_coupons")
+    .update({ used: true })
+    .eq("id", coupon.id)
+    .eq("used", false)
+    .select("id")
+    .maybeSingle<{ id: string }>();
+
+  if (error) throw error;
+  if (!data?.id) {
+    throw new Error("Cupom indisponível. Atualize a página e tente novamente.");
+  }
+
+  return coupon;
+}
+
+async function releaseCouponReservation(coupon: CustomerCoupon | null) {
+  if (!coupon) return;
+
+  const supabase = getSupabaseAdminClient();
+  await supabase.from("user_coupons").update({ used: false }).eq("id", coupon.id);
 }
 
 async function createOrderInDatabase(params: CreateOrderParams) {
@@ -168,16 +251,15 @@ async function createOrderInDatabase(params: CreateOrderParams) {
     paymentMethod,
     notes,
     couponCode,
-    discountAmount = 0,
     items,
   } = params;
 
-  if (!customerName || customerName.length < 3) throw new Error("Nome do cliente invalido.");
-  if (!customerPhone || customerPhone.length < 10) throw new Error("Telefone do cliente invalido.");
-  if (!customerAddress || customerAddress.length < 6) throw new Error("Endereco de entrega invalido.");
-  if (!customerCity || customerCity.length < 2) throw new Error("Cidade de entrega invalida.");
+  if (!customerName || customerName.length < 3) throw new Error("Nome do cliente inválido.");
+  if (!customerPhone || customerPhone.length < 10) throw new Error("Telefone do cliente inválido.");
+  if (!customerAddress || customerAddress.length < 6) throw new Error("Endereço de entrega inválido.");
+  if (!customerCity || customerCity.length < 2) throw new Error("Cidade de entrega inválida.");
   if (!paymentMethod || !ALLOWED_PAYMENT_METHODS.has(paymentMethod)) {
-    throw new Error("Forma de pagamento invalida.");
+    throw new Error("Forma de pagamento inválida.");
   }
   if (!items.length) throw new Error("Nenhum item no carrinho.");
 
@@ -189,15 +271,23 @@ async function createOrderInDatabase(params: CreateOrderParams) {
   const packageCount = items.reduce((sum, item) => {
     return deriveIsPackage(item.product) ? sum + item.quantity : sum;
   }, 0);
+  const totalWeightKg = items.reduce((sum, item) => {
+    return sum + deriveWeightKg(item.product) * item.quantity;
+  }, 0);
 
-  if (!meetsMinimumOrder({ packageCount, orderValue: itemsTotal })) {
+  if (!meetsMinimumOrder({ packageCount, totalWeightKg })) {
     throw new Error(
-      `Pedido minimo: ${MIN_PACKAGES} pacotes ou R$ ${MIN_ORDER_VALUE.toFixed(2)} em produtos.`
+      `Pedido mínimo: ${MIN_PACKAGES} pacotes ou ${MIN_WEIGHT_KG} kg em produtos.`
     );
   }
 
-  const normalizedShippingCost = resolveShippingCost(customerCity, itemsTotal);
-  const safeDiscount = Math.min(Math.max(0, discountAmount), itemsTotal);
+  const coupon = await validateCoupon(customerPhone, couponCode);
+  const reservedCoupon = await reserveCoupon(coupon);
+  const normalizedShippingCost = resolveShippingCost(customerCity, itemsTotal, reservedCoupon?.type);
+  const safeDiscount =
+    reservedCoupon?.type === "percent"
+      ? Math.min(itemsTotal, Math.max(0, Math.round(itemsTotal * reservedCoupon.value) / 100))
+      : 0;
   const finalTotal = Math.max(0, itemsTotal + normalizedShippingCost - safeDiscount);
   const orderNumber = generateOrderNumber();
 
@@ -214,7 +304,7 @@ async function createOrderInDatabase(params: CreateOrderParams) {
     payment_method: paymentMethod || null,
     notes: notes || null,
     status: "recebido",
-    coupon_code: couponCode || null,
+    coupon_code: reservedCoupon?.code || null,
     discount_cents: Math.round(safeDiscount * 100),
     metadata: {
       customer_name: customerName,
@@ -225,85 +315,82 @@ async function createOrderInDatabase(params: CreateOrderParams) {
   };
 
   const supabase = getSupabaseAdminClient();
-  const nextSchemaPayload = {
-    ...baseOrderPayload,
-    customer_name: customerName,
-    shipping_cost: normalizedShippingCost,
-    shipping_cents: Math.round(normalizedShippingCost * 100),
-  };
-  const legacySchemaPayload = {
-    ...baseOrderPayload,
-    employee_cpf: customerPhone,
-    employee_name: customerName,
-  };
 
-  let order:
-    | {
-        id: string;
-        order_number: string | null;
-      }
-    | null = null;
+  try {
+    const nextSchemaPayload = {
+      ...baseOrderPayload,
+      customer_name: customerName,
+      shipping_cost: normalizedShippingCost,
+      shipping_cents: Math.round(normalizedShippingCost * 100),
+    };
+    const legacySchemaPayload = {
+      ...baseOrderPayload,
+      employee_cpf: customerPhone,
+      employee_name: customerName,
+    };
 
-  const nextSchemaResult = await supabase
-    .from("orders")
-    .insert(nextSchemaPayload)
-    .select("id, order_number")
-    .single();
+    let order:
+      | {
+          id: string;
+          order_number: string | null;
+        }
+      | null = null;
 
-  order = nextSchemaResult.data;
-  if (nextSchemaResult.error) {
-    const message = String(nextSchemaResult.error.message || "").toLowerCase();
-    const missingColumn =
-      message.includes("customer_name") ||
-      message.includes("shipping_cost") ||
-      message.includes("shipping_cents");
-
-    if (!missingColumn) throw nextSchemaResult.error;
-
-    const legacyResult = await supabase
+    const nextSchemaResult = await supabase
       .from("orders")
-      .insert(legacySchemaPayload)
+      .insert(nextSchemaPayload)
       .select("id, order_number")
       .single();
 
-    if (legacyResult.error || !legacyResult.data) {
-      throw legacyResult.error ?? new Error("Erro ao criar pedido.");
+    order = nextSchemaResult.data;
+    if (nextSchemaResult.error) {
+      const message = String(nextSchemaResult.error.message || "").toLowerCase();
+      const missingColumn =
+        message.includes("customer_name") ||
+        message.includes("shipping_cost") ||
+        message.includes("shipping_cents");
+
+      if (!missingColumn) throw nextSchemaResult.error;
+
+      const legacyResult = await supabase
+        .from("orders")
+        .insert(legacySchemaPayload)
+        .select("id, order_number")
+        .single();
+
+      if (legacyResult.error || !legacyResult.data) {
+        throw legacyResult.error ?? new Error("Erro ao criar pedido.");
+      }
+
+      order = legacyResult.data;
     }
 
-    order = legacyResult.data;
+    if (!order) throw new Error("Erro ao criar pedido.");
+
+    const itemsPayload = items.map((item) => ({
+      order_id: order.id,
+      product_id: item.product.id,
+      product_old_id: item.product.old_id ?? null,
+      product_name: item.product.name,
+      unit_price: getDisplayProductPrice(item.product),
+      quantity: item.quantity,
+    }));
+
+    const { error: itemsError } = await supabase.from("order_items").insert(itemsPayload);
+    if (itemsError) {
+      await supabase.from("orders").delete().eq("id", order.id);
+      throw itemsError;
+    }
+
+    return {
+      orderId: order.id,
+      orderNumber: order.order_number ?? orderNumber,
+      total: finalTotal,
+    };
+  } catch (error) {
+    await releaseCouponReservation(reservedCoupon);
+    throw error;
   }
-
-  if (!order) throw new Error("Erro ao criar pedido.");
-
-  // Marca o cupom como usado (best-effort)
-  if (couponCode) {
-    await supabase
-      .from("user_coupons")
-      .update({ used: true })
-      .eq("code", couponCode)
-      .eq("customer_phone", customerPhone);
-  }
-
-  const itemsPayload = items.map((item) => ({
-    order_id: order.id,
-    product_id: item.product.id,
-    product_old_id: item.product.old_id ?? null,
-    product_name: item.product.name,
-    unit_price: getDisplayProductPrice(item.product),
-    quantity: item.quantity,
-  }));
-
-  const { error: itemsError } = await supabase.from("order_items").insert(itemsPayload);
-  if (itemsError) {
-    await supabase.from("orders").delete().eq("id", order.id);
-    throw itemsError;
-  }
-
-  return {
-    orderId: order.id,
-    orderNumber: order.order_number ?? orderNumber,
-    total: finalTotal,
-  };
 }
 
 async function resolveOrderItems(
@@ -366,6 +453,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const session = await requireCustomerSession(req);
+    const ip = getRequestIp(req);
+    assertRateLimit(`orders:create:ip:${ip}`, { limit: 20, windowMs: 15 * 60 * 1000 });
+    assertRateLimit(`orders:create:customer:${session.phone}`, { limit: 8, windowMs: 15 * 60 * 1000 });
     const payload = normalizePayload(req.body);
     const safeItems = await resolveOrderItems(payload.items);
 
@@ -396,6 +486,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(200).json(order);
   } catch (error) {
+    if (isRateLimitError(error)) {
+      res.setHeader("Retry-After", String(error.retryAfterSeconds));
+      return res.status(429).json({ error: error.message });
+    }
     if (isSessionError(error)) {
       return res.status(error.statusCode).json({ error: error.message });
     }

@@ -32,6 +32,7 @@ import {
   logoutCustomerSession,
   type CustomerSession,
 } from "@/lib/customerAuth";
+import { mapCatalogProductRow } from "@/lib/catalogProducts";
 
 /* --------------------------------------------------------
    HELPER: SESSION
@@ -83,7 +84,6 @@ const BottomNav: React.FC = () => {
 
   const tabs = [
     { label: "Início", path: HOME_PATH, icon: Home },
-    { label: "Avisos", path: "/avisos", icon: Bell },
     { label: "Favoritos", path: "/favoritos", icon: Heart },
     { label: "Pedidos", path: "/meus-pedidos", icon: ClipboardList },
   ];
@@ -160,30 +160,6 @@ const formatCurrency = (value: number) =>
 /* --------------------------------------------------------
    MAPEAR PRODUTO DO SUPABASE -> Product DO CATÁLOGO
 -------------------------------------------------------- */
-function mapSupabaseProduct(row: Record<string, unknown>): Product {
-  const employeePrice = Number(row.employee_price ?? row.price ?? 0);
-
-  return {
-    id: row.id,
-    old_id: row.old_id ?? null,
-    name: row.name,
-    price: employeePrice,
-    employee_price: employeePrice,
-    images: row.images ?? (row.image ? [row.image] : []),
-    image_path: row.image_path ?? null,
-    category: row.category ?? row.category_name ?? "Outros",
-    description: row.description ?? "",
-    packageInfo: row.packageInfo ?? row.package_info ?? "",
-    saleType: row.saleType === "pct" || row.sale_type === "pct" ? "pct" : "kg",
-    weight: Number(row.weight ?? 0),
-    isPackage: row.isPackage ?? row.is_package ?? false,
-    featured: row.featured ?? row.isFeatured ?? false,
-    inStock: row.inStock ?? row.in_stock ?? true,
-    isLaunch: row.isLaunch ?? row.is_launch ?? false,
-    extraInfo: row.extraInfo ?? undefined,
-  };
-}
-
 /* --------------------------------------------------------
    PAGE
 -------------------------------------------------------- */
@@ -296,19 +272,19 @@ const MyOrdersPage: React.FC = () => {
 
         if (!productRow || !Number.isFinite(quantity) || quantity <= 0) return;
 
-        const product = mapSupabaseProduct(productRow);
+        const product = mapCatalogProductRow(productRow);
         addToCart(product, quantity);
       });
 
       if (items.length < rows.length) {
         alert(
-          "Alguns itens não estão mais disponíveis e não foram adicionados ao carrinho."
+          "Pedido carregado no carrinho. Alguns itens não estão mais disponíveis e não foram adicionados."
         );
       } else {
-        alert("Pedido recarregado no carrinho. Confira e finalize.");
+        alert("Pedido carregado no carrinho. Você pode adicionar mais itens antes de finalizar.");
       }
 
-      navigate("/checkout");
+      navigate("/catalogo");
     } finally {
       setRefazendoId(null);
     }

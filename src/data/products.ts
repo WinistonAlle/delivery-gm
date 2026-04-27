@@ -1,12 +1,12 @@
 
 import { Category, Product } from '../types/products';
-import { MIN_ORDER_VALUE, MIN_PACKAGES, MIN_WEIGHT_KG } from '../../shared/orderRules';
+import { MIN_PACKAGES, MIN_WEIGHT_KG } from '../../shared/orderRules';
 
 // Número do WhatsApp para pedidos
 export const STORE_WHATSAPP = '5561985941557';
 
 // Requisitos mínimos de pedido
-export { MIN_PACKAGES, MIN_WEIGHT_KG, MIN_ORDER_VALUE };
+export { MIN_PACKAGES, MIN_WEIGHT_KG };
 
 // Categorias disponíveis
 export const CATEGORIES: Category[] = [

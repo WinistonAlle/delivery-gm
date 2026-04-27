@@ -3214,3 +3214,44 @@ body {
     opacity: 0.055;
   }
 }
+
+.free-shipping-confetti-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.free-shipping-confetti {
+  position: absolute;
+  top: -18px;
+  display: block;
+  border-radius: 3px;
+  opacity: 0;
+  animation-name: free-shipping-confetti-fall;
+  animation-timing-function: cubic-bezier(0.18, 0.72, 0.28, 1);
+  animation-fill-mode: forwards;
+}
+
+.free-shipping-confetti:nth-child(3n) {
+  border-radius: 999px;
+}
+
+.free-shipping-confetti:nth-child(4n) {
+  height: 14px !important;
+  border-radius: 999px;
+}
+
+@keyframes free-shipping-confetti-fall {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -24px, 0) rotate(0deg);
+  }
+  12% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--confetti-drift, 22px), 105dvh, 0) rotate(540deg);
+  }
+}

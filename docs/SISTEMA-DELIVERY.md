@@ -1,26 +1,26 @@
 # Sistema Delivery GM
 
-Documentacao funcional e tecnica do sistema de delivery da Gostinho Mineiro.
+Documentação funcional e técnica do sistema de delivery da Gostinho Mineiro.
 
-## Visao Geral
+## Visão Geral
 
-O sistema foi construido para permitir que o cliente:
+O sistema foi construído para permitir que o cliente:
 
 - entre no site
-- faca cadastro ou login por telefone
+- faça cadastro ou login por telefone
 - monte o carrinho
 - finalize um pedido
-- envie automaticamente um resumo detalhado para o WhatsApp da operacao
+- envie automaticamente um resumo detalhado para o WhatsApp da operação
 
-Ao mesmo tempo, o sistema oferece recursos de administracao, operacao e analise:
+Ao mesmo tempo, o sistema oferece recursos de administração, operação e análise:
 
-- gestao de produtos
+- gestão de produtos
 - destaque de produtos no carrossel
 - avisos internos
-- operacao de pedidos
+- operação de pedidos
 - acompanhamento de pedidos do cliente
-- relatorios
-- analise de conversao do delivery
+- relatórios
+- análise de conversão do delivery
 
 ## Stack
 
@@ -36,7 +36,7 @@ Ao mesmo tempo, o sistema oferece recursos de administracao, operacao e analise:
 
 ### 1. Entrada no site
 
-Quando o visitante acessa o catalogo, o sistema pode registrar a visita para analise de conversao.
+Quando o visitante acessa o catálogo, o sistema pode registrar a visita para análise de conversão.
 
 Evento registrado:
 - `site_visit`
@@ -46,10 +46,10 @@ Evento registrado:
 O login funciona por telefone.
 
 Comportamento:
-- o usuario informa o numero
-- se ja existir cadastro local, entra normalmente
-- se ainda nao existir cadastro, o sistema redireciona direto para a tela de cadastro
-- o telefone digitado no login ja vai preenchido no cadastro
+- o usuário informa o número
+- se já existir cadastro local, entra normalmente
+- se ainda não existir cadastro, o sistema redireciona direto para a tela de cadastro
+- o telefone digitado no login já vai preenchido no cadastro
 
 Arquivo principal:
 - [Login.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/Login.tsx)
@@ -64,17 +64,17 @@ O cadastro foi adaptado para o delivery atual e hoje inclui:
 - nome completo
 - telefone
 - CPF
-- endereco com busca automatica por CEP
-- numero do endereco
+- endereço com busca automática por CEP
+- número do endereço
 - complemento
 - campo de "como conheceu a gente"
 
 Comportamentos importantes:
 
-- o endereco pode ser preenchido automaticamente pelo CEP
-- a busca do CEP acontece automaticamente ao completar os 8 digitos
-- o foco pode seguir para o campo de numero do endereco
-- o telefone pode vir pre-preenchido a partir da tela de login
+- o endereço pode ser preenchido automaticamente pelo CEP
+- a busca do CEP acontece automaticamente ao completar os 8 dígitos
+- o foco pode seguir para o campo de número do endereço
+- o telefone pode vir pré-preenchido a partir da tela de login
 
 Arquivo principal:
 - [Cadastro.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/Cadastro.tsx)
@@ -82,24 +82,24 @@ Arquivo principal:
 Evento registrado:
 - `signup_completed`
 
-## Catalogo e Carrinho
+## Catálogo e Carrinho
 
-O catalogo exibe os produtos cadastrados no Supabase.
+O catálogo exibe os produtos cadastrados no Supabase.
 
 Recursos existentes:
 
 - listagem de produtos
 - destaques
 - favoritos
-- recomendacoes no carrinho e checkout
-- combos configuraveis
+- recomendações no carrinho e checkout
+- combos configuráveis
 - cross-sell entre produtos
 
-O carrinho hoje tem uma funcao clara:
+O carrinho hoje tem uma função clara:
 
 - revisar itens
 - ajustar quantidades
-- seguir para o checkout unico
+- seguir para o checkout único
 
 O fluxo antigo com dois checkouts foi removido.
 
@@ -109,26 +109,26 @@ Arquivos principais:
 - [CartContext.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/contexts/CartContext.tsx)
 - [deliveryOffers.ts](/Users/winistonalle/Desktop/copia-para-delivery/src/lib/deliveryOffers.ts)
 
-Evento registrado ao primeiro inicio real de carrinho:
+Evento registrado ao primeiro início real de carrinho:
 - `cart_started`
 
 ## Checkout
 
-Hoje o sistema usa um checkout unico.
+Hoje o sistema usa um checkout único.
 
-No checkout o usuario informa ou confirma:
+No checkout o usuário informa ou confirma:
 
 - nome
 - telefone
-- endereco
+- endereço
 - cidade
 - forma de pagamento
-- observacoes
+- observações
 
-O checkout tambem:
+O checkout também:
 
-- reaproveita dados salvos da sessao/localStorage
-- tenta recuperar enderecos do cadastro pelo telefone
+- reaproveita dados salvos da sessão/localStorage
+- tenta recuperar endereços do cadastro pelo telefone
 - calcula frete por cidade
 - pode sugerir produtos complementares
 
@@ -141,15 +141,15 @@ Eventos registrados:
 
 ## Pedido e Envio para WhatsApp
 
-Quando o pedido e confirmado:
+Quando o pedido é confirmado:
 
 1. o sistema grava o pedido no Supabase
 2. grava os itens do pedido
-3. atualiza a sessao local do cliente
+3. atualiza a sessão local do cliente
 4. monta uma mensagem detalhada
-5. abre o WhatsApp para envio ao numero oficial
+5. abre o WhatsApp para envio ao número oficial
 
-Numero configurado:
+Número configurado:
 - `61985941557`
 
 A mensagem enviada inclui:
@@ -157,13 +157,13 @@ A mensagem enviada inclui:
 - nome do cliente
 - telefone
 - CPF
-- endereco
+- endereço
 - cidade
 - forma de pagamento
 - frete
 - total
-- lista detalhada de itens com quantidade, valor unitario e subtotal
-- observacoes, se existirem
+- lista detalhada de itens com quantidade, valor unitário e subtotal
+- observações, se existirem
 
 Arquivos principais:
 - [Checkout.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/Checkout.tsx)
@@ -179,13 +179,13 @@ O cliente pode consultar seus pedidos feitos no sistema.
 Recursos:
 
 - listagem por identificador do cliente logado
-- visualizacao dos itens de cada pedido
-- opcao de refazer pedido reaproveitando itens ainda disponiveis
+- visualização dos itens de cada pedido
+- opção de refazer pedido reaproveitando itens ainda disponíveis
 
 Arquivo principal:
 - [MyOrdersPage.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/MyOrdersPage.tsx)
 
-## Areas Administrativas e Operacionais
+## Áreas Administrativas e Operacionais
 
 ### Admin de produtos
 
@@ -195,10 +195,10 @@ Permite:
 - editar produto
 - excluir produto
 - subir imagem para o bucket `products`
-- editar preco de funcionario
+- editar preço de funcionário
 - configurar categoria
 - configurar `old_id`
-- configurar embalagem, peso, destaque e lancamento
+- configurar embalagem, peso, destaque e lançamento
 
 Arquivo principal:
 - [Admin.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/Admin.tsx)
@@ -207,9 +207,9 @@ Arquivo principal:
 
 Permite:
 
-- alternar entre modo automatico e manual
+- alternar entre modo automático e manual
 - salvar produtos destacados manualmente
-- usar ranking automatico por vendas
+- usar ranking automático por vendas
 
 Arquivos principais:
 - [Destaques.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/Destaques.tsx)
@@ -237,13 +237,13 @@ Arquivo principal:
 Permite:
 
 - listar pedidos
-- filtrar por CPF, numero ou status
+- filtrar por CPF, número ou status
 - abrir itens do pedido
 - cancelar pedido com motivo
 - remover item inteiro do pedido
 - remover quantidade parcial de um item
-- consultar historico de acoes administrativas
-- consultar historico de cancelamentos
+- consultar histórico de ações administrativas
+- consultar histórico de cancelamentos
 
 Arquivo principal:
 - [AdminOrders.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/AdminOrders.tsx)
@@ -254,20 +254,20 @@ RPCs utilizados:
 - `admin_remove_order_item_v3`
 - `admin_remove_order_item_qty_v1`
 
-### Operacao do delivery
+### Operação do delivery
 
-Tela voltada para operacao simples do fluxo de pedidos.
+Tela voltada para operação simples do fluxo de pedidos.
 
 Permite:
 
 - listar pedidos recentes
 - atualizar status do pedido
-- visualizar metricas locais de abandono / inicio / conclusao
+- visualizar métricas locais de abandono / início / conclusão
 
 Arquivo principal:
 - [DeliveryOps.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/DeliveryOps.tsx)
 
-### Painel de separacao
+### Painel de separação
 
 Tela operacional em tempo real para pedidos em andamento.
 
@@ -275,41 +275,41 @@ Recursos:
 
 - acompanha pedidos por status
 - usa realtime do Supabase na tabela `orders`
-- mostra pedidos relevantes para separacao
+- mostra pedidos relevantes para separação
 - destaca visualmente pedidos novos
 - identifica contexto de pagamento
 
 Arquivo principal:
 - [SeparationBoard.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/SeparationBoard.tsx)
 
-## Relatorios
+## Relatórios
 
-### Dashboard de relatorios
+### Dashboard de relatórios
 
 Concentra dados como:
 
 - total de pedidos
 - receita total
 - itens vendidos
-- ticket medio
-- top funcionarios
+- ticket médio
+- top funcionários
 - top produtos
-- resumo diario
-- comparacao por periodo
-- comparacao entre meses
+- resumo diário
+- comparação por período
+- comparação entre meses
 
 Arquivo principal:
 - [ReportsDashboard.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/ReportsDashboard.tsx)
 
-### Relatorio RH
+### Relatório RH
 
-Focado em consumo por funcionario e desconto em folha.
+Focado em consumo por funcionário e desconto em folha.
 
-Informacoes principais:
+Informações principais:
 
-- funcionario
+- funcionário
 - CPF
-- mes de referencia
+- mês de referência
 - quantidade de pedidos
 - total gasto
 - desconto em folha
@@ -318,12 +318,12 @@ Informacoes principais:
 Arquivo principal:
 - [RHSpendingReport.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/rh/RHSpendingReport.tsx)
 
-Dependencias de banco:
+Dependências de banco:
 
 - view `rh_spending_report`
 - RPC `current_pay_cycle_key`
 
-## Analise de Conversao do Delivery
+## Análise de Conversão do Delivery
 
 Essa parte foi adicionada para medir comportamento antes da compra.
 
@@ -332,9 +332,9 @@ Essa parte foi adicionada para medir comportamento antes da compra.
 Entender:
 
 - quantas pessoas entraram no site
-- quantas avancaram no funil
+- quantas avançaram no funil
 - quantas compraram
-- quem nao concluiu pedido
+- quem não concluiu pedido
 
 ### Tabela usada
 
@@ -368,58 +368,58 @@ Cada evento pode armazenar:
 - `user_agent`
 - `created_at`
 
-Arquivo responsavel pela captura:
+Arquivo responsável pela captura:
 - [customerInsights.ts](/Users/winistonalle/Desktop/copia-para-delivery/src/lib/customerInsights.ts)
 
-### Onde os eventos sao disparados
+### Onde os eventos são disparados
 
-- visita ao catalogo: [App.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/App.tsx)
-- cadastro concluido: [Cadastro.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/Cadastro.tsx)
-- login concluido: [Login.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/Login.tsx)
-- inicio de carrinho: [CartContext.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/contexts/CartContext.tsx)
-- visualizacao do checkout: [Checkout.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/Checkout.tsx)
-- pedido concluido: [Checkout.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/Checkout.tsx)
+- visita ao catálogo: [App.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/App.tsx)
+- cadastro concluído: [Cadastro.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/Cadastro.tsx)
+- login concluído: [Login.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/Login.tsx)
+- início de carrinho: [CartContext.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/contexts/CartContext.tsx)
+- visualização do checkout: [Checkout.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/Checkout.tsx)
+- pedido concluído: [Checkout.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/Checkout.tsx)
 
 ### Indicadores gerados
 
-No dashboard administrativo, a secao de conversao mostra:
+No dashboard administrativo, a seção de conversão mostra:
 
-- visitantes unicos
+- visitantes únicos
 - visitantes cadastrados
 - visitantes que chegaram ao checkout
 - compradores
 - visitantes sem compra
 
-Tambem existe uma lista com os leads/visitantes que nao concluiram pedido.
+Também existe uma lista com os leads/visitantes que não concluíram pedido.
 
 Essa lista pode exibir:
 
 - nome
 - telefone
 - CPF
-- ultimo evento
-- ultima rota acessada
-- data/hora do ultimo contato
+- último evento
+- última rota acessada
+- data/hora do último contato
 
-### Interpretacao pratica
+### Interpretação prática
 
-Com essa analise voce consegue enxergar:
+Com essa análise você consegue enxergar:
 
-- trafego que nao converteu
-- pessoas que se cadastraram mas nao compraram
+- tráfego que não converteu
+- pessoas que se cadastraram mas não compraram
 - pessoas que iniciaram checkout e abandonaram
-- sinais de interesse que podem virar acao comercial
+- sinais de interesse que podem virar ação comercial
 
-### Limitacoes atuais
+### Limitações atuais
 
-Algumas limitacoes importantes:
+Algumas limitações importantes:
 
-- a identificacao depende do navegador e do `localStorage`
-- se o usuario trocar de aparelho ou limpar o navegador, vira outro visitante
-- o cadastro do cliente ainda esta majoritariamente local no app
-- hoje as policies e permissoes do banco foram deixadas abertas para facilitar operacao local/dev
+- a identificação depende do navegador e do `localStorage`
+- se o usuário trocar de aparelho ou limpar o navegador, vira outro visitante
+- o cadastro do cliente ainda está majoritariamente local no app
+- hoje as policies e permissões do banco foram deixadas abertas para facilitar operação local/dev
 
-Mesmo com isso, a analise ja entrega um funil util para operacao e marketing.
+Mesmo com isso, a análise já entrega um funil útil para operação e marketing.
 
 ## Banco de Dados
 
@@ -430,23 +430,23 @@ Arquivo SQL principal:
 
 Esse script cria:
 
-- catalogo
+- catálogo
 - pedidos
 - itens do pedido
-- funcionarios
+- funcionários
 - RH
 - avisos
 - destaques
 - tema
 - ofertas do delivery
-- eventos de conversao
+- eventos de conversão
 - buckets de storage
 - RLS
-- views e RPCs necessarios
+- views e RPCs necessários
 
-## Variaveis de Ambiente
+## Variáveis de Ambiente
 
-Exemplo minimo:
+Exemplo mínimo:
 
 ```env
 VITE_SUPABASE_URL=
@@ -475,10 +475,10 @@ npm run build
 
 1. Suba seu Supabase local.
 2. Execute o SQL de [supabase-local-complete.sql](/Users/winistonalle/Desktop/copia-para-delivery/supabase-local-complete.sql).
-3. Configure as variaveis `.env`.
+3. Configure as variáveis `.env`.
 4. Rode o frontend.
 
-## Estrutura Tecnica Relevante
+## Estrutura Técnica Relevante
 
 Arquivos centrais do sistema:
 
@@ -489,7 +489,7 @@ Arquivos centrais do sistema:
 - [src/lib/deliveryOffers.ts](/Users/winistonalle/Desktop/copia-para-delivery/src/lib/deliveryOffers.ts)
 - [src/lib/appTheme.ts](/Users/winistonalle/Desktop/copia-para-delivery/src/lib/appTheme.ts)
 
-Paginas principais:
+Páginas principais:
 
 - [src/pages/Login.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/Login.tsx)
 - [src/pages/Cadastro.tsx](/Users/winistonalle/Desktop/copia-para-delivery/src/pages/Cadastro.tsx)
@@ -505,17 +505,17 @@ Paginas principais:
 
 O sistema hoje:
 
-- nao usa mais Google Sheets
-- nao depende mais de `google-service-account.json`
-- concentra persistencia operacional no Supabase
+- não usa mais Google Sheets
+- não depende mais de `google-service-account.json`
+- concentra persistência operacional no Supabase
 - envia os pedidos por WhatsApp
-- possui base para analytics e conversao
+- possui base para analytics e conversão
 - possui schema SQL completo para Supabase local
 
-## Proximos Passos Recomendados
+## Próximos Passos Recomendados
 
 - mover o cadastro do cliente do `localStorage` para Supabase
-- endurecer RLS para producao
-- criar autenticacao administrativa real no Supabase Auth
-- criar painel de leads sem compra com filtros por periodo
-- adicionar dashboards de conversao por dia, semana e mes
+- endurecer RLS para produção
+- criar autenticação administrativa real no Supabase Auth
+- criar painel de leads sem compra com filtros por período
+- adicionar dashboards de conversão por dia, semana e mês

@@ -1,10 +1,10 @@
 # Deploy no servidor com Cloudflare
 
-Este projeto foi preparado para rodar em um servidor Node atras do Cloudflare.
+Este projeto foi preparado para rodar em um servidor Node atrás do Cloudflare.
 
 ## O que sobe
 
-- frontend Vite estatico em `dist/`
+- frontend Vite estático em `dist/`
 - API Node/Express em [server.ts](/Users/winistonalle/Desktop/copia-para-delivery/server.ts)
 - mesmas rotas usadas hoje pelo app:
   - `/api/auth/*`
@@ -14,7 +14,7 @@ Este projeto foi preparado para rodar em um servidor Node atras do Cloudflare.
   - `/api/reports-dashboard`
   - `/api/delivery-ops`
 
-## Variaveis obrigatorias
+## Variáveis obrigatórias
 
 Configure no servidor:
 
@@ -29,14 +29,14 @@ ADMIN_PHONES=5561998824141
 PORT=4174
 ```
 
-Observacoes:
+Observações:
 
-- `AUTH_SESSION_SECRET` deve ser um segredo forte proprio.
-- `VITE_ADMIN_PHONES` e `ADMIN_PHONES` devem ficar com o telefone admin em formato numerico com DDI.
+- `AUTH_SESSION_SECRET` deve ser um segredo forte próprio.
+- `VITE_ADMIN_PHONES` e `ADMIN_PHONES` devem ficar com o telefone admin em formato numérico com DDI.
 
 ## Admin inicial
 
-Antes de liberar producao, rode no Supabase:
+Antes de liberar produção, rode no Supabase:
 
 - [seed_admin_delivery_customer.sql](/Users/winistonalle/Desktop/copia-para-delivery/docs/seed_admin_delivery_customer.sql)
 
@@ -57,7 +57,7 @@ npm run start:prod
 
 ## PM2
 
-Sugestao simples:
+Sugestão simples:
 
 ```bash
 pm2 start npm --name delivery-gm -- run start:prod
@@ -68,10 +68,10 @@ pm2 save
 
 No painel do Cloudflare:
 
-- DNS do dominio apontando para o IP do servidor
+- DNS do domínio apontando para o IP do servidor
 - Proxy laranja habilitado
 - SSL/TLS em `Full (strict)`
-- Cache Rule: nao fazer cache de `/api/*`
+- Cache Rule: não fazer cache de `/api/*`
 
 ## Reverse proxy
 
@@ -94,12 +94,12 @@ server {
 }
 ```
 
-## Smoke test minimo
+## Smoke test mínimo
 
 Antes de abrir para uso:
 
 1. Acessar `/healthz`
-2. Abrir o catalogo
+2. Abrir o catálogo
 3. Fazer cadastro do admin
 4. Fazer logout e login novamente
 5. Criar um pedido de teste

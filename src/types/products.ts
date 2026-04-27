@@ -15,6 +15,7 @@ export interface ProductExtraInfo {
   usageTips?: string;
   ingredients?: string;
   funFact?: string;
+  hidden?: boolean;
 }
 
 export type ProductSaleType = "kg" | "pct";

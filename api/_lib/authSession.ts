@@ -22,16 +22,21 @@ type SessionPayload = {
 };
 
 function getSessionSecret() {
-  const secret =
-    process.env.AUTH_SESSION_SECRET ||
-    process.env.CUSTOMER_SESSION_SECRET ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const secret = process.env.AUTH_SESSION_SECRET || process.env.CUSTOMER_SESSION_SECRET;
 
-  if (!secret) {
-    throw new Error("Missing AUTH_SESSION_SECRET / CUSTOMER_SESSION_SECRET / SUPABASE_SERVICE_ROLE_KEY");
+  if (secret) {
+    return secret;
   }
 
-  return secret;
+  if (process.env.NODE_ENV !== "production") {
+    const devFallback = process.env.SUPABASE_SERVICE_ROLE_KEY || "gm-delivery-dev-session-secret";
+    console.warn(
+      "AUTH_SESSION_SECRET missing; using development fallback. Configure a dedicated session secret before production."
+    );
+    return devFallback;
+  }
+
+  throw new Error("Missing AUTH_SESSION_SECRET / CUSTOMER_SESSION_SECRET");
 }
 
 function toBase64Url(value: string) {

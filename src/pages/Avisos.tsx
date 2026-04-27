@@ -178,11 +178,7 @@ const PageLoader: React.FC<{ show: boolean }> = ({ show }) => {
 /* --------------------------------------------------------
    BOTTOM NAV (MESMO DO CATÁLOGO)
 -------------------------------------------------------- */
-interface BottomNavProps {
-  noticeCount?: number;
-}
-
-const BottomNav: React.FC<BottomNavProps> = ({ noticeCount = 0 }) => {
+const BottomNav: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -190,7 +186,6 @@ const BottomNav: React.FC<BottomNavProps> = ({ noticeCount = 0 }) => {
 
   const tabs = [
     { label: "Início", path: HOME_PATH, icon: Home },
-    { label: "Avisos", path: "/avisos", icon: Bell },
     { label: "Favoritos", path: "/favoritos", icon: Heart },
     { label: "Pedidos", path: "/meus-pedidos", icon: ClipboardList },
   ];
@@ -211,7 +206,6 @@ const BottomNav: React.FC<BottomNavProps> = ({ noticeCount = 0 }) => {
       <div className="flex justify-around py-2">
         {tabs.map(({ label, path, icon: Icon }) => {
           const active = isActive(path);
-          const isAvisos = label === "Avisos";
 
           return (
             <button
@@ -229,21 +223,6 @@ const BottomNav: React.FC<BottomNavProps> = ({ noticeCount = 0 }) => {
                 `}
               >
                 <Icon className="h-5 w-5" />
-
-                {isAvisos && noticeCount > 0 && (
-                  <span
-                    className="
-                      absolute -top-1.5 -right-1.5
-                      min-w-[16px] h-4 px-1
-                      rounded-full bg-red-500
-                      text-[10px] font-bold text-white
-                      flex items-center justify-center
-                      border-2 border-white
-                    "
-                  >
-                    {noticeCount > 9 ? "9+" : noticeCount}
-                  </span>
-                )}
               </div>
               {label}
               {active && (
@@ -848,7 +827,7 @@ const Avisos: React.FC = () => {
       <Footer />
 
       {/* BOTTOM NAV COM CONTADOR DE AVISOS */}
-      <BottomNav noticeCount={notices.length} />
+      <BottomNav />
 
       {/* MODAL NOVO / EDITAR */}
       <Dialog

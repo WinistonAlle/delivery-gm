@@ -1,5 +1,5 @@
 // src/pages/Admin.tsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Product } from "@/types/products";
 
@@ -126,6 +126,8 @@ type Editable = AdminProduct & {
   employee_price_input?: string;
 };
 
+const PRODUCTS_CACHE_KEY = "gm_catalog_products_v1";
+
 function parseBRNumber(v: unknown, fallback = 0): number {
   if (v === null || v === undefined) return fallback;
   if (typeof v === "number") return Number.isFinite(v) ? v : fallback;
@@ -239,6 +241,20 @@ function mapEditingToDbPayload(editing: Editable) {
   return payload;
 }
 
+function isCatalogHidden(product: Pick<AdminProduct, "extraInfo">) {
+  return product.extraInfo?.hidden === true;
+}
+
+function setCatalogHidden(
+  extraInfo: Product["extraInfo"] | null | undefined,
+  hidden: boolean
+): Product["extraInfo"] {
+  return {
+    ...(extraInfo ?? {}),
+    hidden,
+  };
+}
+
 function getAdminProductsApiUrl() {
   if (typeof window === "undefined") return "/api/admin-products";
   return new URL("/api/admin-products", window.location.origin).toString();
@@ -291,7 +307,26 @@ async function fetchProductsDirectly(): Promise<AdminProduct[]> {
   return mapped;
 }
 
-async function saveProductThroughApi(payload: ProductPayload) {
+type AdminProductsApiResponse = {
+  items?: ProductRow[];
+  error?: string;
+};
+
+async function fetchProductsFromApi(): Promise<AdminProduct[]> {
+  const response = await fetch(getAdminProductsApiUrl(), {
+    method: "GET",
+    credentials: "include",
+  });
+
+  const result = await readApiPayload<AdminProductsApiResponse>(response);
+  if (!response.ok) {
+    throw new Error(result?.error || "Erro ao carregar produtos.");
+  }
+
+  return ((result?.items ?? []) as ProductRow[]).map(mapRowToProduct);
+}
+
+async function saveProductThroughApi(payload: ProductPayload): Promise<AdminProduct[]> {
   const response = await fetch(getAdminProductsApiUrl(), {
     method: "POST",
     credentials: "include",
@@ -299,9 +334,35 @@ async function saveProductThroughApi(payload: ProductPayload) {
     body: JSON.stringify(payload),
   });
 
-  const result = await readApiPayload<{ error?: string }>(response);
+  const result = await readApiPayload<AdminProductsApiResponse>(response);
   if (!response.ok) {
     throw new Error(result?.error || "Erro ao salvar produto.");
+  }
+
+  return ((result?.items ?? []) as ProductRow[]).map(mapRowToProduct);
+}
+
+async function deleteProductThroughApi(productId: string): Promise<AdminProduct[]> {
+  const response = await fetch(getAdminProductsApiUrl(), {
+    method: "DELETE",
+    credentials: "include",
+    headers: getAdminApiHeaders(),
+    body: JSON.stringify({ id: productId }),
+  });
+
+  const result = await readApiPayload<AdminProductsApiResponse>(response);
+  if (!response.ok) {
+    throw new Error(result?.error || "Erro ao excluir produto.");
+  }
+
+  return ((result?.items ?? []) as ProductRow[]).map(mapRowToProduct);
+}
+
+function invalidateCatalogCache() {
+  try {
+    localStorage.removeItem(PRODUCTS_CACHE_KEY);
+  } catch {
+    // ignore localStorage errors
   }
 }
 
@@ -309,6 +370,7 @@ export default function Admin() {
   const [items, setItems] = useState<AdminProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Busca / filtro
   const [busca, setBusca] = useState("");
@@ -341,12 +403,23 @@ export default function Admin() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showScroll]);
 
+  const reloadProducts = useCallback(async () => {
+    try {
+      setItems(await fetchProductsFromApi());
+      return;
+    } catch (err) {
+      console.error("Erro ao carregar produtos via API:", err);
+    }
+
+    setItems(await fetchProductsDirectly());
+  }, []);
+
   // --------- Carregar produtos do Supabase ----------
   useEffect(() => {
     const fetchProducts = async () => {
       setLoading(true);
       try {
-        setItems(await fetchProductsDirectly());
+        await reloadProducts();
       } catch (err) {
         console.error("Erro ao carregar produtos:", err);
         alert("Erro ao carregar produtos do banco.");
@@ -355,8 +428,8 @@ export default function Admin() {
       }
     };
 
-    fetchProducts();
-  }, []);
+    void fetchProducts();
+  }, [reloadProducts]);
 
   // --------- Categorias dinâmicas ----------
   const categoryOptions = useMemo(() => {
@@ -549,7 +622,8 @@ export default function Admin() {
     try {
       const payload = mapEditingToDbPayload(editing);
       await saveProductThroughApi(payload);
-      setItems(await fetchProductsDirectly());
+      await reloadProducts();
+      invalidateCatalogCache();
 
       closeForm();
     } catch (err: unknown) {
@@ -568,29 +642,50 @@ export default function Admin() {
 
   const doDelete = async () => {
     if (!toDelete) return;
+    const deletingProductId = toDelete.id;
+    const previousItems = items;
+    setDeleting(true);
+    setToDelete(null);
+    setItems((current) => current.filter((item) => item.id !== deletingProductId));
 
     try {
-      const response = await fetch(getAdminProductsApiUrl(), {
-        method: "DELETE",
-        credentials: "include",
-        headers: getAdminApiHeaders(),
-        body: JSON.stringify({ id: toDelete.id }),
-      });
-
-      const payload = await readApiPayload<{ error?: string }>(response);
-      if (!response.ok) {
-        throw new Error(payload?.error || "Erro ao excluir produto.");
-      }
-
-      const refreshed = await fetchProductsDirectly();
-      setItems(refreshed);
-      setToDelete(null);
+      await deleteProductThroughApi(deletingProductId);
+      await reloadProducts();
+      invalidateCatalogCache();
     } catch (err) {
+      setItems(previousItems);
       console.error("Erro ao excluir produto:", err);
       alert(
         "Erro ao excluir produto no banco.\n\n" +
           (err instanceof Error ? err.message : "Erro desconhecido.")
       );
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const toggleCatalogVisibility = async (product: AdminProduct) => {
+    const nextHidden = !isCatalogHidden(product);
+    const payload = mapEditingToDbPayload({
+      ...product,
+      extraInfo: setCatalogHidden(product.extraInfo, nextHidden),
+      images: product.images ?? [],
+      weight_input: String(safeNumber(product.weight, 0)).replace(".", ","),
+      employee_price_input: String(safeNumber(product.employee_price, 0)).replace(".", ","),
+    });
+
+    setSaving(true);
+    try {
+      setItems(await saveProductThroughApi(payload));
+      invalidateCatalogCache();
+    } catch (err) {
+      console.error("Erro ao atualizar visibilidade do produto:", err);
+      alert(
+        "Erro ao atualizar visibilidade do produto.\n\n" +
+          (err instanceof Error ? err.message : "Erro desconhecido.")
+      );
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -681,9 +776,10 @@ export default function Admin() {
                 FALLBACK_IMG;
 
               const w = safeNumber(p.weight, 0);
+              const hidden = isCatalogHidden(p);
 
               return (
-                <Card key={p.id} className="overflow-hidden">
+                <Card key={p.id} className={`overflow-hidden ${hidden ? "opacity-75" : ""}`}>
                   <CardHeader className="p-0">
                     <img
                       src={thumb}
@@ -706,6 +802,7 @@ export default function Admin() {
                       {p.inStock === false && (
                         <Badge variant="destructive">Sem estoque</Badge>
                       )}
+                      {hidden && <Badge variant="outline">Oculto no catálogo</Badge>}
                       {p.isLaunch && <Badge variant="outline">Lançamento</Badge>}
                     </div>
 
@@ -718,15 +815,25 @@ export default function Admin() {
                       {p.packageInfo || "—"} • {w ? `${w}kg` : ""}
                     </div>
 
-                    <div className="mt-3 flex gap-2">
+                    <div className="mt-3 flex flex-wrap gap-2">
                       <Button size="sm" onClick={() => startEdit(p)}>
                         Editar
                       </Button>
 
                       <Button
                         size="sm"
+                        variant="outline"
+                        onClick={() => void toggleCatalogVisibility(p)}
+                        disabled={saving || deleting}
+                      >
+                        {hidden ? "Reexibir" : "Ocultar"}
+                      </Button>
+
+                      <Button
+                        size="sm"
                         variant="destructive"
                         onClick={() => confirmDelete(p)}
+                        disabled={saving || deleting}
                       >
                         Excluir
                       </Button>
@@ -973,6 +1080,16 @@ export default function Admin() {
                   onCheckedChange={(v) => setEditing({ ...editing, inStock: v })}
                 />
                 <Flag
+                  label="Visível no catálogo"
+                  checked={!isCatalogHidden(editing)}
+                  onCheckedChange={(v) =>
+                    setEditing({
+                      ...editing,
+                      extraInfo: setCatalogHidden(editing.extraInfo, !v),
+                    })
+                  }
+                />
+                <Flag
                   label="Lançamento"
                   checked={!!editing.isLaunch}
                   onCheckedChange={(v) => setEditing({ ...editing, isLaunch: v })}
@@ -1005,8 +1122,9 @@ export default function Admin() {
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={doDelete}
+              disabled={deleting}
             >
-              Confirmar exclusão
+              {deleting ? "Excluindo..." : "Confirmar exclusão"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
