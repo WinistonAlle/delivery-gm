@@ -57,7 +57,7 @@ import {
 } from "@/components/ui/dialog";
 import { getDisplayProductPrice } from "../../shared/productPricing";
 import CouponRouletteModal from "@/components/CouponRouletteModal";
-import { COUPONS_ENABLED } from "@/lib/featureFlags";
+import { CHATBOT_ENABLED, COUPONS_ENABLED } from "@/lib/featureFlags";
 import { FREE_SHIPPING_THRESHOLD } from "@/data/shipping";
 
 const ITEMS_PER_PAGE = 24;
@@ -2541,7 +2541,7 @@ const Index: React.FC = () => {
 
       <BottomNav />
       <Footer activeTheme={activeTheme} />
-      <HelperChat />
+      {CHATBOT_ENABLED && <HelperChat />}
       <CartToggle />
       <Cart />
 
