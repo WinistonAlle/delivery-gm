@@ -3,13 +3,13 @@ import { Product } from "../types/products";
 import { useCart } from "../contexts/useCart";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardFooter } from "./ui/card";
-import { Plus, Minus, Package, Check, XCircle, Heart } from "lucide-react";
+import { Plus, Minus, Package, Check, XCircle, Heart, BadgePercent } from "lucide-react";
 import { Input } from "./ui/input";
 import ProductImageCarousel from "./ProductImageCarousel";
 import ProductDetail from "./ProductDetail";
 import { toast } from "./ui/sonner-toast";
 import { getCustomerSession } from "@/lib/customerAuth";
-import { getDisplayProductPrice } from "../../shared/productPricing";
+import { getDisplayProductPrice, getProductPrice, WHOLESALE_THRESHOLD } from "../../shared/productPricing";
 
 interface ProductCardProps {
   product: Product;
@@ -60,6 +60,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   const employeePrice = getDisplayProductPrice(product);
+  const wholesalePrice = getProductPrice(product, "atacado_2");
+  const hasWholesalePrice = wholesalePrice < employeePrice;
   const isAvailable = product.inStock !== false;
 
   const currentItem = cartItems.find((item) => item.product.id === product.id);
@@ -406,6 +408,12 @@ const ProductCard: React.FC<ProductCardProps> = ({
                 style: "currency",
                 currency: "BRL",
               })}
+            </p>
+            <p className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 md:text-[11px]">
+              <BadgePercent className="h-3 w-3 shrink-0" />
+              {hasWholesalePrice
+                ? `Preço de atacado disponível acima de ${WHOLESALE_THRESHOLD.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`
+                : `Atacado automático acima de ${WHOLESALE_THRESHOLD.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`}
             </p>
           </CardContent>
 

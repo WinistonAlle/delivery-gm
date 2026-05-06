@@ -8,12 +8,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import ProductImageCarousel from "./ProductImageCarousel";
-import { Package, Scale, Plus, Minus, Check, XCircle } from "lucide-react";
+import { Package, Scale, Plus, Minus, Check, XCircle, BadgePercent } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { useCart } from "@/contexts/useCart";
 import { toast } from "./ui/sonner-toast";
-import { getDisplayProductPrice } from "../../shared/productPricing";
+import { getDisplayProductPrice, WHOLESALE_THRESHOLD } from "../../shared/productPricing";
 import { findProductUpgradeSuggestions } from "@/lib/upsell";
 
 interface ProductDetailProps {
@@ -260,6 +260,14 @@ const ProductDetail: React.FC<ProductDetailProps> = ({
                     currency: "BRL",
                   })}
                 </span>
+                <p className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
+                  <BadgePercent className="h-3.5 w-3.5" />
+                  Preço de atacado disponível em compras acima de{" "}
+                  {WHOLESALE_THRESHOLD.toLocaleString("pt-BR", {
+                    style: "currency",
+                    currency: "BRL",
+                  })}
+                </p>
               </div>
 
               {isInStock ? (

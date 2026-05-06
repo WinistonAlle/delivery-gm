@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useCart } from "@/contexts/useCart";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getDisplayProductPrice } from "../../shared/productPricing";
+import { getProductPrice, getRetailProductPrice, WHOLESALE_THRESHOLD } from "../../shared/productPricing";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -65,6 +65,8 @@ const Cart: React.FC = () => {
   const {
     cartItems,
     cartTotal,
+    activePriceTable,
+    wholesaleRemaining,
     isCartOpen,
     closeCart,
     addToCart,
@@ -90,6 +92,7 @@ const Cart: React.FC = () => {
   const safeCartTotal = Number.isFinite(cartTotal) ? cartTotal : 0;
   const missingForFreeShipping = Math.max(0, FREE_SHIPPING_THRESHOLD - safeCartTotal);
   const hasFreeShipping = cartItems.length > 0 && missingForFreeShipping <= 0;
+  const hasWholesalePrices = activePriceTable === "atacado_2";
   const safeTotalWeight = Number.isFinite(totalWeight) ? totalWeight : 0;
   const missingForMinimumWeight = Math.max(0, MIN_WEIGHT_KG - safeTotalWeight);
 
@@ -246,8 +249,10 @@ const Cart: React.FC = () => {
                   cartItems.map((item) => {
                     const images = Array.isArray(item.product.images) ? item.product.images : [];
                     const thumb = images[0] || item.product.image_path || "/placeholder.svg";
-                    const price = getDisplayProductPrice(item.product);
+                    const price = getProductPrice(item.product, activePriceTable);
+                    const retailPrice = getRetailProductPrice(item.product);
                     const subtotal = price * item.quantity;
+                    const hasItemWholesale = hasWholesalePrices && price < retailPrice;
 
                     return (
                       <div key={item.product.id} className="bg-gray-50 rounded-lg p-3">
@@ -258,9 +263,16 @@ const Cart: React.FC = () => {
                             </div>
                             <div>
                               <p className="text-sm font-medium line-clamp-2">{item.product.name}</p>
-                              <p className="text-sm text-red-600 font-semibold">
-                                {price.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                              </p>
+                              <div className="mt-0.5">
+                                {hasItemWholesale ? (
+                                  <p className="text-xs text-gray-500">
+                                    De <span className="line-through">{retailPrice.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</span>
+                                  </p>
+                                ) : null}
+                                <p className="text-sm text-red-600 font-semibold">
+                                  {price.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                                </p>
+                              </div>
                             </div>
                           </div>
 
@@ -312,6 +324,18 @@ const Cart: React.FC = () => {
               <div className="px-4 py-2 bg-gray-50 border-t">
                 {cartItems.length > 0 ? (
                   <>
+                    <Card className={`mb-3 shadow-none ${hasWholesalePrices ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50"}`}>
+                      <CardContent className="p-3">
+                        <p className={`text-sm font-semibold ${hasWholesalePrices ? "text-emerald-800" : "text-amber-900"}`}>
+                          {hasWholesalePrices
+                            ? "Você desbloqueou preços de atacado. Os valores do seu carrinho foram atualizados."
+                            : `Faltam ${wholesaleRemaining.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} para liberar preços de atacado.`}
+                        </p>
+                        <p className={`mt-1 text-xs ${hasWholesalePrices ? "text-emerald-700" : "text-amber-800"}`}>
+                          A tabela atacado 2 entra automaticamente a partir de {WHOLESALE_THRESHOLD.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} em produtos.
+                        </p>
+                      </CardContent>
+                    </Card>
                     {missingForFreeShipping > 0 ? (
                       <p className="text-sm mb-1">
                         Faltam <span className="font-bold text-red-600">R$ {missingForFreeShipping.toFixed(2)}</span> para frete grátis.
@@ -366,6 +390,10 @@ const Cart: React.FC = () => {
                 <div className="flex justify-between text-sm">
                   <span className="font-medium">Subtotal:</span>
                   <span className="font-bold">R$ {safeCartTotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span>Tabela aplicada:</span>
+                  <span className="font-semibold">{hasWholesalePrices ? "Atacado 2" : "Varejo"}</span>
                 </div>
 
                 {COUPONS_ENABLED && appliedCoupon && (

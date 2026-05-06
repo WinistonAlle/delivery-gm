@@ -1,6 +1,8 @@
 type PriceableProduct = {
   employee_price?: number | null;
   price?: number | null;
+  price_tables?: Partial<Record<PriceTable, number | null>> | null;
+  priceTablePrices?: Partial<Record<PriceTable, number | null>> | null;
   saleType?: "kg" | "pct" | null;
   sale_type?: "kg" | "pct" | null;
   weight?: number | string | null;
@@ -8,6 +10,12 @@ type PriceableProduct = {
   package_info?: string | null;
   name?: string | null;
 };
+
+export type PriceTable = "varejo" | "atacado_2";
+
+export const WHOLESALE_PRICE_TABLE: PriceTable = "atacado_2";
+export const RETAIL_PRICE_TABLE: PriceTable = "varejo";
+export const WHOLESALE_THRESHOLD = 150;
 
 function roundCurrency(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
@@ -52,12 +60,37 @@ export function getStoredProductPrice(product: PriceableProduct): number {
   return Number.isFinite(value) ? value : 0;
 }
 
+function getStoredTablePrice(product: PriceableProduct, priceTable: PriceTable): number | null {
+  const priceTables = product.price_tables ?? product.priceTablePrices ?? null;
+  const tableValue = priceTables?.[priceTable];
+  const parsed = Number(tableValue);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 export function getProductSaleType(product: PriceableProduct): "kg" | "pct" {
   return product.saleType === "pct" || product.sale_type === "pct" ? "pct" : "kg";
 }
 
 export function getDisplayProductPrice(product: PriceableProduct): number {
-  const basePrice = getStoredProductPrice(product);
+  return getProductPrice(product, RETAIL_PRICE_TABLE);
+}
+
+export function getActivePriceTable(subtotal: number): PriceTable {
+  const safeSubtotal = Number(subtotal);
+  return Number.isFinite(safeSubtotal) && safeSubtotal >= WHOLESALE_THRESHOLD
+    ? WHOLESALE_PRICE_TABLE
+    : RETAIL_PRICE_TABLE;
+}
+
+export function getProductPrice(
+  product: PriceableProduct,
+  activePriceTable: PriceTable = RETAIL_PRICE_TABLE
+): number {
+  const tablePrice =
+    activePriceTable === WHOLESALE_PRICE_TABLE
+      ? getStoredTablePrice(product, WHOLESALE_PRICE_TABLE)
+      : getStoredTablePrice(product, RETAIL_PRICE_TABLE);
+  const basePrice = tablePrice ?? getStoredTablePrice(product, RETAIL_PRICE_TABLE) ?? getStoredProductPrice(product);
   const saleType = getProductSaleType(product);
 
   if (saleType === "pct") {
@@ -71,4 +104,13 @@ export function getDisplayProductPrice(product: PriceableProduct): number {
   }
 
   return roundCurrency(basePrice);
+}
+
+export function getRetailProductPrice(product: PriceableProduct): number {
+  return getProductPrice(product, RETAIL_PRICE_TABLE);
+}
+
+export function getWholesaleRemaining(subtotal: number): number {
+  const safeSubtotal = Number.isFinite(Number(subtotal)) ? Number(subtotal) : 0;
+  return Math.max(0, roundCurrency(WHOLESALE_THRESHOLD - safeSubtotal));
 }

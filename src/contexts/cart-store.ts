@@ -1,5 +1,6 @@
 import { createContext } from "react";
 import type { Product, CartItem } from "@/types/products";
+import type { PriceTable } from "../../shared/productPricing";
 
 export type AppliedCoupon = {
   code: string;
@@ -20,6 +21,9 @@ export interface CartContextType {
   openCart: () => void;
   closeCart: () => void;
   cartTotal: number;
+  retailSubtotal: number;
+  activePriceTable: PriceTable;
+  wholesaleRemaining: number;
   itemsCount: number;
   freeShippingRemaining: number;
   totalWeight: number;

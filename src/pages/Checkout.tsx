@@ -31,8 +31,8 @@ import {
   saveCustomerSession,
 } from "@/lib/customerAuth";
 import { trackCustomerEvent, trackCustomerEventOnce } from "@/lib/customerInsights";
-import { createFullAddress, fetchAddressFromCEP, formatCEP } from "@/utils/formatUtils";
-import { getDisplayProductPrice } from "../../shared/productPricing";
+import { createFullAddress, fetchAddressFromCEP, formatCEP, formatCNPJ, formatCPF } from "@/utils/formatUtils";
+import { getProductPrice, getRetailProductPrice } from "../../shared/productPricing";
 import { COUPONS_ENABLED } from "@/lib/featureFlags";
 
 function safeGetSession() {
@@ -101,16 +101,35 @@ const paymentOptions = [
 
 const Checkout: React.FC = () => {
   const navigate = useNavigate();
-  const { cartItems, cartTotal, clearCart, addToCart, appliedCoupon, discountAmount } = useCart();
+  const {
+    cartItems,
+    cartTotal,
+    retailSubtotal,
+    activePriceTable,
+    clearCart,
+    addToCart,
+    appliedCoupon,
+    discountAmount,
+  } = useCart();
 
   const [session, setSession] = useState<CustomerSession | null>(() => safeGetSession());
   const customerDocumentCpf = session?.document_cpf?.toString?.() ?? "";
+  const customerDocumentCnpj = session?.document_cnpj?.toString?.() ?? "";
   const customerCep = session?.cep?.toString?.() ?? "";
   const customerCity = session?.city?.toString?.() ?? "";
   const customerHowFoundUs = session?.how_found_us?.toString?.() ?? "";
   const customerHowFoundUsDetails = session?.how_found_us_details?.toString?.() ?? "";
 
+  const [customerType, setCustomerType] = useState<"pessoa_fisica" | "pessoa_juridica">(
+    session?.customer_type === "pessoa_juridica" ? "pessoa_juridica" : "pessoa_fisica"
+  );
   const [customerName, setCustomerName] = useState(session?.full_name ?? session?.name ?? "");
+  const [documentCpf, setDocumentCpf] = useState(customerDocumentCpf);
+  const [documentCnpj, setDocumentCnpj] = useState(customerDocumentCnpj);
+  const [companyLegalName, setCompanyLegalName] = useState(session?.company_legal_name ?? "");
+  const [companyTradeName, setCompanyTradeName] = useState(session?.company_trade_name ?? "");
+  const [stateRegistration, setStateRegistration] = useState(session?.state_registration ?? "");
+  const [orderResponsibleName, setOrderResponsibleName] = useState(session?.order_responsible_name ?? session?.full_name ?? "");
   const [customerPhone, setCustomerPhone] = useState(session?.phone ?? session?.cpf ?? "");
   const [deliveryAddress, setDeliveryAddress] = useState(session?.address ?? "");
   const [deliveryCep, setDeliveryCep] = useState(customerCep);
@@ -166,7 +185,11 @@ const Checkout: React.FC = () => {
   );
 
   const canSubmit =
-    customerName.trim().length >= 3 &&
+    (customerType === "pessoa_juridica"
+      ? onlyDigits(documentCnpj).length === 14 &&
+        companyLegalName.trim().length >= 3 &&
+        orderResponsibleName.trim().length >= 3
+      : customerName.trim().length >= 3 && onlyDigits(documentCpf).length === 11) &&
     onlyDigits(customerPhone).length >= 10 &&
     deliveryAddress.trim().length >= 6 &&
     selectedCity.trim().length > 0 &&
@@ -337,14 +360,28 @@ const Checkout: React.FC = () => {
 
     try {
       const cleanPhone = onlyDigits(customerPhone);
+      const cleanDocument =
+        customerType === "pessoa_juridica" ? onlyDigits(documentCnpj) : onlyDigits(documentCpf);
+      const customerDisplayName =
+        customerType === "pessoa_juridica" ? orderResponsibleName.trim() : customerName.trim();
       const howFoundLabel = customerHowFoundUsDetails
         ? `${customerHowFoundUs} - ${customerHowFoundUsDetails}`
         : customerHowFoundUs || "Não informado";
 
       const { orderNumber } = await createOrder({
         customerPhone: cleanPhone,
-        customerName: customerName.trim(),
-        customerDocumentCpf,
+        customerName: customerDisplayName,
+        customerType,
+        customerDocument: cleanDocument,
+        customerDocumentCpf: customerType === "pessoa_fisica" ? cleanDocument : "",
+        customerDocumentCnpj: customerType === "pessoa_juridica" ? cleanDocument : "",
+        companyLegalName: companyLegalName.trim(),
+        companyTradeName: companyTradeName.trim(),
+        stateRegistration: stateRegistration.trim(),
+        orderResponsibleName: orderResponsibleName.trim(),
+        priceTableUsed: activePriceTable,
+        subtotalProducts: cartTotal,
+        retailSubtotalProducts: retailSubtotal,
         customerAddress: deliveryAddress.trim(),
         customerCity: selectedCity,
         customerCep: onlyDigits(deliveryCep),
@@ -362,11 +399,17 @@ const Checkout: React.FC = () => {
       const updatedSession: CustomerSession = {
         ...(session ?? {}),
         id: `customer-${cleanPhone}`,
-        full_name: customerName.trim(),
-        name: customerName.trim(),
+        customer_type: customerType,
+        full_name: customerDisplayName,
+        name: customerDisplayName,
         cpf: cleanPhone,
         phone: cleanPhone,
-        document_cpf: customerDocumentCpf,
+        document_cpf: customerType === "pessoa_fisica" ? cleanDocument : "",
+        document_cnpj: customerType === "pessoa_juridica" ? cleanDocument : "",
+        company_legal_name: companyLegalName.trim(),
+        company_trade_name: companyTradeName.trim(),
+        state_registration: stateRegistration.trim(),
+        order_responsible_name: orderResponsibleName.trim(),
         cep: onlyDigits(deliveryCep),
         city: selectedCity,
         address: deliveryAddress.trim(),
@@ -408,19 +451,22 @@ const Checkout: React.FC = () => {
         eventName: "order_completed",
         customerName: customerName.trim(),
         phone: cleanPhone,
-        documentCpf: customerDocumentCpf,
+        documentCpf: customerType === "pessoa_fisica" ? cleanDocument : "",
         metadata: {
           selectedCity,
           paymentMethod,
           finalShipping,
           finalTotal,
+          customerType,
+          document: cleanDocument,
+          priceTableUsed: activePriceTable,
           itemsCount: cartItems.length,
         },
       });
 
       const itemsSummary = cartItems
         .map((item) => {
-          const unitPrice = getDisplayProductPrice(item.product);
+          const unitPrice = getProductPrice(item.product, activePriceTable);
           const totalWeight = Number(item.product.weight ?? 0) * item.quantity;
           const packageInfo = String(item.product.packageInfo ?? "").trim();
           const code = item.product.old_id ?? item.product.id;
@@ -440,10 +486,21 @@ const Checkout: React.FC = () => {
         `*Taxa de entrega:* ${finalShipping > 0 ? formatCurrency(finalShipping) : "Grátis"}`,
         ...(COUPONS_ENABLED && activeDiscount > 0 ? [`*Desconto:* -${formatCurrency(activeDiscount)} (${appliedCoupon?.code})`] : []),
         `*Forma de pagamento:* ${formatPaymentMethodLabel(paymentMethod)}`,
+        `*Tabela aplicada:* ${activePriceTable === "atacado_2" ? "Atacado 2" : "Varejo"}`,
         "",
         "*Dados do Cliente:*",
-        `Nome: ${customerName.trim()}`,
-        `CPF: ${customerDocumentCpf || "Não informado"}`,
+        `Tipo: ${customerType === "pessoa_juridica" ? "Pessoa jurídica" : "Pessoa física"}`,
+        customerType === "pessoa_juridica"
+          ? `Razão social: ${companyLegalName.trim()}`
+          : `Nome: ${customerName.trim()}`,
+        ...(customerType === "pessoa_juridica"
+          ? [
+              `Nome fantasia: ${companyTradeName.trim() || "Não informado"}`,
+              `CNPJ: ${formatCNPJ(documentCnpj) || "Não informado"}`,
+              `Inscrição estadual: ${stateRegistration.trim() || "Não informado"}`,
+              `Responsável: ${orderResponsibleName.trim()}`,
+            ]
+          : [`CPF: ${formatCPF(documentCpf) || "Não informado"}`]),
         `Endereço: ${deliveryAddress.trim()}`,
         `CEP: ${formatCEP(deliveryCep) || "Não informado"}`,
         `Como nos conheceu: ${howFoundLabel}`,
@@ -577,15 +634,108 @@ const Checkout: React.FC = () => {
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-[26px] border border-slate-200 bg-white px-4 py-4">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Nome</p>
-                  <p className="mt-2 text-base font-bold text-slate-900">{customerName || "Não informado"}</p>
-                </div>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">Tipo de cliente</span>
+                  <select
+                    className="h-[56px] w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] font-medium text-slate-900 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
+                    value={customerType}
+                    onChange={(e) => setCustomerType(e.target.value === "pessoa_juridica" ? "pessoa_juridica" : "pessoa_fisica")}
+                    disabled={isSubmitting}
+                  >
+                    <option value="pessoa_fisica">Pessoa física</option>
+                    <option value="pessoa_juridica">Pessoa jurídica</option>
+                  </select>
+                </label>
 
-                <div className="rounded-[26px] border border-slate-200 bg-white px-4 py-4">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">Telefone</p>
-                  <p className="mt-2 text-base font-bold text-slate-900">{customerPhone || "Não informado"}</p>
-                </div>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">Telefone</span>
+                  <input
+                    className="h-[56px] w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] font-medium text-slate-900 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    inputMode="numeric"
+                    disabled={isSubmitting}
+                  />
+                </label>
+
+                {customerType === "pessoa_juridica" ? (
+                  <>
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-semibold text-slate-700">Razão social</span>
+                      <input
+                        className="h-[56px] w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] font-medium text-slate-900 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
+                        value={companyLegalName}
+                        onChange={(e) => setCompanyLegalName(e.target.value)}
+                        disabled={isSubmitting}
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-semibold text-slate-700">CNPJ</span>
+                      <input
+                        className="h-[56px] w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] font-medium text-slate-900 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
+                        value={formatCNPJ(documentCnpj)}
+                        onChange={(e) => setDocumentCnpj(e.target.value)}
+                        inputMode="numeric"
+                        disabled={isSubmitting}
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-semibold text-slate-700">Nome fantasia</span>
+                      <input
+                        className="h-[56px] w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] font-medium text-slate-900 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
+                        value={companyTradeName}
+                        onChange={(e) => setCompanyTradeName(e.target.value)}
+                        disabled={isSubmitting}
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-semibold text-slate-700">Inscrição estadual</span>
+                      <input
+                        className="h-[56px] w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] font-medium text-slate-900 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
+                        value={stateRegistration}
+                        onChange={(e) => setStateRegistration(e.target.value)}
+                        placeholder="Isento, se aplicável"
+                        disabled={isSubmitting}
+                      />
+                    </label>
+
+                    <label className="block md:col-span-2">
+                      <span className="mb-2 block text-sm font-semibold text-slate-700">Responsável pelo pedido</span>
+                      <input
+                        className="h-[56px] w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] font-medium text-slate-900 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
+                        value={orderResponsibleName}
+                        onChange={(e) => setOrderResponsibleName(e.target.value)}
+                        disabled={isSubmitting}
+                      />
+                    </label>
+                  </>
+                ) : (
+                  <>
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-semibold text-slate-700">Nome completo</span>
+                      <input
+                        className="h-[56px] w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] font-medium text-slate-900 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        disabled={isSubmitting}
+                      />
+                    </label>
+
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-semibold text-slate-700">CPF</span>
+                      <input
+                        className="h-[56px] w-full rounded-2xl border border-slate-200 bg-white px-4 text-[15px] font-medium text-slate-900 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
+                        value={formatCPF(documentCpf)}
+                        onChange={(e) => setDocumentCpf(e.target.value)}
+                        inputMode="numeric"
+                        disabled={isSubmitting}
+                      />
+                    </label>
+                  </>
+                )}
               </div>
             </motion.section>
 
@@ -785,8 +935,10 @@ const Checkout: React.FC = () => {
 
                 <div className="mt-5 space-y-3">
                   {cartItems.map((item, index) => {
-                    const unitPrice = getDisplayProductPrice(item.product);
+                    const unitPrice = getProductPrice(item.product, activePriceTable);
+                    const retailPrice = getRetailProductPrice(item.product);
                     const subtotal = unitPrice * item.quantity;
+                    const hasWholesalePrice = activePriceTable === "atacado_2" && unitPrice < retailPrice;
                     return (
                       <motion.div
                         key={item.product.id}
@@ -798,6 +950,11 @@ const Checkout: React.FC = () => {
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="line-clamp-2 text-sm font-bold text-white">{item.product.name}</p>
+                            {hasWholesalePrice ? (
+                              <p className="mt-1 text-xs text-white/45">
+                                De <span className="line-through">{formatCurrency(retailPrice)}</span>
+                              </p>
+                            ) : null}
                             <p className="mt-1 text-xs text-white/60">
                               {item.quantity} x {formatCurrency(unitPrice)}
                             </p>
@@ -813,6 +970,10 @@ const Checkout: React.FC = () => {
                   <div className="flex items-center justify-between text-sm text-white/70">
                     <span>Subtotal</span>
                     <span className="font-semibold text-white">{formatCurrency(cartTotal)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm text-white/70">
+                    <span>Tabela aplicada</span>
+                    <span className="font-semibold text-white">{activePriceTable === "atacado_2" ? "Atacado 2" : "Varejo"}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm text-white/70">
                     <span>Frete</span>
@@ -938,7 +1099,7 @@ const Checkout: React.FC = () => {
                         className="rounded-full border-red-200 text-red-600 hover:bg-red-50"
                         onClick={() => addToCart(product)}
                       >
-                        + {formatCurrency(getDisplayProductPrice(product))}
+                        + {formatCurrency(getRetailProductPrice(product))}
                       </Button>
                     </motion.div>
                   ))}

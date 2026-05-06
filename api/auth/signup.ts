@@ -34,9 +34,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const session = await upsertCustomerProfile({
+      customerType: body.customer_type === "pessoa_juridica" ? "pessoa_juridica" : "pessoa_fisica",
       fullName: String(body.full_name ?? body.fullName ?? ""),
       phone,
       documentCpf: String(body.document_cpf ?? body.documentCpf ?? ""),
+      documentCnpj: String(body.document_cnpj ?? body.documentCnpj ?? ""),
+      companyLegalName: String(body.company_legal_name ?? body.companyLegalName ?? ""),
+      companyTradeName: String(body.company_trade_name ?? body.companyTradeName ?? ""),
+      stateRegistration: String(body.state_registration ?? body.stateRegistration ?? ""),
+      orderResponsibleName: String(body.order_responsible_name ?? body.orderResponsibleName ?? ""),
       cep: String(body.cep ?? ""),
       address: String(body.address ?? ""),
       city: String(body.city ?? ""),

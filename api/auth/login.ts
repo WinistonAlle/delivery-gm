@@ -29,7 +29,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const phone = onlyDigits((req.body ?? {}).phone);
-    const cpf = onlyDigits((req.body ?? {}).cpf).slice(0, 11);
+    const document = onlyDigits((req.body ?? {}).cpf).slice(0, 14);
     const ip = getRequestIp(req);
 
     assertRateLimit(`auth:login:ip:${ip}`, { limit: 25, windowMs: 15 * 60 * 1000 });
@@ -41,14 +41,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: "Informe seu telefone com DDD." });
     }
 
-    if (cpf.length !== 11) {
-      return res.status(400).json({ error: "Informe seu CPF com 11 dígitos." });
+    if (document.length !== 11 && document.length !== 14) {
+      return res.status(400).json({ error: "Informe seu CPF ou CNPJ." });
     }
 
     const session = await getCustomerProfileByPhone(phone);
-    if (!session || session.document_cpf !== cpf) {
+    const sessionDocument =
+      session?.customer_type === "pessoa_juridica"
+        ? session.document_cnpj
+        : session?.document_cpf;
+    if (!session || sessionDocument !== document) {
       await wait(350);
-      return res.status(401).json({ error: "Telefone ou CPF inválidos." });
+      return res.status(401).json({ error: "Telefone ou documento inválidos." });
     }
 
     writeCustomerSession(res, session);

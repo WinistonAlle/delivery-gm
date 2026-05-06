@@ -8,7 +8,17 @@ export interface CartItem {
 export interface CreateOrderParams {
   customerPhone: string;
   customerName: string;
+  customerType?: "pessoa_fisica" | "pessoa_juridica";
+  customerDocument?: string;
   customerDocumentCpf?: string;
+  customerDocumentCnpj?: string;
+  companyLegalName?: string;
+  companyTradeName?: string;
+  stateRegistration?: string;
+  orderResponsibleName?: string;
+  priceTableUsed?: "varejo" | "atacado_2";
+  subtotalProducts?: number;
+  retailSubtotalProducts?: number;
   customerAddress?: string;
   customerCity?: string;
   customerCep?: string;

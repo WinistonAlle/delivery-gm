@@ -6,6 +6,7 @@ import { Bg, Card } from "../components/ui/app-surface";
 import logo from "../images/logop.jpg";
 import {
   loginCustomer,
+  normalizeCnpj,
   normalizeCpf,
   normalizePhone,
   normalizeRedirectPath,
@@ -279,8 +280,17 @@ const maskPhone = (value: string) => {
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 };
 
-const maskCpf = (value: string) => {
-  const digits = normalizeCpf(value);
+const normalizeDocument = (value: string) => normalizePhone(value).slice(0, 14);
+
+const maskDocument = (value: string) => {
+  const digits = normalizeDocument(value);
+  if (digits.length > 11) {
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 5) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
+    if (digits.length <= 8) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5)}`;
+    if (digits.length <= 12) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8)}`;
+    return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
+  }
   if (digits.length <= 3) return digits;
   if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
   if (digits.length <= 9) {
@@ -307,7 +317,10 @@ const Login: React.FC = () => {
   const [error, setError] = useState("");
 
   const canSubmit = useMemo(
-    () => normalizePhone(phone).length >= 10 && normalizeCpf(cpf).length === 11,
+    () => {
+      const document = normalizeDocument(cpf);
+      return normalizePhone(phone).length >= 10 && (document.length === 11 || document.length === 14);
+    },
     [cpf, phone]
   );
 
@@ -346,7 +359,7 @@ const Login: React.FC = () => {
     setError("");
 
     if (!canSubmit) {
-      setError("Informe telefone com DDD e CPF para continuar.");
+      setError("Informe telefone com DDD e CPF ou CNPJ para continuar.");
       return;
     }
 
@@ -372,7 +385,7 @@ const Login: React.FC = () => {
           replace: true,
           state: {
             prefilledPhone: normalizePhone(phone),
-            prefilledCpf: normalizeCpf(cpf),
+            prefilledCpf: normalizeDocument(cpf).length === 14 ? normalizeCnpj(cpf) : normalizeCpf(cpf),
             redirectTo,
           },
         });
@@ -421,7 +434,7 @@ const Login: React.FC = () => {
 
         <Title>Entrar na sua conta</Title>
         <Subtitle>
-          Use seu telefone e CPF cadastrados para continuar.
+          Use seu telefone e CPF ou CNPJ cadastrados para continuar.
         </Subtitle>
 
         <Form onSubmit={handleSubmit} noValidate>
@@ -444,15 +457,15 @@ const Login: React.FC = () => {
           </Field>
 
           <Field>
-            <Label htmlFor="cpf">CPF</Label>
+            <Label htmlFor="cpf">CPF ou CNPJ</Label>
             <InputShell>
               <PhoneInput
                 id="cpf"
                 name="cpf"
                 inputMode="numeric"
                 autoComplete="off"
-                placeholder="000.000.000-00"
-                value={maskCpf(cpf)}
+                placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                value={maskDocument(cpf)}
                 onChange={(e) => setCpf(e.target.value)}
                 aria-invalid={error ? "true" : "false"}
                 aria-describedby={error ? "login-error" : undefined}
@@ -472,7 +485,7 @@ const Login: React.FC = () => {
                 navigate("/cadastro", {
                   state: {
                     prefilledPhone: normalizePhone(phone),
-                    prefilledCpf: normalizeCpf(cpf),
+                    prefilledCpf: normalizeDocument(cpf).length === 14 ? normalizeCnpj(cpf) : normalizeCpf(cpf),
                     redirectTo,
                   },
                 })

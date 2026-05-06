@@ -19,6 +19,7 @@ export interface ProductExtraInfo {
 }
 
 export type ProductSaleType = "kg" | "pct";
+export type ProductPriceTable = "varejo" | "atacado_2";
 
 export interface Product {
   // ID interno do Supabase (UUID)
@@ -34,6 +35,10 @@ export interface Product {
 
   // 💰 Preço base usado pelo catálogo (vem do Supabase)
   employee_price: number;
+
+  // Tabelas opcionais vindas de product_prices. employee_price continua sendo varejo.
+  price_tables?: Partial<Record<ProductPriceTable, number>>;
+  priceTablePrices?: Partial<Record<ProductPriceTable, number>>;
 
   // 🖼️ Lista de imagens (para o carousel)
   images: string[];

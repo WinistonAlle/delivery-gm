@@ -15,13 +15,14 @@ import {
 import logo from "../images/logop.jpg";
 import {
   normalizeCpf,
+  normalizeCnpj,
   normalizeRedirectPath,
   normalizePhone,
   signupCustomer,
 } from "@/lib/customerAuth";
 import { trackCustomerEvent } from "@/lib/customerInsights";
 import { SHIPPING_RATES } from "@/data/shipping";
-import { createFullAddress, fetchAddressFromCEP, formatCEP, formatCPF } from "@/utils/formatUtils";
+import { createFullAddress, fetchAddressFromCEP, formatCEP, formatCPF, formatCNPJ } from "@/utils/formatUtils";
 
 const Screen = styled(Bg)`
   min-height: 100dvh;
@@ -349,11 +350,20 @@ const Cadastro: React.FC = () => {
       : "";
   const prefilledCpf =
     location.state && typeof (location.state as { prefilledCpf?: unknown }).prefilledCpf === "string"
-      ? normalizeCpf((location.state as { prefilledCpf?: string }).prefilledCpf ?? "")
+      ? normalizePhone((location.state as { prefilledCpf?: string }).prefilledCpf ?? "").slice(0, 14)
       : "";
+  const prefilledIsCnpj = prefilledCpf.length === 14;
   const [name, setName] = useState("");
+  const [customerType, setCustomerType] = useState<"pessoa_fisica" | "pessoa_juridica">(
+    prefilledIsCnpj ? "pessoa_juridica" : "pessoa_fisica"
+  );
   const [phone, setPhone] = useState(prefilledPhone);
-  const [cpf, setCpf] = useState(prefilledCpf);
+  const [cpf, setCpf] = useState(prefilledIsCnpj ? "" : prefilledCpf);
+  const [cnpj, setCnpj] = useState(prefilledIsCnpj ? prefilledCpf : "");
+  const [companyLegalName, setCompanyLegalName] = useState("");
+  const [companyTradeName, setCompanyTradeName] = useState("");
+  const [stateRegistration, setStateRegistration] = useState("");
+  const [orderResponsibleName, setOrderResponsibleName] = useState("");
   const [cep, setCep] = useState("");
   const [street, setStreet] = useState("");
   const [number, setNumber] = useState("");
@@ -380,8 +390,14 @@ const Cadastro: React.FC = () => {
   const isFormDirty = useMemo(() => {
     return [
       name,
+      customerType,
       phone,
       cpf,
+      cnpj,
+      companyLegalName,
+      companyTradeName,
+      stateRegistration,
+      orderResponsibleName,
       cep,
       street,
       number,
@@ -395,8 +411,14 @@ const Cadastro: React.FC = () => {
     ].some((value) => String(value).trim().length > 0);
   }, [
     name,
+    customerType,
     phone,
     cpf,
+    cnpj,
+    companyLegalName,
+    companyTradeName,
+    stateRegistration,
+    orderResponsibleName,
     cep,
     street,
     number,
@@ -411,11 +433,16 @@ const Cadastro: React.FC = () => {
   const shouldConfirmExit = isFormDirty && !submitting;
 
   const canSubmit = useMemo(() => {
+    const hasValidPerson =
+      customerType === "pessoa_fisica"
+        ? name.trim().length >= 3 && !/\d/.test(name) && normalizeCpf(cpf).length === 11
+        : normalizeCnpj(cnpj).length === 14 &&
+          companyLegalName.trim().length >= 3 &&
+          orderResponsibleName.trim().length >= 3;
+
     return (
-      name.trim().length >= 3 &&
-      !/\d/.test(name) &&
+      hasValidPerson &&
       normalizePhone(phone).length >= 10 &&
-      normalizeCpf(cpf).length === 11 &&
       street.trim().length >= 3 &&
       number.trim().length >= 1 &&
       district.trim().length >= 2 &&
@@ -425,7 +452,7 @@ const Cadastro: React.FC = () => {
       howFoundUs.trim().length > 0 &&
       (!requiresDetails || howFoundUsDetails.trim().length >= 3)
     );
-  }, [name, phone, cpf, street, number, district, deliveryRegion, city, state, howFoundUs, howFoundUsDetails, requiresDetails]);
+  }, [customerType, name, phone, cpf, cnpj, companyLegalName, orderResponsibleName, street, number, district, deliveryRegion, city, state, howFoundUs, howFoundUsDetails, requiresDetails]);
 
   useBeforeUnload(
     useCallback((event) => {
@@ -526,7 +553,7 @@ const Cadastro: React.FC = () => {
     setError("");
 
     if (!canSubmit) {
-      setError("Preencha nome, telefone, CPF, endereço completo, região de entrega e como conheceu a gente.");
+      setError("Preencha os dados obrigatórios do cliente, telefone, endereço completo, região de entrega e como conheceu a gente.");
       return;
     }
 
@@ -534,9 +561,15 @@ const Cadastro: React.FC = () => {
 
     try {
       const customer = await signupCustomer({
-        full_name: name,
+        customer_type: customerType,
+        full_name: customerType === "pessoa_juridica" ? orderResponsibleName : name,
         phone,
-        document_cpf: cpf,
+        document_cpf: customerType === "pessoa_fisica" ? cpf : "",
+        document_cnpj: customerType === "pessoa_juridica" ? cnpj : "",
+        company_legal_name: companyLegalName,
+        company_trade_name: companyTradeName,
+        state_registration: stateRegistration,
+        order_responsible_name: orderResponsibleName,
         cep,
         address: fullAddress,
         city: deliveryRegion,
@@ -551,6 +584,7 @@ const Cadastro: React.FC = () => {
         documentCpf: customer.document_cpf,
         metadata: {
           deliveryRegion,
+          customerType,
           howFoundUs,
           howFoundUsDetails: requiresDetails ? howFoundUsDetails.trim() : "",
         },
@@ -617,7 +651,7 @@ const Cadastro: React.FC = () => {
           handleLeavePage("/login", {
             redirectTo,
             prefilledPhone: normalizePhone(phone),
-            prefilledCpf: normalizeCpf(cpf),
+            prefilledCpf: customerType === "pessoa_juridica" ? normalizeCnpj(cnpj) : normalizeCpf(cpf),
           })
         }
       >
@@ -643,21 +677,110 @@ const Cadastro: React.FC = () => {
         <Form onSubmit={handleSubmit} noValidate>
           <SectionsGrid>
             <SectionCard>
-              <SectionTitle>Dados pessoais</SectionTitle>
+              <SectionTitle>{customerType === "pessoa_juridica" ? "Dados da empresa" : "Dados pessoais"}</SectionTitle>
               <Fields>
                 <Field>
-                  <Label htmlFor="name">Nome completo</Label>
+                  <Label htmlFor="customerType">Tipo de cliente</Label>
                   <InputShell>
-                    <TextInput
-                      id="name"
-                      value={name}
-                      onChange={(e) => setName(sanitizeName(e.target.value))}
-                      placeholder="Seu nome"
-                      autoComplete="name"
+                    <SelectInput
+                      id="customerType"
+                      value={customerType}
+                      onChange={(e) => setCustomerType(e.target.value === "pessoa_juridica" ? "pessoa_juridica" : "pessoa_fisica")}
                       disabled={submitting}
-                    />
+                    >
+                      <option value="pessoa_fisica">Pessoa física</option>
+                      <option value="pessoa_juridica">Pessoa jurídica</option>
+                    </SelectInput>
                   </InputShell>
                 </Field>
+
+                {customerType === "pessoa_juridica" ? (
+                  <>
+                    <Field>
+                      <Label htmlFor="companyLegalName">Razão social</Label>
+                      <InputShell>
+                        <TextInput
+                          id="companyLegalName"
+                          value={companyLegalName}
+                          onChange={(e) => setCompanyLegalName(e.target.value)}
+                          placeholder="Razão social"
+                          autoComplete="organization"
+                          disabled={submitting}
+                        />
+                      </InputShell>
+                    </Field>
+
+                    <TwoColumns>
+                      <Field>
+                        <Label htmlFor="cnpj">CNPJ</Label>
+                        <InputShell>
+                          <TextInput
+                            id="cnpj"
+                            value={formatCNPJ(cnpj)}
+                            onChange={(e) => setCnpj(e.target.value)}
+                            placeholder="00.000.000/0000-00"
+                            inputMode="numeric"
+                            disabled={submitting}
+                          />
+                        </InputShell>
+                      </Field>
+
+                      <Field>
+                        <Label htmlFor="stateRegistration">Inscrição estadual</Label>
+                        <InputShell>
+                          <TextInput
+                            id="stateRegistration"
+                            value={stateRegistration}
+                            onChange={(e) => setStateRegistration(e.target.value)}
+                            placeholder="Isento, se aplicável"
+                            disabled={submitting}
+                          />
+                        </InputShell>
+                      </Field>
+                    </TwoColumns>
+
+                    <Field>
+                      <Label htmlFor="companyTradeName">Nome fantasia</Label>
+                      <InputShell>
+                        <TextInput
+                          id="companyTradeName"
+                          value={companyTradeName}
+                          onChange={(e) => setCompanyTradeName(e.target.value)}
+                          placeholder="Nome fantasia"
+                          disabled={submitting}
+                        />
+                      </InputShell>
+                    </Field>
+
+                    <Field>
+                      <Label htmlFor="orderResponsibleName">Responsável pelo pedido</Label>
+                      <InputShell>
+                        <TextInput
+                          id="orderResponsibleName"
+                          value={orderResponsibleName}
+                          onChange={(e) => setOrderResponsibleName(sanitizeName(e.target.value))}
+                          placeholder="Nome do responsável"
+                          autoComplete="name"
+                          disabled={submitting}
+                        />
+                      </InputShell>
+                    </Field>
+                  </>
+                ) : (
+                  <Field>
+                    <Label htmlFor="name">Nome completo</Label>
+                    <InputShell>
+                      <TextInput
+                        id="name"
+                        value={name}
+                        onChange={(e) => setName(sanitizeName(e.target.value))}
+                        placeholder="Seu nome"
+                        autoComplete="name"
+                        disabled={submitting}
+                      />
+                    </InputShell>
+                  </Field>
+                )}
 
                 <TwoColumns>
                   <Field>
@@ -675,19 +798,21 @@ const Cadastro: React.FC = () => {
                     </InputShell>
                   </Field>
 
-                  <Field>
-                    <Label htmlFor="cpf">CPF</Label>
-                    <InputShell>
-                      <TextInput
-                        id="cpf"
-                        value={formatCPF(cpf)}
-                        onChange={(e) => setCpf(e.target.value)}
-                        placeholder="000.000.000-00"
-                        inputMode="numeric"
-                        disabled={submitting}
-                      />
-                    </InputShell>
-                  </Field>
+                  {customerType === "pessoa_fisica" ? (
+                    <Field>
+                      <Label htmlFor="cpf">CPF</Label>
+                      <InputShell>
+                        <TextInput
+                          id="cpf"
+                          value={formatCPF(cpf)}
+                          onChange={(e) => setCpf(e.target.value)}
+                          placeholder="000.000.000-00"
+                          inputMode="numeric"
+                          disabled={submitting}
+                        />
+                      </InputShell>
+                    </Field>
+                  ) : null}
                 </TwoColumns>
 
                 <Field>
@@ -884,7 +1009,7 @@ const Cadastro: React.FC = () => {
                 handleLeavePage("/login", {
                   redirectTo,
                   prefilledPhone: normalizePhone(phone),
-                  prefilledCpf: normalizeCpf(cpf),
+                  prefilledCpf: customerType === "pessoa_juridica" ? normalizeCnpj(cnpj) : normalizeCpf(cpf),
                 })
               }
               disabled={submitting}

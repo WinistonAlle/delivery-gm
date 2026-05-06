@@ -42,7 +42,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { getLocalTheme, type AppThemeKey } from "@/lib/appTheme";
 import { buildUpsellCombos } from "@/lib/upsell";
-import { mapCatalogProductRow, isVisibleCatalogProduct } from "@/lib/catalogProducts";
+import { attachProductPriceRows, mapCatalogProductRow, isVisibleCatalogProduct } from "@/lib/catalogProducts";
 import {
   getCustomerSession,
   logoutCustomerSession,
@@ -121,6 +121,23 @@ const BF_TICKER_ITEMS = [
   "Black Friday", "Promo", "Promoções Imperdíveis",
   "Peça Agora", "Ofertas", "Só Hoje",
 ];
+
+async function attachPriceTables(products: Product[]) {
+  const ids = products.map((product) => String(product.id)).filter(Boolean);
+  if (!ids.length) return products;
+
+  try {
+    const { data, error } = await supabase
+      .from("product_prices")
+      .select("product_id, price_table, price")
+      .in("product_id", ids);
+
+    if (error || !data) return products;
+    return attachProductPriceRows(products, data);
+  } catch {
+    return products;
+  }
+}
 
 const COPA_CONFETTI = [
   { left: "4%",  delay: "0s",    duration: "3.0s", color: "#16a34a", drift: "14px",  w: "7px",  h: "13px" },
@@ -936,9 +953,10 @@ const Index: React.FC = () => {
         }
 
         if (isMounted && data) {
-          const mapped: Product[] = (data as ProductRow[])
+          const mappedBase: Product[] = (data as ProductRow[])
             .map(mapCatalogProductRow)
             .filter(isVisibleCatalogProduct);
+          const mapped = await attachPriceTables(mappedBase);
 
           setProducts(mapped);
 
@@ -1032,10 +1050,11 @@ const Index: React.FC = () => {
               const byId = new Map<string, ProductRow>();
               (prods as ProductRow[]).forEach((p) => byId.set(String(p.id), p));
 
-              const mappedManual = ordered
+              const mappedManualBase = ordered
                 .map((r) => byId.get(String(r.product_id)))
                 .filter(Boolean)
                 .map(mapCatalogProductRow);
+              const mappedManual = await attachPriceTables(mappedManualBase);
 
               if (mappedManual.length > 0) {
                 setFeaturedProducts(mappedManual);

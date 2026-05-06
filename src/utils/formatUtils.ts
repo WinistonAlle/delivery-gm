@@ -18,6 +18,21 @@ export const formatCPF = (value: string): string => {
 };
 
 /**
+ * Formats a string as a CNPJ with mask: 00.000.000/0000-00
+ */
+export const formatCNPJ = (value: string): string => {
+  const digits = value.replace(/\D/g, "");
+
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 5) return `${digits.slice(0, 2)}.${digits.slice(2)}`;
+  if (digits.length <= 8) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5)}`;
+  if (digits.length <= 12) {
+    return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8)}`;
+  }
+  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12, 14)}`;
+};
+
+/**
  * Formats a string as a CEP (Brazilian ZIP code) with mask: 00000-000
  */
 export const formatCEP = (value: string): string => {

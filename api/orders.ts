@@ -12,13 +12,19 @@ import {
   meetsMinimumOrder,
   normalizeMatch,
 } from "../shared/orderRules";
-import { getDisplayProductPrice } from "../shared/productPricing";
+import {
+  getActivePriceTable,
+  getProductPrice,
+  getRetailProductPrice,
+  type PriceTable,
+} from "../shared/productPricing";
 
 type ProductSnapshot = {
   id: string;
   old_id?: number | null;
   name: string;
   employee_price: number;
+  price_tables?: Partial<Record<PriceTable, number>>;
   sale_type?: "kg" | "pct" | null;
   weight?: number | null;
   is_package?: boolean | null;
@@ -29,7 +35,17 @@ type ProductSnapshot = {
 type CreateOrderParams = {
   customerPhone: string;
   customerName: string;
+  customerType?: "pessoa_fisica" | "pessoa_juridica";
+  customerDocument?: string;
   customerDocumentCpf?: string;
+  customerDocumentCnpj?: string;
+  companyLegalName?: string;
+  companyTradeName?: string;
+  stateRegistration?: string;
+  orderResponsibleName?: string;
+  priceTableUsed?: PriceTable;
+  subtotalProducts?: number;
+  retailSubtotalProducts?: number;
   customerAddress?: string;
   customerCity?: string;
   customerCep?: string;
@@ -99,7 +115,17 @@ function normalizePayload(body: unknown): CreateOrderParams {
   return {
     customerPhone: String(payload.customerPhone ?? "").replace(/\D/g, ""),
     customerName: String(payload.customerName ?? "").trim(),
+    customerType: payload.customerType === "pessoa_juridica" ? "pessoa_juridica" : "pessoa_fisica",
+    customerDocument: String(payload.customerDocument ?? "").replace(/\D/g, ""),
     customerDocumentCpf: String(payload.customerDocumentCpf ?? "").replace(/\D/g, "").slice(0, 11),
+    customerDocumentCnpj: String(payload.customerDocumentCnpj ?? "").replace(/\D/g, "").slice(0, 14),
+    companyLegalName: String(payload.companyLegalName ?? "").trim(),
+    companyTradeName: String(payload.companyTradeName ?? "").trim(),
+    stateRegistration: String(payload.stateRegistration ?? "").trim(),
+    orderResponsibleName: String(payload.orderResponsibleName ?? "").trim(),
+    priceTableUsed: payload.priceTableUsed === "atacado_2" ? "atacado_2" : "varejo",
+    subtotalProducts: Number(payload.subtotalProducts ?? 0),
+    retailSubtotalProducts: Number(payload.retailSubtotalProducts ?? 0),
     customerAddress: String(payload.customerAddress ?? "").trim(),
     customerCity: String(payload.customerCity ?? "").trim(),
     customerCep: String(payload.customerCep ?? "").replace(/\D/g, "").slice(0, 8),
@@ -244,7 +270,14 @@ async function createOrderInDatabase(params: CreateOrderParams) {
   const {
     customerPhone,
     customerName,
+    customerType = "pessoa_fisica",
+    customerDocument,
     customerDocumentCpf,
+    customerDocumentCnpj,
+    companyLegalName,
+    companyTradeName,
+    stateRegistration,
+    orderResponsibleName,
     customerAddress,
     customerCity,
     customerCep,
@@ -254,7 +287,21 @@ async function createOrderInDatabase(params: CreateOrderParams) {
     items,
   } = params;
 
+  const normalizedCustomerType = customerType === "pessoa_juridica" ? "pessoa_juridica" : "pessoa_fisica";
+  const normalizedDocument =
+    normalizedCustomerType === "pessoa_juridica"
+      ? String(customerDocumentCnpj || customerDocument || "").replace(/\D/g, "").slice(0, 14)
+      : String(customerDocumentCpf || customerDocument || "").replace(/\D/g, "").slice(0, 11);
+
   if (!customerName || customerName.length < 3) throw new Error("Nome do cliente inválido.");
+  if (normalizedCustomerType === "pessoa_fisica" && normalizedDocument.length !== 11) {
+    throw new Error("CPF do cliente inválido.");
+  }
+  if (normalizedCustomerType === "pessoa_juridica") {
+    if (normalizedDocument.length !== 14) throw new Error("CNPJ do cliente inválido.");
+    if (String(companyLegalName ?? "").trim().length < 3) throw new Error("Razão social inválida.");
+    if (String(orderResponsibleName ?? "").trim().length < 3) throw new Error("Responsável pelo pedido inválido.");
+  }
   if (!customerPhone || customerPhone.length < 10) throw new Error("Telefone do cliente inválido.");
   if (!customerAddress || customerAddress.length < 6) throw new Error("Endereço de entrega inválido.");
   if (!customerCity || customerCity.length < 2) throw new Error("Cidade de entrega inválida.");
@@ -264,8 +311,13 @@ async function createOrderInDatabase(params: CreateOrderParams) {
   if (!items.length) throw new Error("Nenhum item no carrinho.");
 
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+  const retailItemsTotal = items.reduce(
+    (sum, item) => sum + getRetailProductPrice(item.product) * item.quantity,
+    0
+  );
+  const activePriceTable = getActivePriceTable(retailItemsTotal);
   const itemsTotal = items.reduce(
-    (sum, item) => sum + getDisplayProductPrice(item.product) * item.quantity,
+    (sum, item) => sum + getProductPrice(item.product, activePriceTable) * item.quantity,
     0
   );
   const packageCount = items.reduce((sum, item) => {
@@ -294,7 +346,7 @@ async function createOrderInDatabase(params: CreateOrderParams) {
   const baseOrderPayload = {
     order_number: orderNumber,
     customer_phone: customerPhone,
-    customer_document_cpf: customerDocumentCpf || null,
+    customer_document_cpf: normalizedCustomerType === "pessoa_fisica" ? normalizedDocument : null,
     customer_address: customerAddress || null,
     customer_city: customerCity || null,
     customer_cep: customerCep || null,
@@ -308,6 +360,16 @@ async function createOrderInDatabase(params: CreateOrderParams) {
     discount_cents: Math.round(safeDiscount * 100),
     metadata: {
       customer_name: customerName,
+      customer_type: normalizedCustomerType,
+      document: normalizedDocument,
+      customer_document_cnpj: normalizedCustomerType === "pessoa_juridica" ? normalizedDocument : null,
+      company_legal_name: companyLegalName || null,
+      company_trade_name: companyTradeName || null,
+      state_registration: stateRegistration || null,
+      order_responsible_name: orderResponsibleName || null,
+      price_table_used: activePriceTable,
+      subtotal_products: itemsTotal,
+      retail_subtotal_products: retailItemsTotal,
       items_total: itemsTotal,
       shipping_cost: normalizedShippingCost,
       discount: safeDiscount,
@@ -320,6 +382,12 @@ async function createOrderInDatabase(params: CreateOrderParams) {
     const nextSchemaPayload = {
       ...baseOrderPayload,
       customer_name: customerName,
+      customer_type: normalizedCustomerType,
+      customer_document: normalizedDocument,
+      price_table_used: activePriceTable,
+      subtotal_products: itemsTotal,
+      delivery_fee: normalizedShippingCost,
+      discount: safeDiscount,
       shipping_cost: normalizedShippingCost,
       shipping_cents: Math.round(normalizedShippingCost * 100),
     };
@@ -347,6 +415,12 @@ async function createOrderInDatabase(params: CreateOrderParams) {
       const message = String(nextSchemaResult.error.message || "").toLowerCase();
       const missingColumn =
         message.includes("customer_name") ||
+        message.includes("customer_type") ||
+        message.includes("customer_document") ||
+        message.includes("price_table_used") ||
+        message.includes("subtotal_products") ||
+        message.includes("delivery_fee") ||
+        message.includes("discount") ||
         message.includes("shipping_cost") ||
         message.includes("shipping_cents");
 
@@ -367,19 +441,48 @@ async function createOrderInDatabase(params: CreateOrderParams) {
 
     if (!order) throw new Error("Erro ao criar pedido.");
 
-    const itemsPayload = items.map((item) => ({
+    const itemsPayload = items.map((item) => {
+      const unitPrice = getProductPrice(item.product, activePriceTable);
+      const originalRetailPrice = getRetailProductPrice(item.product);
+      return {
       order_id: order.id,
       product_id: item.product.id,
       product_old_id: item.product.old_id ?? null,
       product_name: item.product.name,
-      unit_price: getDisplayProductPrice(item.product),
+      unit_price: unitPrice,
       quantity: item.quantity,
-    }));
+      original_retail_price: originalRetailPrice,
+      price_table_used: activePriceTable,
+      total_item_price: unitPrice * item.quantity,
+      metadata: {
+        original_retail_price: originalRetailPrice,
+        price_table_used: activePriceTable,
+        total_item_price: unitPrice * item.quantity,
+      },
+      };
+    });
 
     const { error: itemsError } = await supabase.from("order_items").insert(itemsPayload);
     if (itemsError) {
-      await supabase.from("orders").delete().eq("id", order.id);
-      throw itemsError;
+      const message = String(itemsError.message || "").toLowerCase();
+      const missingItemColumn =
+        message.includes("original_retail_price") ||
+        message.includes("price_table_used") ||
+        message.includes("total_item_price");
+
+      if (!missingItemColumn) {
+        await supabase.from("orders").delete().eq("id", order.id);
+        throw itemsError;
+      }
+
+      const legacyItemsPayload = itemsPayload.map(
+        ({ original_retail_price, price_table_used, total_item_price, ...item }) => item
+      );
+      const { error: legacyItemsError } = await supabase.from("order_items").insert(legacyItemsPayload);
+      if (legacyItemsError) {
+        await supabase.from("orders").delete().eq("id", order.id);
+        throw legacyItemsError;
+      }
     }
 
     return {
@@ -416,12 +519,40 @@ async function resolveOrderItems(
         old_id: row.old_id ?? null,
         name: String(row.name ?? ""),
         employee_price: Number(row.employee_price ?? 0),
+        price_tables: {
+          varejo: Number(row.employee_price ?? 0),
+        },
         sale_type: row.sale_type === "pct" ? "pct" : "kg",
         weight: Number(row.weight ?? 0),
         is_package: row.is_package ?? null,
         package_info: String(row.package_info ?? ""),
         in_stock: row.in_stock !== false,
       });
+  }
+
+  try {
+    const { data: priceRows, error: priceRowsError } = await supabase
+      .from("product_prices")
+      .select("product_id, price_table, price")
+      .in("product_id", uniqueIds);
+
+    if (!priceRowsError) {
+      for (const row of priceRows ?? []) {
+        const productId = String(row.product_id ?? "");
+        const table = String(row.price_table ?? "");
+        const product = productMap.get(productId);
+        if (!product || (table !== "varejo" && table !== "atacado_2")) continue;
+        const price = Number(row.price ?? 0);
+        if (!Number.isFinite(price) || price <= 0) continue;
+        product.price_tables = {
+          ...(product.price_tables ?? {}),
+          [table]: price,
+        };
+        if (table === "varejo") product.employee_price = price;
+      }
+    }
+  } catch {
+    // product_prices is optional during rollout; employee_price remains the retail fallback.
   }
 
   return items.map((item) => {
@@ -463,7 +594,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ...payload,
       customerPhone: session.phone,
       customerName: payload.customerName || session.full_name,
-      customerDocumentCpf: session.document_cpf || payload.customerDocumentCpf,
+      customerType: payload.customerType ?? session.customer_type ?? "pessoa_fisica",
+      customerDocument: payload.customerDocument,
+      customerDocumentCpf: payload.customerDocumentCpf || session.document_cpf,
+      customerDocumentCnpj: payload.customerDocumentCnpj || session.document_cnpj,
+      companyLegalName: payload.companyLegalName || session.company_legal_name,
+      companyTradeName: payload.companyTradeName || session.company_trade_name,
+      stateRegistration: payload.stateRegistration || session.state_registration,
+      orderResponsibleName: payload.orderResponsibleName || session.order_responsible_name,
       items: safeItems,
     };
 
@@ -474,6 +612,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         fullName: normalizedPayload.customerName,
         phone: session.phone,
         documentCpf: normalizedPayload.customerDocumentCpf,
+        customerType: normalizedPayload.customerType,
+        documentCnpj: normalizedPayload.customerDocumentCnpj,
+        companyLegalName: normalizedPayload.companyLegalName,
+        companyTradeName: normalizedPayload.companyTradeName,
+        stateRegistration: normalizedPayload.stateRegistration,
+        orderResponsibleName: normalizedPayload.orderResponsibleName,
         cep: normalizedPayload.customerCep,
         address: normalizedPayload.customerAddress,
         city: normalizedPayload.customerCity,

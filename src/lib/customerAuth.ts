@@ -1,8 +1,14 @@
 export type CustomerRecord = {
   id: string;
+  customer_type?: "pessoa_fisica" | "pessoa_juridica";
   full_name: string;
   phone: string;
   document_cpf: string;
+  document_cnpj?: string;
+  company_legal_name?: string;
+  company_trade_name?: string;
+  state_registration?: string;
+  order_responsible_name?: string;
   cep?: string;
   city?: string;
   address: string;
@@ -23,11 +29,17 @@ export type SavedCustomerAddress = {
 
 export type CustomerSession = {
   id: string;
+  customer_type?: "pessoa_fisica" | "pessoa_juridica";
   full_name: string;
   name: string;
   cpf: string;
   phone: string;
   document_cpf: string;
+  document_cnpj?: string;
+  company_legal_name?: string;
+  company_trade_name?: string;
+  state_registration?: string;
+  order_responsible_name?: string;
   cep: string;
   city: string;
   address: string;
@@ -49,6 +61,7 @@ let memoryHydrated = false;
 
 export const normalizePhone = (value: string) => value.replace(/\D/g, "");
 export const normalizeCpf = (value: string) => value.replace(/\D/g, "").slice(0, 11);
+export const normalizeCnpj = (value: string) => value.replace(/\D/g, "").slice(0, 14);
 
 function normalizeAdminPhone(value: string) {
   const digits = normalizePhone(value);
@@ -68,11 +81,17 @@ function parseStoredSession(raw: string | null): CustomerSession | null {
 
     return {
       id: String(parsed.id ?? ""),
+      customer_type: parsed.customer_type === "pessoa_juridica" ? "pessoa_juridica" : "pessoa_fisica",
       full_name: String(parsed.full_name ?? parsed.name ?? ""),
       name: String(parsed.name ?? parsed.full_name ?? ""),
       cpf: normalizePhone(String(parsed.cpf ?? parsed.phone ?? "")),
       phone: normalizePhone(String(parsed.phone ?? parsed.cpf ?? "")),
       document_cpf: normalizeCpf(String(parsed.document_cpf ?? "")),
+      document_cnpj: normalizeCnpj(String(parsed.document_cnpj ?? "")),
+      company_legal_name: String(parsed.company_legal_name ?? ""),
+      company_trade_name: String(parsed.company_trade_name ?? ""),
+      state_registration: String(parsed.state_registration ?? ""),
+      order_responsible_name: String(parsed.order_responsible_name ?? ""),
       cep: String(parsed.cep ?? "").replace(/\D/g, "").slice(0, 8),
       city: String(parsed.city ?? "").trim(),
       address: String(parsed.address ?? ""),
@@ -194,9 +213,15 @@ export function getCustomers(): CustomerRecord[] {
       const legacyCpf = normalizeCpf(String(item?.cpf ?? ""));
       return {
         id: String(item?.id ?? `customer-${phone || Date.now()}`),
+        customer_type: item?.customer_type === "pessoa_juridica" ? "pessoa_juridica" : "pessoa_fisica",
         full_name: String(item?.full_name ?? ""),
         phone,
         document_cpf: normalizeCpf(String(item?.document_cpf ?? legacyCpf)),
+        document_cnpj: normalizeCnpj(String(item?.document_cnpj ?? "")),
+        company_legal_name: String(item?.company_legal_name ?? ""),
+        company_trade_name: String(item?.company_trade_name ?? ""),
+        state_registration: String(item?.state_registration ?? ""),
+        order_responsible_name: String(item?.order_responsible_name ?? ""),
         cep: String(item?.cep ?? "").replace(/\D/g, "").slice(0, 8),
         city: String(item?.city ?? "").trim(),
         address: String(item?.address ?? ""),
@@ -258,10 +283,16 @@ export function upsertCustomer(record: Omit<CustomerRecord, "id" | "created_at">
     const dedup = Array.from(new Set([...baseAddresses, record.address.trim()]));
     const updated: CustomerRecord = {
       ...existing,
+      customer_type: record.customer_type ?? "pessoa_fisica",
       full_name: record.full_name.trim(),
       address: record.address.trim(),
       phone,
       document_cpf: documentCpf,
+      document_cnpj: normalizeCnpj(record.document_cnpj ?? ""),
+      company_legal_name: record.company_legal_name?.trim() ?? "",
+      company_trade_name: record.company_trade_name?.trim() ?? "",
+      state_registration: record.state_registration?.trim() ?? "",
+      order_responsible_name: record.order_responsible_name?.trim() ?? "",
       cep,
       city,
       addresses: dedup,
@@ -274,9 +305,15 @@ export function upsertCustomer(record: Omit<CustomerRecord, "id" | "created_at">
 
   const created: CustomerRecord = {
     id: `customer-${phone || Date.now()}`,
+    customer_type: record.customer_type ?? "pessoa_fisica",
     full_name: record.full_name.trim(),
     phone,
     document_cpf: documentCpf,
+    document_cnpj: normalizeCnpj(record.document_cnpj ?? ""),
+    company_legal_name: record.company_legal_name?.trim() ?? "",
+    company_trade_name: record.company_trade_name?.trim() ?? "",
+    state_registration: record.state_registration?.trim() ?? "",
+    order_responsible_name: record.order_responsible_name?.trim() ?? "",
     cep,
     city,
     address: record.address.trim(),
@@ -295,11 +332,17 @@ export function createCustomerSession(customer: CustomerRecord) {
   const isAdmin = isAdminPhone(cleanPhone);
   const session: CustomerSession = {
     id: customer.id,
+    customer_type: customer.customer_type ?? "pessoa_fisica",
     full_name: customer.full_name,
     name: customer.full_name,
     cpf: cleanPhone,
     phone: cleanPhone,
     document_cpf: customer.document_cpf,
+    document_cnpj: customer.document_cnpj ?? "",
+    company_legal_name: customer.company_legal_name ?? "",
+    company_trade_name: customer.company_trade_name ?? "",
+    state_registration: customer.state_registration ?? "",
+    order_responsible_name: customer.order_responsible_name ?? "",
     cep: customer.cep ?? "",
     city: customer.city ?? "",
     address: customer.address,
@@ -411,6 +454,7 @@ export async function syncCustomerSessionFromServer() {
 }
 
 export async function loginCustomer(params: { phone: string; cpf: string }) {
+  const documentDigits = normalizePhone(params.cpf).slice(0, 14);
   try {
     const response = await fetch(buildApiUrl("/api/auth/login"), {
       method: "POST",
@@ -420,7 +464,7 @@ export async function loginCustomer(params: { phone: string; cpf: string }) {
       },
       body: JSON.stringify({
         phone: normalizePhone(params.phone),
-        cpf: normalizeCpf(params.cpf),
+        cpf: documentDigits,
       }),
     });
 
@@ -437,9 +481,15 @@ export async function loginCustomer(params: { phone: string; cpf: string }) {
 }
 
 export async function signupCustomer(params: {
+  customer_type?: "pessoa_fisica" | "pessoa_juridica";
   full_name: string;
   phone: string;
   document_cpf: string;
+  document_cnpj?: string;
+  company_legal_name?: string;
+  company_trade_name?: string;
+  state_registration?: string;
+  order_responsible_name?: string;
   cep?: string;
   address: string;
   city?: string;
@@ -455,8 +505,10 @@ export async function signupCustomer(params: {
       },
       body: JSON.stringify({
         ...params,
+        customer_type: params.customer_type ?? "pessoa_fisica",
         phone: normalizePhone(params.phone),
         document_cpf: normalizeCpf(params.document_cpf),
+        document_cnpj: normalizeCnpj(params.document_cnpj ?? ""),
         cep: String(params.cep ?? "").replace(/\D/g, "").slice(0, 8),
       }),
     });

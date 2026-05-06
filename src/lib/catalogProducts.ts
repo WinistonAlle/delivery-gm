@@ -53,6 +53,12 @@ type ProductRow = Record<string, unknown> & {
   extra_info?: Product["extraInfo"] | null;
 };
 
+type ProductPriceRow = {
+  product_id?: string | null;
+  price_table?: string | null;
+  price?: number | string | null;
+};
+
 function isCategory(value: string): value is Category {
   return CATEGORY_VALUES.includes(value as Category);
 }
@@ -87,6 +93,9 @@ function resolveImages(row: ProductRow): string[] {
 export function mapCatalogProductRow(row: ProductRow): Product {
   const employeePrice = Number(row.employee_price ?? row.price ?? 0);
   const images = resolveImages(row);
+  const priceTables = {
+    varejo: employeePrice,
+  };
 
   return {
     id: String(row.id ?? ""),
@@ -94,6 +103,8 @@ export function mapCatalogProductRow(row: ProductRow): Product {
     name: String(row.name ?? ""),
     price: employeePrice,
     employee_price: employeePrice,
+    price_tables: priceTables,
+    priceTablePrices: priceTables,
     images,
     image_path: row.image_path ?? (images[0] ?? null),
     category: resolveCategory(row),
@@ -109,6 +120,40 @@ export function mapCatalogProductRow(row: ProductRow): Product {
   };
 }
 
+export function attachProductPriceRows(products: Product[], rows: ProductPriceRow[]) {
+  if (!rows.length) return products;
+
+  const pricesByProductId = new Map<string, Partial<Record<"varejo" | "atacado_2", number>>>();
+  for (const row of rows) {
+    const productId = String(row.product_id ?? "").trim();
+    const priceTable = String(row.price_table ?? "").trim();
+    if (!productId || (priceTable !== "varejo" && priceTable !== "atacado_2")) continue;
+
+    const price = Number(row.price ?? 0);
+    if (!Number.isFinite(price) || price <= 0) continue;
+
+    const current = pricesByProductId.get(productId) ?? {};
+    current[priceTable] = price;
+    pricesByProductId.set(productId, current);
+  }
+
+  return products.map((product) => {
+    const tablePrices = pricesByProductId.get(String(product.id)) ?? {};
+    const merged = {
+      varejo: tablePrices.varejo ?? product.employee_price ?? product.price,
+      ...tablePrices,
+    };
+
+    return {
+      ...product,
+      price: merged.varejo ?? product.price,
+      employee_price: merged.varejo ?? product.employee_price,
+      price_tables: merged,
+      priceTablePrices: merged,
+    };
+  });
+}
+
 export function isVisibleCatalogProduct(product: Product) {
   return product.extraInfo?.hidden !== true;
 }
@@ -116,4 +161,3 @@ export function isVisibleCatalogProduct(product: Product) {
 export function mapVisibleCatalogProducts(rows: ProductRow[]) {
   return rows.map(mapCatalogProductRow).filter(isVisibleCatalogProduct);
 }
-

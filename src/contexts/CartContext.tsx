@@ -5,7 +5,12 @@ import { deriveIsPackage, deriveWeightKg } from "@/utils/productMetrics";
 import { trackCustomerEventOnce } from "@/lib/customerInsights";
 import { CUSTOMER_SESSION_EVENT, getCustomerSession } from "@/lib/customerAuth";
 import { meetsMinimumOrder as satisfiesMinimumOrder } from "../../shared/orderRules";
-import { getDisplayProductPrice } from "../../shared/productPricing";
+import {
+  getActivePriceTable,
+  getProductPrice,
+  getRetailProductPrice,
+  getWholesaleRemaining,
+} from "../../shared/productPricing";
 import { CartContext, type CartContextType, type AppliedCoupon } from "@/contexts/cart-store";
 
 // Gera uma assinatura do cliente atual pra separar os carrinhos.
@@ -116,9 +121,16 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [cartStorageKey, customerSignature]);
 
-  // 💰 Total do carrinho
+  const retailSubtotal = cartItems.reduce(
+    (total, item) => total + getRetailProductPrice(item.product) * item.quantity,
+    0
+  );
+  const activePriceTable = getActivePriceTable(retailSubtotal);
+  const wholesaleRemaining = getWholesaleRemaining(retailSubtotal);
+
+  // 💰 Total do carrinho com a tabela ativa
   const cartTotal = cartItems.reduce(
-    (total, item) => total + getDisplayProductPrice(item.product) * item.quantity,
+    (total, item) => total + getProductPrice(item.product, activePriceTable) * item.quantity,
     0
   );
 
@@ -316,6 +328,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({
     openCart,
     closeCart,
     cartTotal,
+    retailSubtotal,
+    activePriceTable,
+    wholesaleRemaining,
     itemsCount,
     freeShippingRemaining,
     totalWeight,

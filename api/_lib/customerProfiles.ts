@@ -2,11 +2,17 @@ import { getSupabaseAdminClient } from "./supabaseAdmin";
 
 export type ServerCustomerSession = {
   id: string;
+  customer_type?: "pessoa_fisica" | "pessoa_juridica";
   full_name: string;
   name: string;
   cpf: string;
   phone: string;
   document_cpf: string;
+  document_cnpj?: string;
+  company_legal_name?: string;
+  company_trade_name?: string;
+  state_registration?: string;
+  order_responsible_name?: string;
   cep: string;
   city: string;
   address: string;
@@ -59,6 +65,7 @@ type DeliveryCustomerRow = {
   primary_address: string | null;
   how_found_us: string | null;
   how_found_us_details: string | null;
+  metadata?: Record<string, unknown> | null;
 };
 
 type DeliveryCustomerAddressRow = {
@@ -81,7 +88,7 @@ export async function getCustomerProfileByPhone(phone: string): Promise<ServerCu
   const { data: customer, error: customerError } = await supabase
     .from("delivery_customers")
     .select(
-      "id, full_name, phone, document_cpf, primary_address, how_found_us, how_found_us_details"
+      "id, full_name, phone, document_cpf, primary_address, how_found_us, how_found_us_details, metadata"
     )
     .eq("phone", normalizedPhone)
     .maybeSingle<DeliveryCustomerRow>();
@@ -121,6 +128,9 @@ export async function getCustomerProfileByPhone(phone: string): Promise<ServerCu
     new Set([addressLine, ...savedAddresses.map((item) => item.address)].filter(Boolean))
   );
   const role = isAdminPhone(normalizedPhone) ? "admin" : "customer";
+  const metadata = customer.metadata ?? {};
+  const customerType =
+    metadata.customer_type === "pessoa_juridica" ? "pessoa_juridica" : "pessoa_fisica";
 
   if (!savedAddresses.length && addressLine) {
     savedAddresses = [
@@ -137,11 +147,17 @@ export async function getCustomerProfileByPhone(phone: string): Promise<ServerCu
 
   return {
     id: String(customer.id),
+    customer_type: customerType,
     full_name: String(customer.full_name ?? "").trim(),
     name: String(customer.full_name ?? "").trim(),
     cpf: normalizedPhone,
     phone: normalizedPhone,
     document_cpf: onlyDigits(customer.document_cpf),
+    document_cnpj: onlyDigits(metadata.document_cnpj),
+    company_legal_name: String(metadata.company_legal_name ?? "").trim(),
+    company_trade_name: String(metadata.company_trade_name ?? "").trim(),
+    state_registration: String(metadata.state_registration ?? "").trim(),
+    order_responsible_name: String(metadata.order_responsible_name ?? "").trim(),
     cep: onlyDigits(primaryAddress?.cep),
     city: String(primaryAddress?.city ?? "").trim(),
     address: addressLine,
@@ -155,9 +171,15 @@ export async function getCustomerProfileByPhone(phone: string): Promise<ServerCu
 }
 
 type UpsertCustomerProfileParams = {
+  customerType?: "pessoa_fisica" | "pessoa_juridica";
   fullName: string;
   phone: string;
   documentCpf?: string;
+  documentCnpj?: string;
+  companyLegalName?: string;
+  companyTradeName?: string;
+  stateRegistration?: string;
+  orderResponsibleName?: string;
   cep?: string;
   address?: string;
   city?: string;
@@ -169,6 +191,12 @@ export async function upsertCustomerProfile(params: UpsertCustomerProfileParams)
   const fullName = String(params.fullName ?? "").trim();
   const phone = onlyDigits(params.phone);
   const documentCpf = onlyDigits(params.documentCpf);
+  const customerType = params.customerType === "pessoa_juridica" ? "pessoa_juridica" : "pessoa_fisica";
+  const documentCnpj = onlyDigits(params.documentCnpj).slice(0, 14);
+  const companyLegalName = String(params.companyLegalName ?? "").trim();
+  const companyTradeName = String(params.companyTradeName ?? "").trim();
+  const stateRegistration = String(params.stateRegistration ?? "").trim();
+  const orderResponsibleName = String(params.orderResponsibleName ?? "").trim();
   const cep = onlyDigits(params.cep).slice(0, 8);
   const address = String(params.address ?? "").trim();
   const city = String(params.city ?? "").trim();
@@ -177,7 +205,12 @@ export async function upsertCustomerProfile(params: UpsertCustomerProfileParams)
 
   if (fullName.length < 3) throw new Error("Nome do cliente inválido.");
   if (phone.length < 10) throw new Error("Telefone do cliente inválido.");
-  if (documentCpf.length !== 11) throw new Error("CPF do cliente inválido.");
+  if (customerType === "pessoa_fisica" && documentCpf.length !== 11) throw new Error("CPF do cliente inválido.");
+  if (customerType === "pessoa_juridica") {
+    if (documentCnpj.length !== 14) throw new Error("CNPJ do cliente inválido.");
+    if (companyLegalName.length < 3) throw new Error("Razão social inválida.");
+    if (orderResponsibleName.length < 3) throw new Error("Responsável pelo pedido inválido.");
+  }
 
   const supabase = getSupabaseAdminClient();
   const { data: existing, error: existingError } = await supabase
@@ -203,6 +236,14 @@ export async function upsertCustomerProfile(params: UpsertCustomerProfileParams)
         primary_address: address || null,
         how_found_us: howFoundUs || null,
         how_found_us_details: howFoundUsDetails || null,
+        metadata: {
+          customer_type: customerType,
+          document_cnpj: documentCnpj || null,
+          company_legal_name: companyLegalName || null,
+          company_trade_name: companyTradeName || null,
+          state_registration: stateRegistration || null,
+          order_responsible_name: orderResponsibleName || null,
+        },
       })
       .eq("id", customerId);
 
@@ -217,6 +258,14 @@ export async function upsertCustomerProfile(params: UpsertCustomerProfileParams)
         primary_address: address || null,
         how_found_us: howFoundUs || null,
         how_found_us_details: howFoundUsDetails || null,
+        metadata: {
+          customer_type: customerType,
+          document_cnpj: documentCnpj || null,
+          company_legal_name: companyLegalName || null,
+          company_trade_name: companyTradeName || null,
+          state_registration: stateRegistration || null,
+          order_responsible_name: orderResponsibleName || null,
+        },
       })
       .select("id")
       .single<{ id: string }>();
