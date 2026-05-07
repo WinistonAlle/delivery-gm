@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
   Home,
@@ -14,6 +15,7 @@ import {
   Minus,
   FileSpreadsheet,
   FileText,
+  Sparkles,
 } from "lucide-react";
 import {
   PieChart,
@@ -115,35 +117,6 @@ type DailySummary = {
 };
 
 type PeriodRange = "mes_atual" | "mes_anterior" | "ultimos_90";
-
-type CustomerEventRow = {
-  id: string;
-  visitor_id: string;
-  event_name: string;
-  customer_name: string | null;
-  phone: string | null;
-  document_cpf: string | null;
-  path: string | null;
-  created_at: string;
-};
-
-type VisitorFunnelSummary = {
-  uniqueVisitors: number;
-  registeredVisitors: number;
-  checkoutVisitors: number;
-  buyers: number;
-  visitorsWithoutPurchase: number;
-};
-
-type LeadWithoutPurchase = {
-  visitorId: string;
-  customerName: string | null;
-  phone: string | null;
-  documentCpf: string | null;
-  lastEventName: string;
-  lastPath: string | null;
-  lastSeenAt: string;
-};
 
 const formatCurrency = (value: number) =>
   (value || 0).toLocaleString("pt-BR", {
@@ -250,8 +223,6 @@ const ReportsPage: React.FC = () => {
   const [topProducts, setTopProducts] = useState<ProductSummary[]>([]);
   const [dailySummary, setDailySummary] = useState<DailySummary | null>(null);
   const [ordersRaw, setOrdersRaw] = useState<RawOrder[]>([]);
-  const [visitorFunnel, setVisitorFunnel] = useState<VisitorFunnelSummary | null>(null);
-  const [leadsWithoutPurchase, setLeadsWithoutPurchase] = useState<LeadWithoutPurchase[]>([]);
   const [currentRange, setCurrentRange] = useState<{
     start: string;
     end: string;
@@ -300,8 +271,6 @@ const ReportsPage: React.FC = () => {
           dailySummary: DailySummary | null;
           topCustomers: CustomerSummary[];
           topProducts: ProductSummary[];
-          visitorFunnel: VisitorFunnelSummary | null;
-          leadsWithoutPurchase: LeadWithoutPurchase[];
         }>({
           action: "overview",
           selectedRange,
@@ -314,8 +283,6 @@ const ReportsPage: React.FC = () => {
         setDailySummary(payload.dailySummary);
         setTopCustomers(payload.topCustomers);
         setTopProducts(payload.topProducts);
-        setVisitorFunnel(payload.visitorFunnel);
-        setLeadsWithoutPurchase(payload.leadsWithoutPurchase);
       } catch (err: unknown) {
         console.error("Erro inesperado ao carregar dashboard:", err);
         setError(
@@ -399,6 +366,36 @@ const ReportsPage: React.FC = () => {
       })),
     [topProducts]
   );
+
+  const recentOrdersTable = useMemo(
+    () =>
+      ordersRaw
+        .slice()
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 12),
+    [ordersRaw]
+  );
+
+  const monthComparisonChartData = useMemo(() => {
+    if (!monthComparison) return [];
+    return [
+      {
+        metric: "Pedidos",
+        mesA: monthComparison.month1.totalOrders,
+        mesB: monthComparison.month2.totalOrders,
+      },
+      {
+        metric: "Itens",
+        mesA: monthComparison.month1.totalItems,
+        mesB: monthComparison.month2.totalItems,
+      },
+      {
+        metric: "Ticket",
+        mesA: Math.round(monthComparison.month1.avgTicket),
+        mesB: Math.round(monthComparison.month2.avgTicket),
+      },
+    ];
+  }, [monthComparison]);
 
   const rangeLabel = useMemo(() => {
     if (selectedRange === "mes_atual") return "Mês atual";
@@ -636,28 +633,28 @@ const ReportsPage: React.FC = () => {
     monthOptions.find((m) => m.value === compareMonth2)?.label || "Mês B";
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-red-50 via-white to-gray-50 flex flex-col">
+    <div className="min-h-screen bg-[linear-gradient(180deg,#fff7f2_0%,#f8fafc_42%,#ffffff_100%)] flex flex-col">
       {/* HEADER */}
-      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-red-100/60">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-4">
+      <header className="sticky top-0 z-30 border-b border-red-100/70 bg-white/85 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate("/catalogo")}
-              className="rounded-full p-2 hover:bg-red-50 border border-red-100 transition"
+              className="rounded-2xl p-2 hover:bg-red-50 border border-red-100 transition"
             >
               <Home className="h-5 w-5 text-red-600" />
             </button>
 
             <div className="flex flex-col">
-              <span className="text-[11px] uppercase tracking-wide text-red-500 font-semibold">
-                Painel do catálogo
+              <span className="text-[11px] uppercase tracking-[0.14em] text-red-600 font-black">
+                Relatório comercial
               </span>
               <div className="flex items-center gap-2 flex-wrap">
                 <BarChart2 className="h-4 w-4 text-red-600" />
-                <h1 className="text-sm md:text-base font-semibold text-gray-900">
-                  Relatórios de pedidos
+                <h1 className="text-sm md:text-base font-black text-slate-950">
+                  Vendas do delivery
                 </h1>
-                <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-red-50 text-red-700 capitalize">
+                <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-red-50 text-red-700 capitalize font-bold">
                   <CalendarRange className="h-3 w-3" />
                   {monthName}
                 </span>
@@ -666,8 +663,8 @@ const ReportsPage: React.FC = () => {
           </div>
 
           <div className="hidden sm:flex flex-col items-end">
-            <span className="text-[11px] text-gray-400">Logado como</span>
-            <span className="text-xs font-medium text-gray-700 truncate max-w-[180px]">
+            <span className="text-[11px] text-slate-400">Logado como</span>
+            <span className="text-xs font-bold text-slate-700 truncate max-w-[180px]">
               {employeeName}
             </span>
           </div>
@@ -675,7 +672,7 @@ const ReportsPage: React.FC = () => {
       </header>
 
       {/* CONTEÚDO */}
-      <main className="flex-1 container mx-auto px-4 py-6 space-y-6">
+      <main className="mx-auto flex-1 w-full max-w-7xl px-4 py-6 space-y-6">
         {/* Estado de carregamento */}
         {loading && (
           <div className="flex flex-col items-center justify-center py-16 gap-3 text-gray-600 text-sm">
@@ -702,6 +699,82 @@ const ReportsPage: React.FC = () => {
         {/* Dashboard */}
         {!loading && !error && summary && (
           <>
+            <motion.section
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35 }}
+              className="overflow-hidden rounded-[28px] border border-red-100 bg-white shadow-[0_24px_70px_rgba(127,29,29,0.08)]"
+            >
+              <div className="grid gap-0 lg:grid-cols-[1.15fr_0.85fr]">
+                <div className="p-5 sm:p-6 lg:p-7">
+                  <div className="inline-flex w-fit items-center gap-2 rounded-full border border-red-100 bg-red-50 px-3 py-1 text-xs font-black uppercase tracking-[0.14em] text-red-700">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Vendas e margem de decisão
+                  </div>
+                  <h2 className="mt-4 text-2xl font-black tracking-tight text-slate-950 sm:text-4xl">
+                    Relatório de vendas do catálogo
+                  </h2>
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
+                    Concentre aqui pedidos, faturamento, ticket médio, clientes,
+                    produtos e comparativos. Funil e recuperação de contatos ficam
+                    na página de operação delivery.
+                  </p>
+
+                  <div className="mt-6 flex flex-wrap gap-2">
+                    {[
+                      ["mes_atual", "Mês atual"],
+                      ["mes_anterior", "Mês anterior"],
+                      ["ultimos_90", "Últimos 90 dias"],
+                    ].map(([key, label]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setSelectedRange(key as PeriodRange)}
+                        className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${
+                          selectedRange === key
+                            ? "bg-slate-950 text-white shadow-sm"
+                            : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t border-red-100 bg-[radial-gradient(circle_at_20%_20%,rgba(220,38,38,0.12),transparent_34%),linear-gradient(135deg,#fff,#fff7ed)] p-5 sm:p-6 lg:border-l lg:border-t-0 lg:p-7">
+                  <div className="rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm backdrop-blur">
+                    <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+                      Faturamento no recorte
+                    </p>
+                    <p className="mt-3 text-3xl font-black text-slate-950 sm:text-4xl">
+                      {formatCurrency(summary.totalRevenue)}
+                    </p>
+                    <p className="mt-2 text-sm text-slate-600">
+                      {summary.totalOrders} pedidos com ticket médio de{" "}
+                      <span className="font-black text-red-700">
+                        {formatCurrency(summary.avgTicket)}
+                      </span>
+                    </p>
+                    <div className="mt-4 grid grid-cols-2 gap-2">
+                      <div className="rounded-xl bg-slate-50 p-3">
+                        <p className="text-xs font-semibold text-slate-500">Itens</p>
+                        <p className="mt-1 text-lg font-black text-slate-950">
+                          {summary.totalItems}
+                        </p>
+                      </div>
+                      <div className="rounded-xl bg-slate-50 p-3">
+                        <p className="text-xs font-semibold text-slate-500">Período</p>
+                        <p className="mt-1 text-lg font-black text-slate-950">
+                          {rangeLabel}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.section>
+
             {/* Visão geral + filtro + ações */}
             <section className="space-y-3">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -738,49 +811,18 @@ const ReportsPage: React.FC = () => {
                     </button>
                   </div>
 
-                  {/* Filtro de período */}
-                  <div className="inline-flex items-center rounded-full border border-gray-200 bg-white p-1 text-[11px] shadow-sm overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedRange("mes_atual")}
-                      className={`px-3 py-1 rounded-full transition ${
-                        selectedRange === "mes_atual"
-                          ? "bg-red-500 text-white shadow-sm"
-                          : "text-gray-600 hover:bg-gray-50"
-                      }`}
-                    >
-                      Mês atual
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedRange("mes_anterior")}
-                      className={`px-3 py-1 rounded-full transition ${
-                        selectedRange === "mes_anterior"
-                          ? "bg-red-500 text-white shadow-sm"
-                          : "text-gray-600 hover:bg-gray-50"
-                      }`}
-                    >
-                      Mês anterior
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedRange("ultimos_90")}
-                      className={`px-3 py-1 rounded-full transition ${
-                        selectedRange === "ultimos_90"
-                          ? "bg-red-500 text-white shadow-sm"
-                          : "text-gray-600 hover:bg-gray-50"
-                      }`}
-                    >
-                      Últimos 90 dias
-                    </button>
-                  </div>
                 </div>
               </div>
 
               {/* Cards resumo do período */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Pedidos no período */}
-                <div className="relative overflow-hidden rounded-2xl bg-white/80 backdrop-blur-sm border border-red-100 shadow-sm shadow-red-50 p-4">
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.28, delay: 0.03 }}
+                  className="relative overflow-hidden rounded-2xl bg-white/90 backdrop-blur-sm border border-red-100 shadow-sm shadow-red-50 p-4 transition hover:-translate-y-0.5 hover:shadow-md"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-[11px] text-gray-500 mb-1">
@@ -805,10 +847,15 @@ const ReportsPage: React.FC = () => {
                       label="vs período anterior"
                     />
                   )}
-                </div>
+                </motion.div>
 
                 {/* Faturamento */}
-                <div className="relative overflow-hidden rounded-2xl bg-white/80 backdrop-blur-sm border border-emerald-100 shadow-sm shadow-emerald-50 p-4">
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.28, delay: 0.06 }}
+                  className="relative overflow-hidden rounded-2xl bg-white/90 backdrop-blur-sm border border-emerald-100 shadow-sm shadow-emerald-50 p-4 transition hover:-translate-y-0.5 hover:shadow-md"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-[11px] text-gray-500 mb-1">
@@ -833,10 +880,15 @@ const ReportsPage: React.FC = () => {
                       label="vs período anterior"
                     />
                   )}
-                </div>
+                </motion.div>
 
                 {/* Itens vendidos */}
-                <div className="relative overflow-hidden rounded-2xl bg-white/80 backdrop-blur-sm border border-sky-100 shadow-sm shadow-sky-50 p-4">
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.28, delay: 0.09 }}
+                  className="relative overflow-hidden rounded-2xl bg-white/90 backdrop-blur-sm border border-sky-100 shadow-sm shadow-sky-50 p-4 transition hover:-translate-y-0.5 hover:shadow-md"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-[11px] text-gray-500 mb-1">
@@ -860,10 +912,15 @@ const ReportsPage: React.FC = () => {
                       label="vs período anterior"
                     />
                   )}
-                </div>
+                </motion.div>
 
                 {/* Ticket médio */}
-                <div className="relative overflow-hidden rounded-2xl bg-white/80 backdrop-blur-sm border border-amber-100 shadow-sm shadow-amber-50 p-4">
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.28, delay: 0.12 }}
+                  className="relative overflow-hidden rounded-2xl bg-white/90 backdrop-blur-sm border border-amber-100 shadow-sm shadow-amber-50 p-4 transition hover:-translate-y-0.5 hover:shadow-md"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-[11px] text-gray-500 mb-1">
@@ -888,7 +945,7 @@ const ReportsPage: React.FC = () => {
                       label="vs período anterior"
                     />
                   )}
-                </div>
+                </motion.div>
               </div>
 
               {summary.totalOrders === 0 && (
@@ -901,77 +958,73 @@ const ReportsPage: React.FC = () => {
               )}
             </section>
 
-            {visitorFunnel ? (
-              <section className="space-y-3">
-                <div className="flex flex-col gap-1">
-                  <h2 className="text-sm font-semibold text-gray-800">
-                    Conversão do delivery
-                  </h2>
-                  <span className="text-[11px] text-gray-500">
-                    Visitantes rastreados no período e quem ainda não concluiu pedido.
+            {recentOrdersTable.length > 0 && (
+              <section className="rounded-2xl border border-gray-100 bg-white/90 p-4 shadow-sm">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h2 className="text-sm font-black text-slate-950">
+                      Tabela de pedidos recentes
+                    </h2>
+                    <p className="mt-1 text-[11px] text-gray-500">
+                      Últimos pedidos dentro do período selecionado.
+                    </p>
+                  </div>
+                  <span className="w-fit rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-600">
+                    {ordersRaw.length} pedido(s) no recorte
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
-                  <div className="rounded-2xl bg-white/80 backdrop-blur-sm border border-gray-100 shadow-sm p-4">
-                    <p className="text-[11px] text-gray-500 mb-1">Visitantes únicos</p>
-                    <p className="text-2xl font-bold text-gray-900">{visitorFunnel.uniqueVisitors}</p>
-                  </div>
-                  <div className="rounded-2xl bg-white/80 backdrop-blur-sm border border-blue-100 shadow-sm p-4">
-                    <p className="text-[11px] text-gray-500 mb-1">Cadastros</p>
-                    <p className="text-2xl font-bold text-gray-900">{visitorFunnel.registeredVisitors}</p>
-                  </div>
-                  <div className="rounded-2xl bg-white/80 backdrop-blur-sm border border-amber-100 shadow-sm p-4">
-                    <p className="text-[11px] text-gray-500 mb-1">Foram ao checkout</p>
-                    <p className="text-2xl font-bold text-gray-900">{visitorFunnel.checkoutVisitors}</p>
-                  </div>
-                  <div className="rounded-2xl bg-white/80 backdrop-blur-sm border border-emerald-100 shadow-sm p-4">
-                    <p className="text-[11px] text-gray-500 mb-1">Compraram</p>
-                    <p className="text-2xl font-bold text-gray-900">{visitorFunnel.buyers}</p>
-                  </div>
-                  <div className="rounded-2xl bg-white/80 backdrop-blur-sm border border-red-100 shadow-sm p-4">
-                    <p className="text-[11px] text-gray-500 mb-1">Entraram e não compraram</p>
-                    <p className="text-2xl font-bold text-gray-900">{visitorFunnel.visitorsWithoutPurchase}</p>
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-gray-100 bg-white/85 shadow-sm overflow-hidden">
-                  <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/70">
-                    <h3 className="text-sm font-semibold text-gray-800">
-                      Visitantes sem pedido concluído
-                    </h3>
-                  </div>
-                  {leadsWithoutPurchase.length === 0 ? (
-                    <div className="px-4 py-4 text-sm text-gray-500">
-                      Nenhum visitante sem compra registrado nesse período.
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-gray-100">
-                      {leadsWithoutPurchase.map((lead) => (
-                        <div key={lead.visitorId} className="px-4 py-3 text-sm">
-                          <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-                            <div>
-                              <div className="font-medium text-gray-900">
-                                {lead.customerName || "Visitante sem nome"}
-                              </div>
-                              <div className="text-gray-500">
-                                {lead.phone || "Sem telefone"} {lead.documentCpf ? `• CPF ${lead.documentCpf}` : ""}
-                              </div>
-                            </div>
-                            <div className="text-gray-500">
-                              {new Date(lead.lastSeenAt).toLocaleString("pt-BR")}
-                            </div>
-                          </div>
-                          <div className="mt-1 text-[12px] text-gray-500">
-                            Último evento: {lead.lastEventName} {lead.lastPath ? `• ${lead.lastPath}` : ""}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                <div className="mt-4 overflow-x-auto rounded-2xl border border-gray-100">
+                  <table className="w-full min-w-[820px] text-xs">
+                    <thead className="bg-gray-50 text-[10px] uppercase tracking-[0.12em] text-gray-500">
+                      <tr>
+                        <th className="px-3 py-3 text-left font-black">Data</th>
+                        <th className="px-3 py-3 text-left font-black">Cliente</th>
+                        <th className="px-3 py-3 text-left font-black">Telefone</th>
+                        <th className="px-3 py-3 text-right font-black">Itens</th>
+                        <th className="px-3 py-3 text-right font-black">Valor</th>
+                        <th className="px-3 py-3 text-left font-black">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {recentOrdersTable.map((order) => {
+                        const date = new Date(order.created_at);
+                        return (
+                          <tr key={order.id} className="transition hover:bg-red-50/50">
+                            <td className="px-3 py-3 text-gray-700">
+                              {date.toLocaleDateString("pt-BR")}{" "}
+                              <span className="text-gray-400">
+                                {date.toLocaleTimeString("pt-BR", {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </span>
+                            </td>
+                            <td className="px-3 py-3 font-bold text-gray-900">
+                              {order.customer_name || "Cliente não informado"}
+                            </td>
+                            <td className="px-3 py-3 font-mono text-gray-500">
+                              {order.customer_phone || "-"}
+                            </td>
+                            <td className="px-3 py-3 text-right font-bold text-gray-700">
+                              {order.total_items ?? 0}
+                            </td>
+                            <td className="px-3 py-3 text-right font-black text-gray-900">
+                              {formatCurrency(Number(order.total_value ?? 0))}
+                            </td>
+                            <td className="px-3 py-3">
+                              <span className="inline-flex rounded-full bg-gray-100 px-2 py-1 text-[10px] font-bold text-gray-600">
+                                {order.status || "-"}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </section>
-            ) : null}
+            )}
 
             {/* NOVA SEÇÃO: COMPARAÇÃO DE MESES */}
             <section className="space-y-3">
@@ -1142,6 +1195,30 @@ const ReportsPage: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {monthComparison && monthComparisonChartData.length > 0 && (
+                <div className="rounded-2xl bg-white/90 border border-gray-100 p-4 shadow-sm">
+                  <h3 className="text-sm font-black text-slate-950">
+                    Gráfico comparativo A vs B
+                  </h3>
+                  <p className="mt-1 text-[11px] text-gray-500">
+                    Pedidos, itens e ticket médio arredondado para leitura rápida.
+                  </p>
+                  <div className="mt-4 h-[280px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={monthComparisonChartData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                        <XAxis dataKey="metric" tick={{ fontSize: 11, fontWeight: 700 }} />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                        <RechartsTooltip />
+                        <Legend wrapperStyle={{ fontSize: 11 }} />
+                        <Bar dataKey="mesA" name={month1Label} fill="#dc2626" radius={[6, 6, 0, 0]} />
+                        <Bar dataKey="mesB" name={month2Label} fill="#0f766e" radius={[6, 6, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
             </section>
 
             {/* Resumo do dia */}
@@ -1354,6 +1431,64 @@ const ReportsPage: React.FC = () => {
                 )}
               </div>
             </section>
+
+            {topProducts.length > 0 && (
+              <section className="rounded-2xl border border-gray-100 bg-white/90 p-4 shadow-sm">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h2 className="text-sm font-black text-slate-950">
+                      Tabela comercial de produtos
+                    </h2>
+                    <p className="mt-1 text-[11px] text-gray-500">
+                      Ranking completo do período com quantidade, valor e participação estimada.
+                    </p>
+                  </div>
+                  <span className="w-fit rounded-full bg-sky-50 px-3 py-1 text-[11px] font-bold text-sky-700">
+                    Top {topProducts.length}
+                  </span>
+                </div>
+
+                <div className="mt-4 overflow-x-auto rounded-2xl border border-gray-100">
+                  <table className="w-full min-w-[760px] text-xs">
+                    <thead className="bg-gray-50 text-[10px] uppercase tracking-[0.12em] text-gray-500">
+                      <tr>
+                        <th className="px-3 py-3 text-left font-black">#</th>
+                        <th className="px-3 py-3 text-left font-black">Produto</th>
+                        <th className="px-3 py-3 text-right font-black">Qtd</th>
+                        <th className="px-3 py-3 text-right font-black">Total</th>
+                        <th className="px-3 py-3 text-right font-black">Participação</th>
+                        <th className="px-3 py-3 text-left font-black">ID</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {topProducts.map((prod, index) => {
+                        const share = summary.totalRevenue
+                          ? (Number(prod.totalValue || 0) / summary.totalRevenue) * 100
+                          : 0;
+                        return (
+                          <tr key={prod.productId ?? prod.productName ?? index} className="transition hover:bg-sky-50/50">
+                            <td className="px-3 py-3 font-black text-sky-700">{index + 1}</td>
+                            <td className="px-3 py-3 font-bold text-gray-900">{prod.productName}</td>
+                            <td className="px-3 py-3 text-right font-bold text-gray-700">
+                              {prod.totalQuantity}
+                            </td>
+                            <td className="px-3 py-3 text-right font-black text-gray-900">
+                              {formatCurrency(prod.totalValue)}
+                            </td>
+                            <td className="px-3 py-3 text-right text-gray-600">
+                              {share.toFixed(1)}%
+                            </td>
+                            <td className="px-3 py-3 font-mono text-gray-500">
+                              {prod.productId ? String(prod.productId) : "-"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
 
             {/* GRÁFICOS (pizza + barras) */}
             {(customerChartData.length > 0 || productChartData.length > 0) && (
